@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: CareerForge-AI
+careerforge:
+  model:
+    base-url: ${AI_MODEL_BASE_URL}
+    api-key: ${AI_MODEL_API_KEY}
+    name: ${AI_MODEL_NAME}
+server:
+  port: 8080
+# springdoc-openapi 项目配置
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html          # Swagger UI 访问路径
+    tags-sorter: alpha              # 标签按字母顺序排序
+    operations-sorter: alpha        # 操作按字母顺序排序
+  api-docs:
+    path: /v3/api-docs              # OpenAPI 文档访问路径
+
+# ===== Knife4j 配置（4.x 无需 @EnableKnife4j 注解）=====
+knife4j:
+  enable: true
+  openapi:                       # 纯 yaml 设置标题/版本，免写 OpenAPI @Bean
+    title: CareerForge-AI 接口文档
+    description: 职业锻造 AI 后端 API
+    version: 1.0.0
+    group:
+      default:
+        api-rule: package
+        api-rule-resources:
+          - com.leo.careerforgeai.controller
+          - com.leo.careerforgeai.career.api

@@ -1,11 +1,35 @@
 spring:
   application:
     name: CareerForge-AI
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
 careerforge:
   model:
     base-url: ${AI_MODEL_BASE_URL}
     api-key: ${AI_MODEL_API_KEY}
     name: ${AI_MODEL_NAME}
+  embedding:
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      model: ${OLLAMA_EMBEDDING_MODEL:qwen3-embedding:0.6b}
+      dimensions: ${OLLAMA_EMBEDDING_DIMENSIONS:1024}
+  # 面经/岗位JD 文档配置
+  knowledge:
+    source:
+      knowledge-base-id: careerforge-career-materials
+      root-directory: ${KNOWLEDGE_SOURCE_ROOT:/Users/zhengsmacbook/Desktop/AI 应用开发/AI应用开发/文档/AI应用开发}
+      documents:
+        - document-id: ai-job-jd-summary
+          document-name: AI应用开发_岗位JD汇总.md
+          document-type: JOB_DESCRIPTION
+          relative-path: AI应用开发_岗位JD汇总.md
+        - document-id: ai-interview-summary
+          document-name: AI应用开发_面经汇总.md
+          document-type: INTERVIEW_EXPERIENCE
+          relative-path: AI应用开发_面经汇总.md
+    chunking:
+      max-chunk-chars: ${RAG_CHUNK_MAX_CHARS:1000}
+      overlap-chars: ${RAG_CHUNK_OVERLAP_CHARS:120}
 server:
   port: 8080
 # springdoc-openapi 项目配置
@@ -20,7 +44,7 @@ springdoc:
 # ===== Knife4j 配置（4.x 无需 @EnableKnife4j 注解）=====
 knife4j:
   enable: true
-  openapi:                       # 纯 yaml 设置标题/版本，免写 OpenAPI @Bean
+  openapi: # 纯 yaml 设置标题/版本，免写 OpenAPI @Bean
     title: CareerForge-AI 接口文档
     description: 职业锻造 AI 后端 API
     version: 1.0.0
@@ -28,5 +52,5 @@ knife4j:
       default:
         api-rule: package
         api-rule-resources:
-          - com.leo.careerforgeai.controller
+          - com.leo.careerforgeai.model.api
           - com.leo.careerforgeai.career.api

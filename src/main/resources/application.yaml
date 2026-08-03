@@ -30,6 +30,9 @@ careerforge:
     chunking:
       max-chunk-chars: ${RAG_CHUNK_MAX_CHARS:1000}
       overlap-chars: ${RAG_CHUNK_OVERLAP_CHARS:120}
+    elasticsearch:
+      index-alias: ${RAG_INDEX_ALIAS:careerforge-knowledge}
+      index-version: ${RAG_INDEX_VERSION:v1}
 server:
   port: 8080
 # springdoc-openapi 项目配置

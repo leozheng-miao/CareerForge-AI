@@ -1,7 +1,9 @@
 package com.leo.careerforgeai.knowledge.infrastructure.document;
 
-import com.leo.careerforgeai.knowledge.domain.CleanedDocument;
-import com.leo.careerforgeai.knowledge.domain.SourceDocument;
+import com.leo.careerforgeai.knowledge.domain.document.CleanedDocument;
+import com.leo.careerforgeai.knowledge.domain.document.SourceDocument;
+import com.leo.careerforgeai.knowledge.infrastructure.document.cleaning.DocumentCleaner;
+import com.leo.careerforgeai.knowledge.infrastructure.document.loading.MarkdownDocumentLoader;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

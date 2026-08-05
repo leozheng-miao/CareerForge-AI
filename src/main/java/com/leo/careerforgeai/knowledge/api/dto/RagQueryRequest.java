@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.knowledge.api.dto;
 
-import com.leo.careerforgeai.knowledge.domain.KnowledgeDocumentType;
+import com.leo.careerforgeai.knowledge.domain.document.KnowledgeDocumentType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;

@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.knowledge.domain.answer;
 
-import com.leo.careerforgeai.knowledge.domain.DocumentChunk;
-import com.leo.careerforgeai.knowledge.domain.KnowledgeDocumentType;
+import com.leo.careerforgeai.knowledge.domain.document.DocumentChunk;
+import com.leo.careerforgeai.knowledge.domain.document.KnowledgeDocumentType;
 
 import java.util.List;
 

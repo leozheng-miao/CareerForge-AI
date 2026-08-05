@@ -1,9 +1,9 @@
 package com.leo.careerforgeai.knowledge.infrastructure.rerank;
 
-import com.leo.careerforgeai.knowledge.application.ChunkRerankException;
-import com.leo.careerforgeai.knowledge.domain.DocumentChunk;
-import com.leo.careerforgeai.knowledge.domain.KnowledgeDocumentType;
-import com.leo.careerforgeai.knowledge.domain.retrieval.ChunkRerankResult;
+import com.leo.careerforgeai.knowledge.application.rerank.ChunkRerankException;
+import com.leo.careerforgeai.knowledge.domain.document.DocumentChunk;
+import com.leo.careerforgeai.knowledge.domain.document.KnowledgeDocumentType;
+import com.leo.careerforgeai.knowledge.domain.rerank.ChunkRerankResult;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RrfRankedChunk;
 import com.leo.careerforgeai.model.application.ModelGateway;
 import com.leo.careerforgeai.model.domain.ModelOutputFormat;

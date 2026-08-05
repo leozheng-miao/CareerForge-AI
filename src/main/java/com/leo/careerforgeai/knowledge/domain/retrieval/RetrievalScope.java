@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.knowledge.domain.retrieval;
 
-import com.leo.careerforgeai.knowledge.domain.KnowledgeDocumentType;
+import com.leo.careerforgeai.knowledge.domain.document.KnowledgeDocumentType;
 
 import java.util.Objects;
 import java.util.Set;

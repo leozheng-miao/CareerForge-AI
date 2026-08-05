@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.knowledge.domain.context;
 
-import com.leo.careerforgeai.knowledge.domain.DocumentChunk;
+import com.leo.careerforgeai.knowledge.domain.document.DocumentChunk;
 
 import java.util.HashSet;
 import java.util.List;

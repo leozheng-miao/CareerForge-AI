@@ -1,8 +1,8 @@
 package com.leo.careerforgeai.knowledge.api.dto;
 
-import com.leo.careerforgeai.knowledge.application.RagQueryResult;
+import com.leo.careerforgeai.knowledge.application.query.RagQueryResult;
 import com.leo.careerforgeai.knowledge.domain.answer.RagAnswerStatus;
-import com.leo.careerforgeai.knowledge.domain.retrieval.RerankStatus;
+import com.leo.careerforgeai.knowledge.domain.rerank.RerankStatus;
 
 import java.util.List;
 

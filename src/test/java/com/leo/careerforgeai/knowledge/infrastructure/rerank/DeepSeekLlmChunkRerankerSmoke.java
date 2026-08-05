@@ -1,16 +1,15 @@
 package com.leo.careerforgeai.knowledge.infrastructure.rerank;
 
-import com.leo.careerforgeai.knowledge.application.ChunkReranker;
-import com.leo.careerforgeai.knowledge.application.ContextAssembler;
-import com.leo.careerforgeai.knowledge.application.KnowledgeRerankingService;
-import com.leo.careerforgeai.knowledge.application.KnowledgeRetrievalService;
+import com.leo.careerforgeai.knowledge.application.context.ContextAssembler;
+import com.leo.careerforgeai.knowledge.application.rerank.KnowledgeRerankingService;
+import com.leo.careerforgeai.knowledge.application.retrieval.KnowledgeRetrievalService;
 import com.leo.careerforgeai.knowledge.domain.context.AssembledContext;
 import com.leo.careerforgeai.knowledge.domain.retrieval.HybridRetrievalResult;
-import com.leo.careerforgeai.knowledge.domain.retrieval.RerankStatus;
-import com.leo.careerforgeai.knowledge.domain.retrieval.RerankedRetrievalResult;
+import com.leo.careerforgeai.knowledge.domain.rerank.RerankStatus;
+import com.leo.careerforgeai.knowledge.domain.rerank.RerankedRetrievalResult;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalScope;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RrfRankedChunk;
-import com.leo.careerforgeai.knowledge.infrastructure.document.KnowledgeSourceProperties;
+import com.leo.careerforgeai.knowledge.config.KnowledgeSourceProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

@@ -2,9 +2,9 @@ package com.leo.careerforgeai.knowledge.api;
 
 import com.leo.careerforgeai.knowledge.api.dto.RagQueryRequest;
 import com.leo.careerforgeai.knowledge.api.dto.RagQueryResponse;
-import com.leo.careerforgeai.knowledge.application.RagQueryService;
+import com.leo.careerforgeai.knowledge.application.query.RagQueryService;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalScope;
-import com.leo.careerforgeai.knowledge.infrastructure.document.KnowledgeSourceProperties;
+import com.leo.careerforgeai.knowledge.config.KnowledgeSourceProperties;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
 import jakarta.validation.Valid;

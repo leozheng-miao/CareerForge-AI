@@ -1,8 +1,8 @@
 package com.leo.careerforgeai.knowledge.api.dto;
 
-import com.leo.careerforgeai.knowledge.application.RetrievalDebugResult;
-import com.leo.careerforgeai.knowledge.domain.DocumentChunk;
-import com.leo.careerforgeai.knowledge.domain.KnowledgeDocumentType;
+import com.leo.careerforgeai.knowledge.application.retrieval.RetrievalDebugResult;
+import com.leo.careerforgeai.knowledge.domain.document.DocumentChunk;
+import com.leo.careerforgeai.knowledge.domain.document.KnowledgeDocumentType;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalComparisonResult;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievedChunk;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RrfRankedChunk;

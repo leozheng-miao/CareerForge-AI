@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.knowledge.domain.retrieval;
 
-import com.leo.careerforgeai.knowledge.domain.DocumentChunk;
+import com.leo.careerforgeai.knowledge.domain.document.DocumentChunk;
 
 /**
  * @program: CareerForge-AI

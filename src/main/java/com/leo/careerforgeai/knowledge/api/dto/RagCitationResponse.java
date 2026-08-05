@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.knowledge.api.dto;
 
-import com.leo.careerforgeai.knowledge.domain.KnowledgeDocumentType;
+import com.leo.careerforgeai.knowledge.domain.document.KnowledgeDocumentType;
 import com.leo.careerforgeai.knowledge.domain.answer.RagCitation;
 
 import java.util.List;

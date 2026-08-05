@@ -33,6 +33,12 @@ careerforge:
     elasticsearch:
       index-alias: ${RAG_INDEX_ALIAS:careerforge-knowledge}
       index-version: ${RAG_INDEX_VERSION:v1}
+    query:
+      candidate-top-k: ${RAG_CANDIDATE_TOP_K:5}
+      num-candidates: ${RAG_NUM_CANDIDATES:50}
+      final-top-k: ${RAG_FINAL_TOP_K:5}
+      rerank-enabled: ${RAG_RERANK_ENABLED:false}
+      max-content-chars: ${RAG_MAX_CONTENT_CHARS:3000}
 server:
   port: 8080
 # springdoc-openapi 项目配置
@@ -57,3 +63,4 @@ knife4j:
         api-rule-resources:
           - com.leo.careerforgeai.model.api
           - com.leo.careerforgeai.career.api
+          - com.leo.careerforgeai.knowledge.api

@@ -2,6 +2,7 @@ package com.leo.careerforgeai.knowledge.infrastructure.rerank;
 
 import com.leo.careerforgeai.knowledge.application.ChunkRerankException;
 import com.leo.careerforgeai.knowledge.application.ChunkReranker;
+import com.leo.careerforgeai.knowledge.domain.retrieval.ChunkRerankResult;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RrfRankedChunk;
 import com.leo.careerforgeai.knowledge.infrastructure.rerank.dto.ChunkRerankModelOutput;
 import com.leo.careerforgeai.model.application.ModelGateway;
@@ -81,9 +82,9 @@ public class DeepSeekLlmChunkReranker implements ChunkReranker {
 
     /** 调用 LLM 重排候选，并将经过严格校验的 Chunk ID 映射回原始候选对象。 */
     @Override
-    public List<RrfRankedChunk> rerank(String query, List<RrfRankedChunk> candidates) {
+    public ChunkRerankResult rerank(String query, List<RrfRankedChunk> candidates) {
         validateInput(query, candidates);
-        if (candidates.isEmpty()) return List.of();
+        if (candidates.isEmpty()) return ChunkRerankResult.notCalled();
 
         String userContent = serializePromptInput(query, candidates);
         ModelRequest request = new ModelRequest(
@@ -110,7 +111,10 @@ public class DeepSeekLlmChunkReranker implements ChunkReranker {
         ModelUsage usage = response.usage();
 
         log.info("DeepSeek LLM Rerank完成，requestId={}, model={}, candidates={}, retained={}, durationMs={}, inputTokens={}, outputTokens={}, totalTokens={}", response.requestId(), response.model(), candidates.size(), result.size(), durationMs, usage == null ? null : usage.inputTokens(), usage == null ? null : usage.outputTokens(), usage == null ? null : usage.totalTokens());
-        return result;
+        long inputTokens = usage == null ? 0 : usage.inputTokens();
+        long outputTokens = usage == null ? 0 : usage.outputTokens();
+        long totalTokens = usage == null ? 0 : usage.totalTokens();
+        return new ChunkRerankResult(result, response.model(), inputTokens, outputTokens, totalTokens);
     }
 
     /** 将不可信的查询和候选内容序列化为结构明确的 JSON 数据。 */

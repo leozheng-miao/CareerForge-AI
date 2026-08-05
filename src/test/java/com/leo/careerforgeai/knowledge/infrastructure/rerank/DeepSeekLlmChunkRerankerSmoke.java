@@ -56,6 +56,11 @@ class DeepSeekLlmChunkRerankerSmoke {
 
         RerankedRetrievalResult rerankResult = rerankingService.rerank(query, retrievalResult, true);
         assertThat(rerankResult.status()).isEqualTo(RerankStatus.APPLIED);
+        assertThat(rerankResult.rerankModel()).isNotBlank();
+        assertThat(rerankResult.rerankInputTokens()).isPositive();
+        assertThat(rerankResult.rerankOutputTokens()).isPositive();
+        assertThat(rerankResult.rerankTotalTokens()).isEqualTo(rerankResult.rerankInputTokens() + rerankResult.rerankOutputTokens());
+
         List<RrfRankedChunk> rerankedCandidates = rerankResult.rankedChunks();
 
         AssembledContext context = contextAssembler.assemble(rerankedCandidates, 3_000);
@@ -80,7 +85,15 @@ class DeepSeekLlmChunkRerankerSmoke {
                 .collect(Collectors.toMap(item -> item.chunk().chunkId(), item -> item));
         rerankedCandidates.forEach(candidate -> assertThat(candidate).isSameAs(candidateById.get(candidate.chunk().chunkId())));
 
-        System.out.printf("rerankStatus=%s, rerankDurationMs=%d%n", rerankResult.status(), rerankResult.rerankDurationMs());
+        System.out.printf(
+                "rerankStatus=%s, rerankModel=%s, rerankDurationMs=%d, inputTokens=%d, outputTokens=%d, totalTokens=%d%n",
+                rerankResult.status(),
+                rerankResult.rerankModel(),
+                rerankResult.rerankDurationMs(),
+                rerankResult.rerankInputTokens(),
+                rerankResult.rerankOutputTokens(),
+                rerankResult.rerankTotalTokens()
+        );
         System.out.printf("query=%s, candidateCount=%d%n", query, rrfCandidates.size());
         System.out.println("beforeRerank:");
         rrfCandidates.forEach(candidate -> System.out.printf("  rrfRank=%d, chunkId=%s, sectionPath=%s%n", candidate.finalRank(), candidate.chunk().chunkId().substring(0, 12), candidate.chunk().sectionPath()));

@@ -2,6 +2,7 @@ package com.leo.careerforgeai.knowledge.application;
 
 import com.leo.careerforgeai.knowledge.domain.DocumentChunk;
 import com.leo.careerforgeai.knowledge.domain.KnowledgeDocumentType;
+import com.leo.careerforgeai.knowledge.domain.retrieval.ChunkRerankResult;
 import com.leo.careerforgeai.knowledge.domain.retrieval.HybridRetrievalResult;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RerankStatus;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RerankedRetrievalResult;
@@ -32,7 +33,7 @@ class KnowledgeRerankingServiceTest {
         HybridRetrievalResult hybridResult = hybrid(candidates);
         RrfRankedChunk changedB = candidate(B_ID, 2, "被模型修改的候选 B");
 
-        when(chunkReranker.rerank("Java 并发", candidates)).thenReturn(List.of(changedB, candidates.getFirst()));
+        when(chunkReranker.rerank("Java 并发", candidates)).thenReturn(rerankResult(List.of(changedB, candidates.getFirst())));
 
         RerankedRetrievalResult result = service.rerank("Java 并发", hybridResult, true);
 
@@ -40,6 +41,12 @@ class KnowledgeRerankingServiceTest {
         assertThat(result.rankedChunks()).containsExactly(candidates.get(1), candidates.get(0));
         assertThat(result.rankedChunks().getFirst()).isSameAs(candidates.get(1));
         assertThat(result.rerankDurationMs()).isGreaterThanOrEqualTo(0);
+        assertThat(result.rerankDurationMs()).isGreaterThanOrEqualTo(0);
+
+        assertThat(result.rerankModel()).isEqualTo("test-rerank-model");
+        assertThat(result.rerankInputTokens()).isEqualTo(200);
+        assertThat(result.rerankOutputTokens()).isEqualTo(30);
+        assertThat(result.rerankTotalTokens()).isEqualTo(230);
     }
 
     /** 验证关闭和空候选时不会调用模型。 */
@@ -55,6 +62,17 @@ class KnowledgeRerankingServiceTest {
         assertThat(disabled.rankedChunks()).containsExactlyElementsOf(populated.rrfChunks());
         assertThat(skippedEmpty.status()).isEqualTo(RerankStatus.SKIPPED_EMPTY);
         assertThat(skippedEmpty.rankedChunks()).isEmpty();
+        assertThat(disabled.status()).isEqualTo(RerankStatus.DISABLED);
+        assertThat(disabled.rankedChunks()).containsExactlyElementsOf(populated.rrfChunks());
+        assertThat(disabled.rerankModel()).isNull();
+        assertThat(disabled.rerankTotalTokens()).isZero();
+
+        assertThat(skippedEmpty.status()).isEqualTo(RerankStatus.SKIPPED_EMPTY);
+        assertThat(skippedEmpty.rankedChunks()).isEmpty();
+        assertThat(skippedEmpty.rerankModel()).isNull();
+        assertThat(skippedEmpty.rerankTotalTokens()).isZero();
+
+        verifyNoInteractions(chunkReranker);
         verifyNoInteractions(chunkReranker);
     }
 
@@ -70,6 +88,11 @@ class KnowledgeRerankingServiceTest {
         assertThat(result.status()).isEqualTo(RerankStatus.FALLBACK);
         assertThat(result.rankedChunks()).containsExactlyElementsOf(candidates);
         assertThat(result.rerankDurationMs()).isGreaterThanOrEqualTo(0);
+        assertThat(result.status()).isEqualTo(RerankStatus.FALLBACK);
+        assertThat(result.rankedChunks()).containsExactlyElementsOf(candidates);
+        assertThat(result.rerankDurationMs()).isGreaterThanOrEqualTo(0);
+        assertThat(result.rerankModel()).isNull();
+        assertThat(result.rerankTotalTokens()).isZero();
     }
 
     /** 验证未知候选无法进入最终结果，并触发 RRF 回退。 */
@@ -78,12 +101,16 @@ class KnowledgeRerankingServiceTest {
         List<RrfRankedChunk> candidates = List.of(candidate(A_ID, 1, "候选 A"), candidate(B_ID, 2, "候选 B"));
         HybridRetrievalResult hybridResult = hybrid(candidates);
         RrfRankedChunk unknown = candidate(C_ID, 2, "未知候选");
-        when(chunkReranker.rerank("Java 并发", candidates)).thenReturn(List.of(candidates.getFirst(), unknown));
+        when(chunkReranker.rerank("Java 并发", candidates)).thenReturn(rerankResult(List.of(candidates.getFirst(), unknown)));
 
         RerankedRetrievalResult result = service.rerank("Java 并发", hybridResult, true);
 
         assertThat(result.status()).isEqualTo(RerankStatus.FALLBACK);
         assertThat(result.rankedChunks()).containsExactlyElementsOf(candidates);
+        assertThat(result.status()).isEqualTo(RerankStatus.FALLBACK);
+        assertThat(result.rankedChunks()).containsExactlyElementsOf(candidates);
+        assertThat(result.rerankModel()).isNull();
+        assertThat(result.rerankTotalTokens()).isZero();
     }
 
     /** 验证基础输入在调用 Reranker 前完成校验。 */
@@ -118,5 +145,9 @@ class KnowledgeRerankingServiceTest {
                 content
         );
         return new RrfRankedChunk(chunk, rank, null, 1D / (60 + rank), rank);
+    }
+
+    private ChunkRerankResult rerankResult(List<RrfRankedChunk> rankedChunks) {
+        return new ChunkRerankResult(rankedChunks, "test-rerank-model", 200, 30, 230);
     }
 }

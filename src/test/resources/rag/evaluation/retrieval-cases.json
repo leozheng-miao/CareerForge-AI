@@ -1,0 +1,203 @@
+{
+  "schemaVersion": "rag-retrieval-evaluation-v1",
+  "evaluationSetVersion": "careerforge-rag-eval-v1",
+  "corpusManifestResource": "rag/evaluation/corpus-manifest.json",
+  "cases": [
+    {
+      "caseId": "rag-eval-001",
+      "query": "Atomic 类适合解决什么并发问题，哪些场景不应该使用？",
+      "queryType": "DIRECT",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "2ca158d3ac8a95fa886c2ea3b921efc11e2bb4a3c2769dac3d64ff3f1b62daa7"
+      ],
+      "labelReason": "该 Chunk 同时说明单变量原子更新、CAS 适用场景以及多变量和代码块原子性的不适用边界。"
+    },
+    {
+      "caseId": "rag-eval-002",
+      "query": "AI 聊天接口需要自定义请求头时，前端怎样接收流式回复并处理断线重连？",
+      "queryType": "PARAPHRASE",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "1b387e73cf801765fc5a3e1279980aa706eb94c846c212c71a7bc32137673b51"
+      ],
+      "labelReason": "问题没有直接使用章节标题，但该 Chunk 完整说明 fetch 读流、SSE 解析、增量渲染和断线恢复。"
+    },
+    {
+      "caseId": "rag-eval-003",
+      "query": "服务器出现大量 CLOSE_WAIT 说明什么，应该从哪些地方排查？",
+      "queryType": "TECHNICAL_TERM",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "1c767d189b7a6df9c3e046c7ef06df01c3e71333062ef2771bb203d978ce451e"
+      ],
+      "labelReason": "该 Chunk 直接包含 CLOSE_WAIT 的含义、常见原因、排查步骤和最终风险。"
+    },
+    {
+      "caseId": "rag-eval-004",
+      "query": "IO 密集型和 CPU 密集型线程池应如何估算核心线程数，为什么最终仍需要压测？",
+      "queryType": "MULTI_CHUNK",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "511bbebaec79bb9a446e64b440e0f5dcdb449c11166f0c63815ef48dda37c8cc",
+        "a8a9a9ae5df1fa629746e787ef2893f539798e2144bc03646d3ea4890613919f"
+      ],
+      "labelReason": "第一个 Chunk 给出两类任务的经验公式，第二个 Chunk 解释等待时间与计算时间的关系以及经验值不能替代压测。"
+    },
+    {
+      "caseId": "rag-eval-005",
+      "query": "Rust 借用检查器如何在编译期处理可变引用和不可变引用冲突？",
+      "queryType": "UNANSWERABLE",
+      "expectedAnswerability": "UNANSWERABLE",
+      "relevantChunkIds": [],
+      "labelReason": "当前两份固定语料没有 Rust 所有权或借用检查器相关内容。"
+    },
+    {
+      "caseId": "rag-eval-006",
+      "query": "科大讯飞校招的 AI Agent 岗位包含哪些智能体和 RAG 相关职责？",
+      "queryType": "DIRECT",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "cb898766f9bd3d9a3ca8abd5e7bb9da07cfc2eb81b43782fae0e2bb070e1aef8"
+      ],
+      "labelReason": "该岗位 Chunk 明确列出任务规划、对话管理、RAG、多模态、长期记忆和 Multi-Agent 等职责。"
+    },
+    {
+      "caseId": "rag-eval-007",
+      "query": "为什么 AI 回复逐字输出时，React Fiber 能减少输入和滚动卡顿？",
+      "queryType": "PARAPHRASE",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "9b24284a1d32f937b263da57e7964bde053bbb7d0d53b974b2d03e9acfa8fc3c"
+      ],
+      "labelReason": "该 Chunk 通过时间切片、优先级调度和可中断恢复解释了 AI 流式渲染场景。"
+    },
+    {
+      "caseId": "rag-eval-008",
+      "query": "发生 OOM 后，怎样利用 Heap Dump、Dominator Tree 和 GC Root 定位问题？",
+      "queryType": "TECHNICAL_TERM",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "6b7b293693d32fbb5c45c4ba3815ec3001959a381c760820d68939a626343bc8"
+      ],
+      "labelReason": "该 Chunk 完整包含 Heap Dump、MAT、Dominator Tree、Retained Heap 和 GC Root 排查流程。"
+    },
+    {
+      "caseId": "rag-eval-009",
+      "query": "哪份岗位材料把文档解析、Embedding、混合召回和 Rerank 列为职责，哪场面试又询问了 Hybrid Search 与 Rerank？",
+      "queryType": "CROSS_DOCUMENT",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "43aa5dbdb091160ca67bed0c41dfb08f9c3c0cff1b56360d4bb07c8dd0916e8a",
+        "5241ea5184f58f1029fc1d3abecd4bd477518403fb616c49d12bfc1e3c732221"
+      ],
+      "labelReason": "第一个 Chunk 是包含完整 RAG 职责的岗位材料，第二个 Chunk 是明确出现 Hybrid Search 和 Rerank 问题的大疆面经。"
+    },
+    {
+      "caseId": "rag-eval-010",
+      "query": "当前岗位材料中，哪些岗位明确要求熟悉 Kubernetes 和 Terraform？",
+      "queryType": "UNANSWERABLE",
+      "expectedAnswerability": "UNANSWERABLE",
+      "relevantChunkIds": [],
+      "labelReason": "当前固定岗位语料没有出现 Kubernetes、K8s 或 Terraform 要求。"
+    },
+    {
+      "caseId": "rag-eval-011",
+      "query": "网商银行社招岗位要求候选人使用哪些 AI Coding 和 Agent 工具，并具备哪些智能体实践经验？",
+      "queryType": "DIRECT",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "93d98fa2f28005584fbec64db4605ec32ebd599989d97f397d9107210f1f5b6f"
+      ],
+      "labelReason": "该岗位 Chunk 明确列出 Claude Code、Gemini、Codex、Skill、MCP，以及智能体框架、Planning、工具调用、Memory 和反思机制。"
+    },
+    {
+      "caseId": "rag-eval-012",
+      "query": "前端实时展示包含代码和数学公式的 Markdown 时，应该怎样组合解析、高亮、公式渲染与性能优化？",
+      "queryType": "PARAPHRASE",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "43f507da65be96536ba297fb8b585a9b1dbff8c9339fca7eef5cf80e19485f51"
+      ],
+      "labelReason": "该 Chunk 说明 markdown-it、highlight.js、KaTeX 的组合流程，以及防抖和 Web Worker 优化。"
+    },
+    {
+      "caseId": "rag-eval-013",
+      "query": "JVM 堆、线程栈、Xms、Xmx、Xss 和 MaxRAMPercentage 应该如何设置？",
+      "queryType": "TECHNICAL_TERM",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "a156d6986ba86b36ad02916bdb22b415c09d74af953ddc4f60e1be3cca888548"
+      ],
+      "labelReason": "该 Chunk 直接包含堆占比、默认栈大小、Xms/Xmx、Xss 和容器 MaxRAMPercentage 的设置建议。"
+    },
+    {
+      "caseId": "rag-eval-014",
+      "query": "TCP 连接为什么需要三次握手和四次挥手，服务端大量出现 CLOSE_WAIT 又说明什么？",
+      "queryType": "MULTI_CHUNK",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "dad01dbc14b1e2474ed4f678737035bd7377012efb717fb39a39ce93ad33b40a",
+        "1c767d189b7a6df9c3e046c7ef06df01c3e71333062ef2771bb203d978ce451e"
+      ],
+      "labelReason": "第一个 Chunk 解释连接建立和关闭过程，第二个 Chunk 解释 CLOSE_WAIT 的应用层原因和排查方法。"
+    },
+    {
+      "caseId": "rag-eval-015",
+      "query": "InnoDB 在可重复读隔离级别下如何创建 Read View，并根据事务 ID 判断记录可见性？",
+      "queryType": "UNANSWERABLE",
+      "expectedAnswerability": "UNANSWERABLE",
+      "relevantChunkIds": [],
+      "labelReason": "当前语料虽包含 Java、数据库和并发内容，但没有 InnoDB MVCC、Read View 或事务可见性规则。"
+    },
+    {
+      "caseId": "rag-eval-016",
+      "query": "Java 类加载的双亲委派机制按什么顺序工作，它解决了什么安全问题？",
+      "queryType": "TECHNICAL_TERM",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "ba474c50d48690d3d97bffb2888ea507ff7b344b43ce62f3251674e070cb4d5f"
+      ],
+      "labelReason": "该 Chunk 说明 Bootstrap、Extension、Application 的委派顺序以及防止核心类库被篡改的作用。"
+    },
+    {
+      "caseId": "rag-eval-017",
+      "query": "怎样设计一个新增处理能力时不需要修改渲染引擎的 Prompt 模板系统？",
+      "queryType": "PARAPHRASE",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "23d0579c04f17387d62d44701150ddcdc74bc260f738d4dbc79f89a477dd1769"
+      ],
+      "labelReason": "问题未直接使用函数注册和插件机制等原文措辞，但该 Chunk 完整说明变量插值、函数调用、模板组合和插件式注册。"
+    },
+    {
+      "caseId": "rag-eval-018",
+      "query": "AI 接口的超时、指数退避重试、熔断和降级分别应该怎样处理？",
+      "queryType": "DIRECT",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "d9e55392938b3f9cdfd4bbaf905c86106c11f6c7d1f0c78754be3ee8db43e957"
+      ],
+      "labelReason": "该 Chunk 给出了超时上限、读写重试边界、指数退避间隔、熔断条件和降级方式。"
+    },
+    {
+      "caseId": "rag-eval-019",
+      "query": "岗位材料中哪里要求熟悉 Elasticsearch，面试材料中哪里追问 text 与 dense_vector 字段如何配合？",
+      "queryType": "CROSS_DOCUMENT",
+      "expectedAnswerability": "ANSWERABLE",
+      "relevantChunkIds": [
+        "43aa5dbdb091160ca67bed0c41dfb08f9c3c0cff1b56360d4bb07c8dd0916e8a",
+        "3e4033dc29f2d0a4a826cd602c4742cdd2d7830b3490bde83308d8ae9401b6d2"
+      ],
+      "labelReason": "第一个 Chunk 的岗位要求列出 Elasticsearch，第二个 Chunk 的面试题明确追问索引 Mapping 中 text 与 dense_vector 的配合。"
+    },
+    {
+      "caseId": "rag-eval-020",
+      "query": "当前材料给出的 RRF rankConstant 最优值是多少，它在固定评测集上的 Recall@10 和 MRR 分别是多少？",
+      "queryType": "UNANSWERABLE",
+      "expectedAnswerability": "UNANSWERABLE",
+      "relevantChunkIds": [],
+      "labelReason": "语料虽然出现 RRF、混合检索和 Recall@K，但没有提供 RRF rankConstant 的校准结果，也没有对应的 Recall@10 与 MRR 数据。"
+    }
+  ]
+}

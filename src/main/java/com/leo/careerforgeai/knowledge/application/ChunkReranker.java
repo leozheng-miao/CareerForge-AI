@@ -1,5 +1,6 @@
 package com.leo.careerforgeai.knowledge.application;
 
+import com.leo.careerforgeai.knowledge.domain.retrieval.ChunkRerankResult;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RrfRankedChunk;
 
 import java.util.List;
@@ -21,6 +22,6 @@ import java.util.List;
  **/
 public interface ChunkReranker {
 
-    /** 返回重新排序后的相同候选集合，列表位置代表 Rerank 顺序，候选内部保留原始 RRF 排名。 */
-    List<RrfRankedChunk> rerank(String query, List<RrfRankedChunk> candidates);
+    /** 返回重新排序后的相同候选集合，以及本次模型调用的可观测数据。 */
+    ChunkRerankResult rerank(String query, List<RrfRankedChunk> candidates);
 }

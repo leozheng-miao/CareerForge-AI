@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "rag-evaluation-corpus-v1",
+  "knowledgeBaseId": "careerforge-career-materials",
+  "cleaningVersion": "markdown-cleaner-v2",
+  "chunkerVersion": "markdown-structure-v2|max=1000|overlap=120",
+  "documents": [
+    {
+      "documentId": "ai-job-jd-summary",
+      "documentName": "AI应用开发_岗位JD汇总.md",
+      "documentType": "JOB_DESCRIPTION",
+      "sourcePath": "AI应用开发_岗位JD汇总.md",
+      "sourceHash": "dc6ccd74b0469e0a85173b5b14fd844e74e2db4f5899eb01497d4520ffcd7542"
+    },
+    {
+      "documentId": "ai-interview-summary",
+      "documentName": "AI应用开发_面经汇总.md",
+      "documentType": "INTERVIEW_EXPERIENCE",
+      "sourcePath": "AI应用开发_面经汇总.md",
+      "sourceHash": "1ae00e8fed0b9caf58ae3bb5d1fb2e195d8a1071bcb3651b6e89dcf9ecedf0e7"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ package com.leo.careerforgeai.knowledge.infrastructure.rerank;
 import com.leo.careerforgeai.knowledge.application.ChunkRerankException;
 import com.leo.careerforgeai.knowledge.domain.DocumentChunk;
 import com.leo.careerforgeai.knowledge.domain.KnowledgeDocumentType;
+import com.leo.careerforgeai.knowledge.domain.retrieval.ChunkRerankResult;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RrfRankedChunk;
 import com.leo.careerforgeai.model.application.ModelGateway;
 import com.leo.careerforgeai.model.domain.ModelOutputFormat;
@@ -43,10 +44,14 @@ class DeepSeekLlmChunkRerankerTest {
         List<RrfRankedChunk> candidates = List.of(candidate(A_ID, 1), candidate(B_ID, 2), candidate(C_ID, 3));
         when(modelGateway.chat(any())).thenReturn(response("{\"chunkIds\":[\"" + C_ID + "\",\"" + A_ID + "\",\"" + B_ID + "\"]}"));
 
-        List<RrfRankedChunk> result = reranker.rerank("什么内容最能解释 Java 并发？", candidates);
+        ChunkRerankResult result = reranker.rerank("什么内容最能解释 Java 并发？", candidates);
 
-        assertThat(result).containsExactly(candidates.get(2), candidates.get(0), candidates.get(1));
-        assertThat(result.getFirst()).isSameAs(candidates.get(2));
+        assertThat(result.rankedChunks()).containsExactly(candidates.get(2), candidates.get(0), candidates.get(1));
+        assertThat(result.rankedChunks().getFirst()).isSameAs(candidates.get(2));
+        assertThat(result.model()).isEqualTo("configured-deepseek-model");
+        assertThat(result.inputTokens()).isEqualTo(200);
+        assertThat(result.outputTokens()).isEqualTo(30);
+        assertThat(result.totalTokens()).isEqualTo(230);
 
         ArgumentCaptor<ModelRequest> captor = ArgumentCaptor.forClass(ModelRequest.class);
         verify(modelGateway).chat(captor.capture());
@@ -73,7 +78,11 @@ class DeepSeekLlmChunkRerankerTest {
     /** 验证空候选不调用模型，非法输入在模型调用前失败。 */
     @Test
     void shouldHandleEmptyCandidatesAndRejectInvalidInput() {
-        assertThat(reranker.rerank("Java 并发", List.of())).isEmpty();
+        ChunkRerankResult emptyResult = reranker.rerank("Java 并发", List.of());
+
+        assertThat(emptyResult.rankedChunks()).isEmpty();
+        assertThat(emptyResult.model()).isNull();
+        assertThat(emptyResult.totalTokens()).isZero();
 
         List<RrfRankedChunk> duplicateCandidates = List.of(candidate(A_ID, 1), candidate(A_ID, 2));
         List<RrfRankedChunk> tooManyCandidates = IntStream.rangeClosed(1, 21)

@@ -2,10 +2,12 @@ package com.leo.careerforgeai.knowledge.application;
 
 import com.leo.careerforgeai.knowledge.domain.DocumentChunk;
 import com.leo.careerforgeai.knowledge.domain.KnowledgeDocumentType;
+import com.leo.careerforgeai.knowledge.domain.retrieval.HybridRetrievalResult;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalComparisonResult;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalResult;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalScope;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievedChunk;
+import com.leo.careerforgeai.knowledge.domain.retrieval.RrfRankedChunk;
 import com.leo.careerforgeai.model.application.EmbeddingGateway;
 import com.leo.careerforgeai.model.domain.embedding.EmbeddingPurpose;
 import com.leo.careerforgeai.model.domain.embedding.EmbeddingRequest;
@@ -33,7 +35,8 @@ class KnowledgeRetrievalServiceTest {
     private final Bm25Retriever bm25Retriever = mock(Bm25Retriever.class);
     private final VectorRetriever vectorRetriever = mock(VectorRetriever.class);
     private final EmbeddingGateway embeddingGateway = mock(EmbeddingGateway.class);
-    private final KnowledgeRetrievalService service = new KnowledgeRetrievalService(bm25Retriever, vectorRetriever, embeddingGateway);
+    private final RrfFusion rrfFusion = mock(RrfFusion.class);
+    private final KnowledgeRetrievalService service = new KnowledgeRetrievalService(bm25Retriever, vectorRetriever, embeddingGateway, rrfFusion);
 
     @Test
     void shouldGenerateQueryEmbeddingAndReturnBothResults() {
@@ -78,7 +81,7 @@ class KnowledgeRetrievalServiceTest {
         when(embeddingGateway.embed(any(EmbeddingRequest.class))).thenThrow(failure);
 
         assertThatThrownBy(() -> service.retrieveBoth(query, scope, 5, 50)).isSameAs(failure);
-        verifyNoInteractions(vectorRetriever);
+        verifyNoInteractions(vectorRetriever, rrfFusion);
     }
 
     @Test
@@ -88,8 +91,40 @@ class KnowledgeRetrievalServiceTest {
         assertThatThrownBy(() -> service.retrieveBoth(" ", scope, 5, 50)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> service.retrieveBoth("RAG", scope, 0, 50)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> service.retrieveBoth("RAG", scope, 10, 5)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.retrieveHybrid("RAG", scope, 5, 50, 0)).isInstanceOf(IllegalArgumentException.class);
 
-        verifyNoInteractions(bm25Retriever, embeddingGateway, vectorRetriever);
+        verifyNoInteractions(bm25Retriever, embeddingGateway, vectorRetriever, rrfFusion);
+    }
+
+    /** 验证应用服务使用更大的候选集合执行 RRF 并返回最终混合结果。 */
+    @Test
+    void shouldRetrieveCandidatesAndReturnHybridResult() {
+        String query = "Java 并发";
+        RetrievalScope scope = new RetrievalScope("careerforge", Set.of(), Set.of());
+        RetrievalResult bm25Result = result("a", 8.2D, 12);
+        RetrievalResult vectorResult = result("b", 0.91D, 8);
+        List<Float> queryVector = List.of(0.1F, 0.2F);
+        EmbeddingResult embeddingResult = new EmbeddingResult("qwen3-embedding:0.6b", 2, List.of(queryVector), 20);
+        RrfRankedChunk fusedChunk = new RrfRankedChunk(bm25Result.chunks().getFirst().chunk(), 1, null, 1D / 61, 1);
+        List<RrfRankedChunk> fusedChunks = List.of(fusedChunk);
+
+        when(bm25Retriever.retrieve(query, scope, 10)).thenReturn(bm25Result);
+        when(embeddingGateway.embed(any(EmbeddingRequest.class))).thenReturn(embeddingResult);
+        when(vectorRetriever.retrieve(queryVector, scope, 10, 50)).thenReturn(vectorResult);
+        when(rrfFusion.fuse(bm25Result, vectorResult, 5)).thenReturn(fusedChunks);
+
+        HybridRetrievalResult result = service.retrieveHybrid(query, scope, 10, 50, 5);
+
+        assertThat(result.comparisonResult().bm25Result()).isSameAs(bm25Result);
+        assertThat(result.comparisonResult().vectorResult()).isSameAs(vectorResult);
+        assertThat(result.rrfChunks()).containsExactlyElementsOf(fusedChunks);
+        assertThat(result.fusionDurationMs()).isGreaterThanOrEqualTo(0);
+
+        InOrder order = inOrder(bm25Retriever, embeddingGateway, vectorRetriever, rrfFusion);
+        order.verify(bm25Retriever).retrieve(query, scope, 10);
+        order.verify(embeddingGateway).embed(any(EmbeddingRequest.class));
+        order.verify(vectorRetriever).retrieve(queryVector, scope, 10, 50);
+        order.verify(rrfFusion).fuse(bm25Result, vectorResult, 5);
     }
 
     private RetrievalResult result(String idCharacter, double score, long durationMs) {

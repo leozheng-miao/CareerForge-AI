@@ -169,7 +169,7 @@ public final class SafeToolExecutor {
                 return failure(toolCall, ToolExecutionErrorType.TIMEOUT, "Agent Deadline 已到期");
             }
 
-            return success(toolCall, output, contract);
+            return mapOutput(toolCall, output, contract);
         } catch (TimeoutException exception) {
             future.cancel(true);
             return failure(toolCall, ToolExecutionErrorType.TIMEOUT, "工具执行超时");
@@ -212,8 +212,8 @@ public final class SafeToolExecutor {
         );
     }
 
-    /** 校验工具业务输出、Trace 元数据和模型可见结果预算。 */
-    private <O> ToolExecutionResult success(
+    /** 校验并序列化成功或已处理失败的工具业务输出。 */
+    private <O> ToolExecutionResult mapOutput(
             ToolCall toolCall,
             AgentToolOutput<O> output,
             ToolContract<?, O> contract
@@ -222,14 +222,20 @@ public final class SafeToolExecutor {
             return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "工具返回结果类型错误");
         }
 
-        if (contract.implementationType() == ToolImplementationType.MODEL_BACKED && output.modelUsage() == null) {
-            return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "模型驱动工具缺少内部 Token");
-        }
-        if (contract.implementationType() != ToolImplementationType.MODEL_BACKED && output.modelUsage() != null) {
-            return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "非模型工具不能声明内部模型 Token");
-        }
-        if (output.resultCount() != null && output.resultCount() > contract.maxResultItems()) {
-            return failure(toolCall, ToolExecutionErrorType.OUTPUT_LIMIT_EXCEEDED, "工具返回数量超过限制");
+        if (output.status() == ToolExecutionStatus.SUCCESS) {
+            if (contract.implementationType() == ToolImplementationType.MODEL_BACKED
+                    && output.modelUsage() == null) {
+                return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "模型驱动工具缺少内部Token");
+            }
+            if (contract.implementationType() != ToolImplementationType.MODEL_BACKED
+                    && contract.implementationType() != ToolImplementationType.RETRIEVAL_BACKED
+                    && output.modelUsage() != null) {
+                return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "当前工具类型不能声明内部模型Token");
+            }
+            if (output.resultCount() != null
+                    && output.resultCount() > contract.maxResultItems()) {
+                return failure(toolCall, ToolExecutionErrorType.OUTPUT_LIMIT_EXCEEDED, "工具返回数量超过限制");
+            }
         }
 
         try {
@@ -243,22 +249,54 @@ public final class SafeToolExecutor {
                 return failure(toolCall, ToolExecutionErrorType.OUTPUT_LIMIT_EXCEEDED, "工具返回集合超过数量限制");
             }
 
+            ErrorEnvelope error = output.status() == ToolExecutionStatus.FAILURE
+                    ? new ErrorEnvelope(output.errorType(), safeFailureMessage(output.errorType()))
+                    : null;
             String resultJson = jsonMapper.writeValueAsString(
-                    new ResultEnvelope(ToolExecutionStatus.SUCCESS, outputNode, null));
+                    new ResultEnvelope(output.status(), outputNode, error));
 
-            if (resultJson.length() > contract.maxResultChars()) {
-                return failure(toolCall, ToolExecutionErrorType.OUTPUT_LIMIT_EXCEEDED, "工具返回内容超过长度限制");
+            int resultLimit = output.status() == ToolExecutionStatus.FAILURE
+                    ? Math.min(contract.maxResultChars(), MAX_FAILURE_RESULT_CHARS)
+                    : contract.maxResultChars();
+
+            if (resultJson.length() > resultLimit) {
+                return output.status() == ToolExecutionStatus.FAILURE
+                        ? fallbackFailure(toolCall)
+                        : failure(toolCall, ToolExecutionErrorType.OUTPUT_LIMIT_EXCEEDED, "工具返回内容超过长度限制");
+            }
+
+            if (output.status() == ToolExecutionStatus.FAILURE) {
+                return ToolExecutionResult.failure(
+                        toolCall.id(),
+                        toolCall.name(),
+                        resultJson,
+                        output.errorType()
+                );
             }
 
             return ToolExecutionResult.success(
-                    toolCall.id(), toolCall.name(), resultJson,
-                    output.resultCount(), output.modelUsage()
+                    toolCall.id(),
+                    toolCall.name(),
+                    resultJson,
+                    output.resultCount(),
+                    output.modelUsage()
             );
         } catch (JacksonException exception) {
             return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "工具返回结果无法序列化");
         }
     }
 
+    /** 根据安全错误类型生成不包含内部详情的固定消息。 */
+    private String safeFailureMessage(ToolExecutionErrorType errorType) {
+        return switch (errorType) {
+            case TIMEOUT -> "工具执行超时";
+            case SCOPE_VIOLATION -> "工具访问范围不合法";
+            case INVALID_ARGUMENTS, VALIDATION_FAILED -> "工具参数不合法";
+            case OUTPUT_LIMIT_EXCEEDED -> "工具输出超过限制";
+            case UNKNOWN_TOOL -> "工具不可用";
+            case EXECUTION_FAILED -> "工具执行失败";
+        };
+    }
     private boolean exceedsCollectionLimit(JsonNode node, int maxItems) {
         if (node.isArray() && node.size() > maxItems) {
             return true;

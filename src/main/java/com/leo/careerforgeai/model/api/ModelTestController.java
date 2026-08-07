@@ -12,6 +12,7 @@ import com.leo.careerforgeai.model.domain.stream.ModelStreamEvent;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,10 +33,18 @@ import java.util.List;
  **/
 @RestController
 @RequestMapping("api/model")
-@RequiredArgsConstructor
 public class ModelTestController {
+
     private final ModelGateway modelGateway;
     private final TaskExecutor taskExecutor;
+    /** 注入模型调用网关和专用流式任务执行器。 */
+    public ModelTestController(
+            ModelGateway modelGateway,
+            @Qualifier("modelStreamTaskExecutor") TaskExecutor taskExecutor
+    ) {
+        this.modelGateway = modelGateway;
+        this.taskExecutor = taskExecutor;
+    }
 
     @PostMapping("/chat")
     public BaseResponse<String> chat(@Valid @RequestBody ChatRequest request) {

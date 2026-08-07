@@ -2,6 +2,7 @@ package com.leo.careerforgeai.model.infrastructure.deepseek.toolcalling;
 
 import com.leo.careerforgeai.model.application.ToolCallingGateway;
 import com.leo.careerforgeai.model.config.ModelProperties;
+import com.leo.careerforgeai.model.domain.ModelOutputFormat;
 import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.model.domain.toolcalling.AssistantToolCallsMessage;
 import com.leo.careerforgeai.model.domain.toolcalling.FinalAnswerResult;
@@ -92,7 +93,10 @@ public class DeepSeekToolCallingClient implements ToolCallingGateway {
                 request.toolChoiceMode().name().toLowerCase(Locale.ROOT),
                 new DeepSeekToolCallingRequest.Thinking("disabled"),
                 request.maxOutputTokens(),
-                false
+                false,
+                new DeepSeekToolCallingRequest.ResponseFormat(
+                        request.outputFormat() == ModelOutputFormat.JSON_OBJECT ? "json_object" : "text"
+                )
         );
     }
 

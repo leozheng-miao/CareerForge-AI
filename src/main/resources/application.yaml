@@ -3,6 +3,9 @@ spring:
     name: CareerForge-AI
   elasticsearch:
     uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
 careerforge:
   model:
     base-url: ${AI_MODEL_BASE_URL}
@@ -39,6 +42,19 @@ careerforge:
       final-top-k: ${RAG_FINAL_TOP_K:5}
       rerank-enabled: ${RAG_RERANK_ENABLED:false}
       max-content-chars: ${RAG_MAX_CONTENT_CHARS:3000}
+  agent:
+    loop:
+      max-model-iterations: ${AGENT_MAX_MODEL_ITERATIONS:6}
+      max-total-tool-calls: ${AGENT_MAX_TOTAL_TOOL_CALLS:8}
+      max-calls-per-tool: ${AGENT_MAX_CALLS_PER_TOOL:4}
+      max-repeated-call-count: ${AGENT_MAX_REPEATED_CALL_COUNT:2}
+      max-total-tokens: ${AGENT_MAX_TOTAL_TOKENS:20000}
+      max-output-tokens-per-model-call: ${AGENT_MAX_OUTPUT_TOKENS_PER_MODEL_CALL:2000}
+      max-message-history-chars: ${AGENT_MAX_MESSAGE_HISTORY_CHARS:80000}
+      total-timeout: ${AGENT_TOTAL_TIMEOUT:60s}
+      model-call-timeout: ${AGENT_MODEL_CALL_TIMEOUT:30s}
+      tool-executor-threads: ${AGENT_TOOL_EXECUTOR_THREADS:8}
+      tool-executor-queue-capacity: ${AGENT_TOOL_EXECUTOR_QUEUE_CAPACITY:32}
 server:
   port: 8080
 # springdoc-openapi 项目配置
@@ -64,3 +80,4 @@ knife4j:
           - com.leo.careerforgeai.model.api
           - com.leo.careerforgeai.career.api
           - com.leo.careerforgeai.knowledge.api
+          - com.leo.careerforgeai.agent.api

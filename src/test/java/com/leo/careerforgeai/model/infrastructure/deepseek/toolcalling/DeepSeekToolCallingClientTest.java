@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.model.infrastructure.deepseek.toolcalling;
 
 import com.leo.careerforgeai.model.config.ModelProperties;
+import com.leo.careerforgeai.model.domain.ModelOutputFormat;
 import com.leo.careerforgeai.model.domain.ModelRole;
 import com.leo.careerforgeai.model.domain.toolcalling.AssistantToolCallsMessage;
 import com.leo.careerforgeai.model.domain.toolcalling.FinalAnswerResult;
@@ -43,11 +44,12 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+
 /**
- - @program: CareerForge-AI
- - @description: 验证 DeepSeek Tool Calling 请求映射、互斥响应映射和失败分类。
- - @author: Miao Zheng
- - @date: 2026-08-06 15:53
+ * @program: CareerForge-AI
+ * @description: 验证DeepSeek Tool Calling请求映射、输出格式、互斥响应映射和失败分类。
+ * @author: Miao Zheng
+ * @date: 2026-08-07 14:40
  **/
 class DeepSeekToolCallingClientTest {
 
@@ -85,7 +87,7 @@ class DeepSeekToolCallingClientTest {
     private final DeepSeekToolCallingClient client = createClient(jsonMapper);
 
     @Test
-    @DisplayName("发送初始请求并将tool_calls响应映射为ToolCallsResult")
+    @DisplayName("发送JSON初始请求并将tool_calls响应映射为ToolCallsResult")
     void shouldMapInitialRequestAndToolCallsResponse() throws Exception {
         stubResponse(200, response("\"\"", ONE_TOOL_CALL, "tool_calls", VALID_USAGE));
 
@@ -110,6 +112,7 @@ class DeepSeekToolCallingClientTest {
         assertThat(providerRequest.model()).isEqualTo("deepseek-v4-flash");
         assertThat(providerRequest.toolChoice()).isEqualTo("auto");
         assertThat(providerRequest.thinking().type()).isEqualTo("disabled");
+        assertThat(providerRequest.responseFormat().type()).isEqualTo("json_object");
         assertThat(providerRequest.maxTokens()).isEqualTo(512);
         assertThat(providerRequest.stream()).isFalse();
 
@@ -134,12 +137,11 @@ class DeepSeekToolCallingClientTest {
         HttpRequest httpRequest = httpRequestCaptor.getValue();
         assertThat(httpRequest.uri()).isEqualTo(URI.create("http://provider.test/chat/completions"));
         assertThat(httpRequest.timeout()).contains(Duration.ofSeconds(7));
-        assertThat(httpRequest.headers().firstValue("Authorization"))
-                .contains("Bearer test-api-key");
+        assertThat(httpRequest.headers().firstValue("Authorization")).contains("Bearer test-api-key");
     }
 
     @Test
-    @DisplayName("回放Assistant Tool Calls和Tool Result并映射最终回答")
+    @DisplayName("回放Assistant Tool Calls和Tool Result并映射文本最终回答")
     void shouldReplayToolExchangeAndMapFinalAnswer() throws Exception {
         stubResponse(200, response(
                 "\"根据证据，Atomic适合单变量原子更新。\"",
@@ -167,6 +169,7 @@ class DeepSeekToolCallingClientTest {
                 ),
                 List.of(toolDefinition(VALID_SCHEMA)),
                 ToolChoiceMode.AUTO,
+                ModelOutputFormat.TEXT,
                 512
         );
 
@@ -178,10 +181,10 @@ class DeepSeekToolCallingClientTest {
         });
 
         DeepSeekToolCallingRequest providerRequest = capturedProviderRequest();
+        assertThat(providerRequest.responseFormat().type()).isEqualTo("text");
         assertThat(providerRequest.messages()).hasSize(4);
 
-        DeepSeekToolCallingRequest.Message assistantMessage =
-                providerRequest.messages().get(2);
+        DeepSeekToolCallingRequest.Message assistantMessage = providerRequest.messages().get(2);
         assertThat(assistantMessage.role()).isEqualTo("assistant");
         assertThat(assistantMessage.content()).isEmpty();
         assertThat(assistantMessage.toolCalls()).singleElement().satisfies(call -> {
@@ -191,12 +194,10 @@ class DeepSeekToolCallingClientTest {
             assertThat(call.function().arguments()).isEqualTo("{\"query\":\"Java并发\"}");
         });
 
-        DeepSeekToolCallingRequest.Message toolMessage =
-                providerRequest.messages().get(3);
+        DeepSeekToolCallingRequest.Message toolMessage = providerRequest.messages().get(3);
         assertThat(toolMessage.role()).isEqualTo("tool");
         assertThat(toolMessage.toolCallId()).isEqualTo("call-1");
-        assertThat(toolMessage.content())
-                .isEqualTo("{\"status\":\"SUCCESS\",\"evidence\":[]}");
+        assertThat(toolMessage.content()).isEqualTo("{\"status\":\"SUCCESS\",\"evidence\":[]}");
         assertThat(toolMessage.toolCalls()).isNull();
     }
 
@@ -221,8 +222,7 @@ class DeepSeekToolCallingClientTest {
 
         DeepSeekToolCallingClient brokenClient = createClient(brokenMapper);
 
-        assertConfigurationError(() ->
-                brokenClient.call(initialRequest(VALID_SCHEMA)));
+        assertConfigurationError(() -> brokenClient.call(initialRequest(VALID_SCHEMA)));
         verifyNoInteractions(httpClient);
     }
 
@@ -236,10 +236,7 @@ class DeepSeekToolCallingClientTest {
             "500, PROVIDER_ERROR"
     })
     @DisplayName("将HTTP状态码映射为统一模型错误")
-    void shouldMapHttpStatus(
-            int statusCode,
-            ModelErrorType expectedType
-    ) throws Exception {
+    void shouldMapHttpStatus(int statusCode, ModelErrorType expectedType) throws Exception {
         stubResponse(statusCode, "");
 
         assertModelError(
@@ -274,11 +271,9 @@ class DeepSeekToolCallingClientTest {
         )).thenThrow(new InterruptedException("interrupted"));
 
         try {
-            assertThatThrownBy(() ->
-                    client.call(initialRequest(VALID_SCHEMA)))
+            assertThatThrownBy(() -> client.call(initialRequest(VALID_SCHEMA)))
                     .isInstanceOfSatisfying(ModelException.class, exception ->
-                            assertThat(exception.getErrorType())
-                                    .isEqualTo(ModelErrorType.NETWORK_ERROR));
+                            assertThat(exception.getErrorType()).isEqualTo(ModelErrorType.NETWORK_ERROR));
 
             assertThat(Thread.currentThread().isInterrupted()).isTrue();
         } finally {
@@ -289,8 +284,7 @@ class DeepSeekToolCallingClientTest {
     @ParameterizedTest(name = "[{index}] 拒绝非法供应商响应")
     @MethodSource("invalidProviderResponses")
     @DisplayName("将无法安全归类的供应商响应拒绝为INVALID_RESPONSE")
-    void shouldRejectInvalidProviderResponse(String responseBody)
-            throws Exception {
+    void shouldRejectInvalidProviderResponse(String responseBody) throws Exception {
         stubResponse(200, responseBody);
 
         assertModelError(
@@ -349,6 +343,17 @@ class DeepSeekToolCallingClientTest {
                 }
                 """;
 
+        String oversizedToolCall = """
+                [{
+                  "id":"call-oversized",
+                  "type":"function",
+                  "function":{
+                    "name":"parse_job_requirements",
+                    "arguments":"%s"
+                  }
+                }]
+                """.formatted("a".repeat(30_001));
+
         return Stream.of(
                 "{invalid-json",
                 response("\"\"", "null", "stop", VALID_USAGE),
@@ -358,7 +363,8 @@ class DeepSeekToolCallingClientTest {
                 response("\"\"", duplicateCalls, "tool_calls", VALID_USAGE),
                 response("\"未完成\"", "null", "length", VALID_USAGE),
                 response("\"最终回答\"", "null", "stop", mismatchedUsage),
-                response("\"最终回答\"", "null", "stop", "null")
+                response("\"最终回答\"", "null", "stop", "null"),
+                response("\"\"", oversizedToolCall, "tool_calls", VALID_USAGE)
         );
     }
 
@@ -385,32 +391,22 @@ class DeepSeekToolCallingClientTest {
                   ],
                   "usage": %s
                 }
-                """.formatted(
-                contentJson,
-                toolCallsJson,
-                finishReason,
-                usageJson
-        );
+                """.formatted(contentJson, toolCallsJson, finishReason, usageJson);
     }
 
-    private DeepSeekToolCallingRequest capturedProviderRequest()
-            throws Exception {
-        ArgumentCaptor<Object> captor =
-                ArgumentCaptor.forClass(Object.class);
+    private DeepSeekToolCallingRequest capturedProviderRequest() throws Exception {
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
         verify(jsonMapper).writeValueAsString(captor.capture());
         return (DeepSeekToolCallingRequest) captor.getValue();
     }
 
-    /** 创建使用默认模型超时的初始 Tool Calling 请求。 */
+    /** 创建使用默认模型超时的JSON初始Tool Calling请求。 */
     private ToolCallingRequest initialRequest(String schema) {
         return initialRequest(schema, Duration.ofSeconds(60));
     }
 
-    /** 创建使用指定模型超时的初始 Tool Calling 请求。 */
-    private ToolCallingRequest initialRequest(
-            String schema,
-            Duration timeout
-    ) {
+    /** 创建使用指定模型超时的JSON初始Tool Calling请求。 */
+    private ToolCallingRequest initialRequest(String schema, Duration timeout) {
         return new ToolCallingRequest(
                 List.of(
                         new ToolCallingTextMessage(ModelRole.SYSTEM, "你是职业辅导助手"),
@@ -418,11 +414,13 @@ class DeepSeekToolCallingClientTest {
                 ),
                 List.of(toolDefinition(schema)),
                 ToolChoiceMode.AUTO,
+                ModelOutputFormat.JSON_OBJECT,
                 512,
                 timeout
         );
     }
 
+    /** 创建测试使用的搜索工具定义。 */
     private ToolDefinition toolDefinition(String schema) {
         return new ToolDefinition(
                 "search_career_materials",
@@ -431,21 +429,18 @@ class DeepSeekToolCallingClientTest {
         );
     }
 
+    /** 创建使用指定JsonMapper和共享HTTP Stub的被测客户端。 */
     private DeepSeekToolCallingClient createClient(JsonMapper mapper) {
         ModelProperties properties = new ModelProperties(
                 URI.create("http://provider.test"),
                 "test-api-key",
                 "deepseek-v4-flash"
         );
-        return new DeepSeekToolCallingClient(
-                properties,
-                mapper,
-                httpClient
-        );
+        return new DeepSeekToolCallingClient(properties, mapper, httpClient);
     }
 
-    private void stubResponse(int statusCode, String body)
-            throws Exception {
+    /** Stub指定HTTP状态和响应正文。 */
+    private void stubResponse(int statusCode, String body) throws Exception {
         @SuppressWarnings("unchecked")
         HttpResponse<String> response = mock(HttpResponse.class);
 
@@ -453,32 +448,28 @@ class DeepSeekToolCallingClientTest {
         when(response.body()).thenReturn(body);
         when(httpClient.send(
                 any(HttpRequest.class),
-                org.mockito.ArgumentMatchers
-                        .<HttpResponse.BodyHandler<String>>any()
+                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()
         )).thenReturn(response);
     }
 
-    private void stubSendFailure(IOException failure)
-            throws Exception {
+    /** Stub模型传输层异常。 */
+    private void stubSendFailure(IOException failure) throws Exception {
         when(httpClient.send(
                 any(HttpRequest.class),
-                org.mockito.ArgumentMatchers
-                        .<HttpResponse.BodyHandler<String>>any()
+                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()
         )).thenThrow(failure);
     }
 
+    /** 断言调用失败被分类为配置错误。 */
     private void assertConfigurationError(ThrowingCall call) {
         assertModelError(call, ModelErrorType.CONFIGURATION_ERROR);
     }
 
-    private void assertModelError(
-            ThrowingCall call,
-            ModelErrorType expectedType
-    ) {
+    /** 断言调用失败被映射为指定模型错误。 */
+    private void assertModelError(ThrowingCall call, ModelErrorType expectedType) {
         assertThatThrownBy(call::invoke)
                 .isInstanceOfSatisfying(ModelException.class,
-                        exception -> assertThat(exception.getErrorType())
-                                .isEqualTo(expectedType));
+                        exception -> assertThat(exception.getErrorType()).isEqualTo(expectedType));
     }
 
     @FunctionalInterface

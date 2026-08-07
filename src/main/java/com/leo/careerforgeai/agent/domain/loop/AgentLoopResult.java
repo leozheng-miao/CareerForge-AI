@@ -1,5 +1,8 @@
 package com.leo.careerforgeai.agent.domain.loop;
 
+import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;
+
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -12,7 +15,8 @@ public record AgentLoopResult(
         AgentRunStatus status,
         AgentTerminationReason terminationReason,
         String finalContent,
-        AgentRunTrace trace
+        AgentRunTrace trace,
+        List<ToolExecutionResult> toolResults
 ) {
 
     public AgentLoopResult {
@@ -25,6 +29,27 @@ public record AgentLoopResult(
         }
         if (trace.terminationReason() != terminationReason) {
             throw new IllegalArgumentException("结果终止原因与 Trace 终止原因不一致");
+        }
+
+        if (toolResults == null || toolResults.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("toolResults不能为空且不能包含null");
+        }
+        toolResults = List.copyOf(toolResults);
+
+        if (toolResults.size() != trace.toolCalls().size()) {
+            throw new IllegalArgumentException("Tool Result数量必须与Tool Trace数量一致");
+        }
+
+        for (int index = 0; index < toolResults.size(); index++) {
+            ToolExecutionResult result = toolResults.get(index);
+            AgentToolCallTrace toolTrace = trace.toolCalls().get(index);
+
+            if (!result.toolCallId().equals(toolTrace.toolCallId())
+                    || !result.toolName().equals(toolTrace.toolName())
+                    || result.status() != toolTrace.status()
+                    || result.errorType() != toolTrace.errorType()) {
+                throw new IllegalArgumentException("Tool Result与Tool Trace关联不一致");
+            }
         }
 
         boolean hasFinalContent = finalContent != null && !finalContent.isBlank();
@@ -40,22 +65,32 @@ public record AgentLoopResult(
     }
 
     /** 创建包含原始模型最终内容的成功结果。 */
-    public static AgentLoopResult completed(String finalContent, AgentRunTrace trace) {
+    public static AgentLoopResult completed(
+            String finalContent,
+            AgentRunTrace trace,
+            List<ToolExecutionResult> toolResults
+    ) {
         return new AgentLoopResult(
                 AgentRunStatus.COMPLETED,
                 AgentTerminationReason.FINAL_ANSWER,
                 finalContent,
-                trace
+                trace,
+                toolResults
         );
     }
 
     /** 创建经过上层结构化校验确认的拒答结果。 */
-    public static AgentLoopResult refused(String finalContent, AgentRunTrace trace) {
+    public static AgentLoopResult refused(
+            String finalContent,
+            AgentRunTrace trace,
+            List<ToolExecutionResult> toolResults
+    ) {
         return new AgentLoopResult(
                 AgentRunStatus.REFUSED,
                 AgentTerminationReason.REFUSAL,
                 finalContent,
-                trace
+                trace,
+                toolResults
         );
     }
 
@@ -63,9 +98,16 @@ public record AgentLoopResult(
     public static AgentLoopResult terminated(
             AgentRunStatus status,
             AgentTerminationReason terminationReason,
-            AgentRunTrace trace
+            AgentRunTrace trace,
+            List<ToolExecutionResult> toolResults
     ) {
-        return new AgentLoopResult(status, terminationReason, null, trace);
+        return new AgentLoopResult(
+                status,
+                terminationReason,
+                null,
+                trace,
+                toolResults
+        );
     }
 
     /** 校验面向业务的状态与内部终止原因是否属于合法组合。 */

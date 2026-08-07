@@ -1,5 +1,6 @@
 package com.leo.careerforgeai.model.domain.toolcalling;
 
+import com.leo.careerforgeai.model.domain.ModelOutputFormat;
 import com.leo.careerforgeai.model.domain.ModelRole;
 
 import java.time.Duration;
@@ -18,6 +19,7 @@ public record ToolCallingRequest(
         List<ToolCallingMessage> messages,
         List<ToolDefinition> tools,
         ToolChoiceMode toolChoiceMode,
+        ModelOutputFormat outputFormat,
         int maxOutputTokens,
         Duration timeout
 ) {
@@ -34,6 +36,7 @@ public record ToolCallingRequest(
         if (timeout == null || timeout.isZero() || timeout.isNegative()) {
             throw new IllegalArgumentException("timeout 必须大于 0");
         }
+        if (outputFormat == null) throw new IllegalArgumentException("outputFormat 不能为空");
 
         messages = List.copyOf(messages);
         tools = List.copyOf(tools);
@@ -45,9 +48,10 @@ public record ToolCallingRequest(
             List<ToolCallingMessage> messages,
             List<ToolDefinition> tools,
             ToolChoiceMode toolChoiceMode,
+            ModelOutputFormat outputFormat,
             int maxOutputTokens
     ) {
-        this(messages, tools, toolChoiceMode, maxOutputTokens, DEFAULT_TIMEOUT);
+        this(messages, tools, toolChoiceMode, outputFormat, maxOutputTokens, DEFAULT_TIMEOUT);
     }
 
     private static void validateUniqueToolNames(List<ToolDefinition> tools) {

@@ -110,6 +110,7 @@ public final class AgentLoop {
                     messages,
                     toolRegistry.definitions(),
                     ToolChoiceMode.AUTO,
+                    request.outputFormat(),
                     policy.maxOutputTokensPerModelCall(),
                     state.modelCallTimeout(clock.instant())
             );
@@ -174,7 +175,11 @@ public final class AgentLoop {
                         AgentTerminationReason.FINAL_ANSWER,
                         modelFinishedAt
                 );
-                return AgentLoopResult.completed(finalAnswer.content(), trace);
+                return AgentLoopResult.completed(
+                        finalAnswer.content(),
+                        trace,
+                        state.toolResults()
+                );
             }
 
             if (state.isTokenBudgetExhausted()) {
@@ -234,6 +239,7 @@ public final class AgentLoop {
                         executionResult.modelUsage(),
                         executionResult.modelDurationMs()
                 ));
+                state.recordToolResult(executionResult);
 
                 messages.add(executionResult.toMessage());
 
@@ -266,7 +272,12 @@ public final class AgentLoop {
     private AgentLoopResult terminate(AgentRunState state, AgentTerminationReason reason) {
         AgentRunStatus status = statusFor(reason);
         AgentRunTrace trace = state.snapshot(status, reason, clock.instant());
-        return AgentLoopResult.terminated(status, reason, trace);
+        return AgentLoopResult.terminated(
+                status,
+                reason,
+                trace,
+                state.toolResults()
+        );
     }
 
     /** 将内部终止原因映射为对上层暴露的 Agent 状态。 */

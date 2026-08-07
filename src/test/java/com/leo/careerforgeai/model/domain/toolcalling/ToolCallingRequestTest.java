@@ -1,5 +1,6 @@
 package com.leo.careerforgeai.model.domain.toolcalling;
 
+import com.leo.careerforgeai.model.domain.ModelOutputFormat;
 import com.leo.careerforgeai.model.domain.ModelRole;
 import org.junit.jupiter.api.Test;
 
@@ -10,9 +11,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * @program: CareerForge-AI
- * @description:
+ * @description: 验证Tool Calling请求格式、消息关联和协议级输入边界。
  * @author: Miao Zheng
- * @date: 2026-08-06 15:37
+ * @date: 2026-08-07 14:40
  **/
 class ToolCallingRequestTest {
 
@@ -31,11 +32,13 @@ class ToolCallingRequestTest {
                 ),
                 List.of(SEARCH_TOOL),
                 ToolChoiceMode.AUTO,
+                ModelOutputFormat.JSON_OBJECT,
                 512
         );
 
         assertThat(request.messages()).hasSize(2);
         assertThat(request.tools()).containsExactly(SEARCH_TOOL);
+        assertThat(request.outputFormat()).isEqualTo(ModelOutputFormat.JSON_OBJECT);
     }
 
     @Test
@@ -53,6 +56,7 @@ class ToolCallingRequestTest {
                 ),
                 List.of(SEARCH_TOOL),
                 ToolChoiceMode.AUTO,
+                ModelOutputFormat.JSON_OBJECT,
                 512
         );
 
@@ -73,6 +77,7 @@ class ToolCallingRequestTest {
                 ),
                 List.of(SEARCH_TOOL),
                 ToolChoiceMode.AUTO,
+                ModelOutputFormat.JSON_OBJECT,
                 512
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("遗漏");
@@ -86,6 +91,7 @@ class ToolCallingRequestTest {
                 ),
                 List.of(SEARCH_TOOL),
                 ToolChoiceMode.AUTO,
+                ModelOutputFormat.JSON_OBJECT,
                 512
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("不匹配");
@@ -100,8 +106,39 @@ class ToolCallingRequestTest {
                 ),
                 List.of(SEARCH_TOOL, SEARCH_TOOL),
                 ToolChoiceMode.AUTO,
+                ModelOutputFormat.JSON_OBJECT,
                 512
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("重复工具名称");
+    }
+
+    @Test
+    void shouldRejectMissingOutputFormat() {
+        assertThatThrownBy(() -> new ToolCallingRequest(
+                List.of(
+                        new ToolCallingTextMessage(ModelRole.SYSTEM, "系统规则"),
+                        new ToolCallingTextMessage(ModelRole.USER, "查询职业材料")
+                ),
+                List.of(SEARCH_TOOL),
+                ToolChoiceMode.AUTO,
+                null,
+                512
+        )).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("outputFormat");
+    }
+
+    @Test
+    void shouldRejectOversizedToolCallFields() {
+        assertThatThrownBy(() -> new ToolCall("a".repeat(129), "search_career_materials", "{}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ID超过长度限制");
+
+        assertThatThrownBy(() -> new ToolCall("call-1", "a".repeat(65), "{}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("名称超过长度限制");
+
+        assertThatThrownBy(() -> new ToolCall("call-1", "search_career_materials", "a".repeat(30_001)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("协议级长度限制");
     }
 }

@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.agent.domain.loop;
 
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalScope;
+import com.leo.careerforgeai.model.domain.ModelOutputFormat;
 import com.leo.careerforgeai.model.domain.ModelRole;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolCallingTextMessage;
 
@@ -16,6 +17,7 @@ import java.util.Objects;
 public record AgentLoopRequest(
         List<ToolCallingTextMessage> initialMessages,
         RetrievalScope retrievalScope,
+        ModelOutputFormat outputFormat,
         String contextVersion
 ) {
 
@@ -37,6 +39,7 @@ public record AgentLoopRequest(
         }
 
         Objects.requireNonNull(retrievalScope, "retrievalScope 不能为空");
+        Objects.requireNonNull(outputFormat, "outputFormat 不能为空");
         if (contextVersion == null || contextVersion.isBlank()) {
             throw new IllegalArgumentException("contextVersion 不能为空");
         }

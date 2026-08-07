@@ -14,7 +14,9 @@ public record DeepSeekToolCallingRequest(
         @JsonProperty("tool_choice") String toolChoice,
         Thinking thinking,
         @JsonProperty("max_tokens") int maxTokens,
-        boolean stream
+        boolean stream,
+        @JsonProperty("response_format")
+        ResponseFormat responseFormat
 ) {
 
     public record Message(
@@ -58,5 +60,7 @@ public record DeepSeekToolCallingRequest(
     }
 
     public record Thinking(String type) {
+    }
+    public record ResponseFormat(String type) {
     }
 }

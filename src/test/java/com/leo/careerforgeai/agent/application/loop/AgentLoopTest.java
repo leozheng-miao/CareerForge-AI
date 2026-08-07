@@ -15,11 +15,13 @@ import com.leo.careerforgeai.agent.domain.tool.AgentToolOutput;
 import com.leo.careerforgeai.agent.domain.tool.ToolContract;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionContext;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionErrorType;
+import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionStatus;
 import com.leo.careerforgeai.agent.domain.tool.ToolImplementationType;
 import com.leo.careerforgeai.agent.domain.tool.ToolRiskLevel;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalScope;
 import com.leo.careerforgeai.model.application.ToolCallingGateway;
+import com.leo.careerforgeai.model.domain.ModelOutputFormat;
 import com.leo.careerforgeai.model.domain.ModelRole;
 import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.model.domain.toolcalling.AssistantToolCallsMessage;
@@ -119,6 +121,7 @@ class AgentLoopTest {
         assertThat(result.trace().modelCalls()).hasSize(1);
         assertThat(result.trace().toolCalls()).isEmpty();
         assertThat(executions).hasValue(0);
+        assertThat(result.toolResults()).isEmpty();
         verify(gateway).call(any(ToolCallingRequest.class));
     }
 
@@ -149,6 +152,9 @@ class AgentLoopTest {
 
         ArgumentCaptor<ToolCallingRequest> captor = ArgumentCaptor.forClass(ToolCallingRequest.class);
         verify(gateway, times(2)).call(captor.capture());
+        assertThat(captor.getAllValues()).allSatisfy(
+                modelRequest -> assertThat(modelRequest.outputFormat()).isEqualTo(ModelOutputFormat.JSON_OBJECT)
+        );
         List<ToolCallingMessage> secondRoundMessages = captor.getAllValues().get(1).messages();
 
         assertThat(secondRoundMessages).hasSize(4);
@@ -159,6 +165,11 @@ class AgentLoopTest {
         assertThat(toolResult.toolCallId()).isEqualTo("call-1");
         assertThat(toolResult.toolName()).isEqualTo("search_tool");
         assertThat(toolResult.content()).contains("\"status\":\"SUCCESS\"", "evidence-Java并发");
+
+        assertThat(result.toolResults()).hasSize(1);
+        assertThat(result.toolResults().getFirst().toolCallId()).isEqualTo("call-1");
+        assertThat(result.toolResults().getFirst().toolName()).isEqualTo("search_tool");
+        assertThat(result.toolResults().getFirst().resultJson()).contains("evidence-Java并发");
     }
 
     @Test
@@ -210,6 +221,9 @@ class AgentLoopTest {
         assertThat(firstResult.content()).contains("\"status\":\"SUCCESS\"");
         assertThat(secondResult.content()).contains("\"status\":\"FAILURE\"", "SCOPE_VIOLATION");
         assertThat(thirdResult.content()).contains("\"status\":\"SUCCESS\"");
+        assertThat(result.toolResults())
+                .extracting(ToolExecutionResult::toolCallId)
+                .containsExactly("call-1", "call-2", "call-3");
     }
 
     @Test
@@ -454,6 +468,7 @@ class AgentLoopTest {
                         new ToolCallingTextMessage(ModelRole.USER, "查询职业材料")
                 ),
                 new RetrievalScope("careerforge", Set.of(), Set.of()),
+                ModelOutputFormat.JSON_OBJECT,
                 "scope-v1"
         );
     }

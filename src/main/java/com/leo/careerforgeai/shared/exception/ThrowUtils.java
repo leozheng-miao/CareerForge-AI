@@ -1,7 +1,4 @@
-package com.leo.careerforgeai.exception;
-
-import com.leo.careerforgeai.shared.exception.BusinessException;
-import com.leo.careerforgeai.shared.exception.ErrorCode;
+package com.leo.careerforgeai.shared.exception;
 
 /**
  * @program: yu-picture

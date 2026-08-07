@@ -8,12 +8,18 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * @program: CareerForge-AI
+ * @description: 验证DeepSeek Tool Calling请求和响应DTO的JSON协议映射。
+ * @author: Miao Zheng
+ * @date: 2026-08-07 14:40
+ **/
 class DeepSeekToolCallingDtoTest {
 
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
     @Test
-    void shouldSerializeToolCallingMessagesAndSchema() throws Exception {
+    void shouldSerializeToolCallingMessagesSchemaAndResponseFormat() throws Exception {
         JsonNode schema = jsonMapper.readTree("""
                 {
                   "type": "object",
@@ -62,13 +68,15 @@ class DeepSeekToolCallingDtoTest {
                 "auto",
                 new DeepSeekToolCallingRequest.Thinking("disabled"),
                 512,
-                false
+                false,
+                new DeepSeekToolCallingRequest.ResponseFormat("json_object")
         );
 
         JsonNode root = jsonMapper.readTree(jsonMapper.writeValueAsString(request));
 
         assertThat(root.get("tool_choice").asText()).isEqualTo("auto");
         assertThat(root.get("thinking").get("type").asText()).isEqualTo("disabled");
+        assertThat(root.get("response_format").get("type").asText()).isEqualTo("json_object");
         assertThat(root.get("max_tokens").asInt()).isEqualTo(512);
         assertThat(root.get("messages").get(2).get("tool_calls").get(0).get("id").asText()).isEqualTo("call-1");
         assertThat(root.get("messages").get(3).get("tool_call_id").asText()).isEqualTo("call-1");
@@ -109,8 +117,7 @@ class DeepSeekToolCallingDtoTest {
                 }
                 """;
 
-        DeepSeekToolCallingResponse response =
-                jsonMapper.readValue(responseJson, DeepSeekToolCallingResponse.class);
+        DeepSeekToolCallingResponse response = jsonMapper.readValue(responseJson, DeepSeekToolCallingResponse.class);
 
         DeepSeekToolCallingResponse.Choice choice = response.choices().getFirst();
         DeepSeekToolCallingResponse.ToolCall call = choice.message().toolCalls().getFirst();
@@ -146,8 +153,7 @@ class DeepSeekToolCallingDtoTest {
                 }
                 """;
 
-        DeepSeekToolCallingResponse response =
-                jsonMapper.readValue(responseJson, DeepSeekToolCallingResponse.class);
+        DeepSeekToolCallingResponse response = jsonMapper.readValue(responseJson, DeepSeekToolCallingResponse.class);
 
         assertThat(response.choices().getFirst().finishReason()).isEqualTo("stop");
         assertThat(response.choices().getFirst().message().content()).isEqualTo("最终回答");

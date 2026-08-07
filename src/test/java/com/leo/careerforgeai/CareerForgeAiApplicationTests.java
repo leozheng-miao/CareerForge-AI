@@ -1,8 +1,11 @@
 package com.leo.careerforgeai;
 
+import com.leo.careerforgeai.agent.application.loop.AgentLoop;
+import com.leo.careerforgeai.agent.application.tool.SafeToolExecutor;
 import com.leo.careerforgeai.agent.application.tool.ToolRegistry;
 import com.leo.careerforgeai.agent.application.tool.career.ParseJobRequirementsTool;
 import com.leo.careerforgeai.agent.application.tool.career.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.config.AgentLoopProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,6 +28,15 @@ class CareerForgeAiApplicationTests {
     @Autowired
     private ToolRegistry toolRegistry;
 
+    @Autowired
+    private AgentLoop agentLoop;
+
+    @Autowired
+    private SafeToolExecutor safeToolExecutor;
+
+    @Autowired
+    private AgentLoopProperties agentLoopProperties;
+
     @Test
     void contextLoadsWithExplicitAgentToolWhitelist() {
         assertThat(toolRegistry.contracts())
@@ -33,5 +45,8 @@ class CareerForgeAiApplicationTests {
                         SearchCareerMaterialsTool.NAME,
                         ParseJobRequirementsTool.NAME
                 );
+        assertThat(agentLoop).isNotNull();
+        assertThat(safeToolExecutor).isNotNull();
+        assertThat(agentLoopProperties.toPolicy().maxModelIterations()).isPositive();
     }
 }

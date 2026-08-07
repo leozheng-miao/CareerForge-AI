@@ -6,6 +6,7 @@ import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentRunTrace;
 import com.leo.careerforgeai.agent.domain.loop.AgentTerminationReason;
 import com.leo.careerforgeai.agent.domain.loop.AgentToolCallTrace;
+import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;
 import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolCall;
 
@@ -34,6 +35,7 @@ public final class AgentRunState {
     private final List<AgentToolCallTrace> toolCallTraces = new ArrayList<>();
     private final Map<String, Integer> callsByToolName = new HashMap<>();
     private final Map<String, Integer> callsByFingerprint = new HashMap<>();
+    private final List<ToolExecutionResult> toolResults = new ArrayList<>();
 
     private int modelIterations;
     private int totalToolCalls;
@@ -189,6 +191,31 @@ public final class AgentRunState {
     /** 返回当前累计的真实模型 Token。 */
     public ModelUsage totalUsage() {
         return new ModelUsage(inputTokens, outputTokens, totalTokens);
+    }
+
+    /** 按工具执行顺序保存供上层业务校验使用的内部Tool Result。 */
+    public void recordToolResult(ToolExecutionResult result) {
+        Objects.requireNonNull(result, "result 不能为空");
+
+        int resultIndex = toolResults.size();
+        if (resultIndex >= toolCallTraces.size()) {
+            throw new IllegalStateException("Tool Result缺少对应的Tool Trace");
+        }
+
+        AgentToolCallTrace trace = toolCallTraces.get(resultIndex);
+        if (!trace.toolCallId().equals(result.toolCallId())
+                || !trace.toolName().equals(result.toolName())
+                || trace.status() != result.status()
+                || trace.errorType() != result.errorType()) {
+            throw new IllegalArgumentException("Tool Result与Tool Trace无法关联");
+        }
+
+        toolResults.add(result);
+    }
+
+    /** 返回本次Agent Run中按执行顺序保存的内部Tool Result快照。 */
+    public List<ToolExecutionResult> toolResults() {
+        return List.copyOf(toolResults);
     }
 
     /** 返回本次 Agent Run 的统一 Deadline。 */

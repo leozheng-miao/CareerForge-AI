@@ -187,7 +187,8 @@ class AgentLoopFoundationTest {
                 200,
                 1,
                 null,
-                new ModelUsage(30, 10, 40)
+                new ModelUsage(30, 10, 40),
+                25L
         ));
 
         int secondIteration = state.startModelIteration();
@@ -212,6 +213,7 @@ class AgentLoopFoundationTest {
 
         assertThat(trace.modelCalls()).hasSize(2);
         assertThat(trace.toolCalls()).hasSize(1);
+        assertThat(trace.toolCalls().getFirst().modelDurationMs()).isEqualTo(25L);
         assertThat(trace.totalUsage()).isEqualTo(new ModelUsage(180, 40, 220));
         assertThat(trace.durationMs()).isEqualTo(2000);
         assertThatThrownBy(() -> trace.modelCalls().add(trace.modelCalls().getFirst()))

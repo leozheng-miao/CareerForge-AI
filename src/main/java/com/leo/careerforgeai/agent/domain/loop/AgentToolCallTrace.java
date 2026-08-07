@@ -23,7 +23,8 @@ public record AgentToolCallTrace(
         int outputSize,
         Integer resultCount,
         ToolExecutionErrorType errorType,
-        ModelUsage modelUsage
+        ModelUsage modelUsage,
+        Long modelDurationMs
 ) {
 
     public AgentToolCallTrace {
@@ -40,6 +41,12 @@ public record AgentToolCallTrace(
         if (durationMs < 0) throw new IllegalArgumentException("durationMs 不能小于 0");
         if (inputSize < 0 || outputSize < 0) throw new IllegalArgumentException("inputSize 和 outputSize 不能小于 0");
         if (resultCount != null && resultCount < 0) throw new IllegalArgumentException("resultCount 不能小于 0");
+        if (modelDurationMs != null && modelDurationMs < 0) {
+            throw new IllegalArgumentException("modelDurationMs 不能小于 0");
+        }
+        if (modelDurationMs != null && implementationType != ToolImplementationType.MODEL_BACKED) {
+            throw new IllegalArgumentException("只有MODEL_BACKED工具能够记录独立模型耗时");
+        }
 
         if (status == ToolExecutionStatus.SUCCESS && errorType != null) {
             throw new IllegalArgumentException("成功工具调用不能包含 errorType");

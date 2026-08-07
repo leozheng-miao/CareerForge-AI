@@ -7,6 +7,7 @@ import com.leo.careerforgeai.agent.domain.tool.ToolExecutionErrorType;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionStatus;
 import com.leo.careerforgeai.agent.domain.tool.ToolImplementationType;
+import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolCall;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
@@ -27,28 +28,26 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * 安全地完成白名单查找、参数解析校验、超时执行和受控结果序列化。
- */
+ * @program: CareerForge-AI
+ * @description: 安全完成工具白名单查找、参数校验、超时执行、结果序列化和内部模型观测数据传递。
+ * @author: Miao Zheng
+ * @date: 2026-08-07 00:10
+ **/
 @Slf4j
 public final class SafeToolExecutor {
 
     private static final String FALLBACK_FAILURE_JSON =
             "{\"status\":\"FAILURE\",\"data\":null,\"error\":{\"type\":\"EXECUTION_FAILED\",\"message\":\"工具执行失败\"}}";
+    private static final int MAX_FAILURE_RESULT_CHARS = 512;
 
     private final ToolRegistry registry;
     private final JsonMapper jsonMapper;
     private final Validator validator;
     private final ExecutorService executorService;
     private final Clock clock;
-    private static final int MAX_FAILURE_RESULT_CHARS = 512;
 
-    public SafeToolExecutor(
-            ToolRegistry registry,
-            JsonMapper jsonMapper,
-            Validator validator,
-            ExecutorService executorService,
-            Clock clock
-    ) {
+    public SafeToolExecutor(ToolRegistry registry, JsonMapper jsonMapper, Validator validator,
+                            ExecutorService executorService, Clock clock) {
         this.registry = registry;
         this.jsonMapper = jsonMapper;
         this.validator = validator;
@@ -56,16 +55,12 @@ public final class SafeToolExecutor {
         this.clock = clock;
     }
 
+    /** 安全执行一次模型请求的工具调用。 */
     public ToolExecutionResult execute(ToolCall toolCall, ToolExecutionContext context) {
-        if (toolCall == null) {
-            throw new IllegalArgumentException("toolCall 不能为空");
-        }
-        if (context == null) {
-            throw new IllegalArgumentException("context 不能为空");
-        }
+        if (toolCall == null) throw new IllegalArgumentException("toolCall 不能为空");
+        if (context == null) throw new IllegalArgumentException("context 不能为空");
 
         Optional<AgentTool<?, ?>> registered = registry.find(toolCall.name());
-
         if (registered.isEmpty()) {
             return failure(toolCall, ToolExecutionErrorType.UNKNOWN_TOOL, "工具不可用");
         }
@@ -73,34 +68,25 @@ public final class SafeToolExecutor {
         try {
             return executeRegistered(toolCall, context, registered.get());
         } catch (RuntimeException exception) {
-            log.warn(
-                    "工具执行器内部失败，agentRunId={}, toolCallId={}, toolName={}, exceptionType={}",
-                    safeLogValue(context.agentRunId()),
-                    safeLogValue(toolCall.id()),
-                    toolCall.name(),
-                    exception.getClass().getSimpleName()
-            );
+            log.warn("工具执行器内部失败，agentRunId={}, toolCallId={}, toolName={}, exceptionType={}",
+                    safeLogValue(context.agentRunId()), safeLogValue(toolCall.id()),
+                    toolCall.name(), exception.getClass().getSimpleName());
             return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "工具执行失败");
         }
     }
 
-    private ToolExecutionResult executeRegistered(
-            ToolCall toolCall,
-            ToolExecutionContext context,
-            AgentTool<?, ?> registeredTool
-    ) {
+    /** 将通配符工具转交给类型安全的执行方法。 */
+    private ToolExecutionResult executeRegistered(ToolCall toolCall, ToolExecutionContext context,
+                                                  AgentTool<?, ?> registeredTool) {
         return executeTyped(toolCall, context, registeredTool);
     }
 
-    private <I, O> ToolExecutionResult executeTyped(
-            ToolCall toolCall,
-            ToolExecutionContext context,
-            AgentTool<I, O> tool
-    ) {
+    /** 校验工具参数和剩余时间后执行具体工具。 */
+    private <I, O> ToolExecutionResult executeTyped(ToolCall toolCall, ToolExecutionContext context,
+                                                    AgentTool<I, O> tool) {
         ToolContract<I, O> contract = tool.contract();
 
-        if (toolCall.argumentsJson().length()
-                > contract.maxArgumentsChars()) {
+        if (toolCall.argumentsJson().length() > contract.maxArgumentsChars()) {
             return failure(toolCall, ToolExecutionErrorType.INVALID_ARGUMENTS, "工具参数超过长度限制");
         }
 
@@ -109,35 +95,27 @@ public final class SafeToolExecutor {
             return failure(toolCall, ToolExecutionErrorType.INVALID_ARGUMENTS, "工具参数不是合法 JSON 对象");
         }
 
-        Set<ConstraintViolation<I>> violations =
-                validator.validate(input);
-
+        Set<ConstraintViolation<I>> violations = validator.validate(input);
         if (!violations.isEmpty()) {
             return failure(toolCall, ToolExecutionErrorType.VALIDATION_FAILED, "工具参数校验失败");
         }
 
-        Duration remaining =
-                Duration.between(clock.instant(), context.deadline());
-
+        Duration remaining = Duration.between(clock.instant(), context.deadline());
         if (remaining.isZero() || remaining.isNegative()) {
             return failure(toolCall, ToolExecutionErrorType.TIMEOUT, "Agent Deadline 已到期");
         }
 
         Duration executionTimeout = min(contract.timeout(), remaining);
-
         return invoke(toolCall, context, tool, input, contract, executionTimeout);
     }
 
+    /** 将不可信arguments严格解析为工具输入对象。 */
     private <I> I parseInput(ToolCall toolCall, ToolContract<I, ?> contract) {
         try {
             JsonNode inputNode = jsonMapper.readTree(toolCall.argumentsJson());
+            if (inputNode == null || !inputNode.isObject()) return null;
 
-            if (inputNode == null || !inputNode.isObject()) {
-                return null;
-            }
-
-            return jsonMapper
-                    .readerFor(contract.inputType())
+            return jsonMapper.readerFor(contract.inputType())
                     .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                     .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
                     .readValue(toolCall.argumentsJson());
@@ -146,14 +124,11 @@ public final class SafeToolExecutor {
         }
     }
 
-    private <I, O> ToolExecutionResult invoke(
-            ToolCall toolCall,
-            ToolExecutionContext context,
-            AgentTool<I, O> tool,
-            I input,
-            ToolContract<I, O> contract,
-            Duration executionTimeout
-    ) {
+    /** 在单工具Timeout和Agent Deadline共同限制内执行工具。 */
+    private <I, O> ToolExecutionResult invoke(ToolCall toolCall, ToolExecutionContext context,
+                                              AgentTool<I, O> tool, I input,
+                                              ToolContract<I, O> contract,
+                                              Duration executionTimeout) {
         Future<AgentToolOutput<O>> future;
 
         try {
@@ -178,64 +153,69 @@ public final class SafeToolExecutor {
             Thread.currentThread().interrupt();
             return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "工具执行被中断");
         } catch (ExecutionException exception) {
-            return mapExecutionFailure(
-                    toolCall,
-                    context,
-                    exception.getCause()
-            );
+            return mapExecutionFailure(toolCall, context, exception.getCause());
         }
     }
 
-    private ToolExecutionResult mapExecutionFailure(
-            ToolCall toolCall,
-            ToolExecutionContext context,
-            Throwable cause
-    ) {
+    /** 将工具抛出的异常转换为不泄露内部信息的失败结果。 */
+    private ToolExecutionResult mapExecutionFailure(ToolCall toolCall, ToolExecutionContext context,
+                                                    Throwable cause) {
         if (cause instanceof ToolExecutionException exception) {
-            return failure(
-                    toolCall,
-                    exception.getErrorType(),
-                    exception.getMessage()
-            );
+            return failure(toolCall, exception.getErrorType(), exception.getMessage());
         }
 
-        String exceptionType = cause == null
-                ? "Unknown"
-                : cause.getClass().getSimpleName();
+        String exceptionType = cause == null ? "Unknown" : cause.getClass().getSimpleName();
+        log.warn("业务工具执行失败，agentRunId={}, toolCallId={}, toolName={}, exceptionType={}",
+                safeLogValue(context.agentRunId()), safeLogValue(toolCall.id()),
+                toolCall.name(), exceptionType);
 
-        log.warn("业务工具执行失败，agentRunId={}, toolCallId={}, toolName={}, exceptionType={}", safeLogValue(context.agentRunId()), safeLogValue(toolCall.id()), toolCall.name(), exceptionType);
-
-        return failure(
-                toolCall,
-                ToolExecutionErrorType.EXECUTION_FAILED,
-                "工具执行失败"
-        );
+        return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "工具执行失败");
     }
 
     /** 校验并序列化成功或已处理失败的工具业务输出。 */
-    private <O> ToolExecutionResult mapOutput(
-            ToolCall toolCall,
-            AgentToolOutput<O> output,
-            ToolContract<?, O> contract
-    ) {
+    private <O> ToolExecutionResult mapOutput(ToolCall toolCall, AgentToolOutput<O> output,
+                                              ToolContract<?, O> contract) {
         if (output == null || !contract.outputType().isInstance(output.data())) {
             return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "工具返回结果类型错误");
         }
 
-        if (output.status() == ToolExecutionStatus.SUCCESS) {
-            if (contract.implementationType() == ToolImplementationType.MODEL_BACKED
-                    && output.modelUsage() == null) {
-                return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "模型驱动工具缺少内部Token");
-            }
-            if (contract.implementationType() != ToolImplementationType.MODEL_BACKED
-                    && contract.implementationType() != ToolImplementationType.RETRIEVAL_BACKED
-                    && output.modelUsage() != null) {
-                return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "当前工具类型不能声明内部模型Token");
-            }
-            if (output.resultCount() != null
-                    && output.resultCount() > contract.maxResultItems()) {
-                return failure(toolCall, ToolExecutionErrorType.OUTPUT_LIMIT_EXCEEDED, "工具返回数量超过限制");
-            }
+        boolean modelBacked = contract.implementationType() == ToolImplementationType.MODEL_BACKED;
+
+        if (output.status() == ToolExecutionStatus.SUCCESS
+                && modelBacked
+                && (output.modelUsage() == null || output.modelDurationMs() == null)) {
+            return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "模型驱动工具缺少内部模型观测数据");
+        }
+
+        if (!modelBacked && output.modelDurationMs() != null) {
+            return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "当前工具类型不能声明内部模型耗时");
+        }
+
+        if (output.status() == ToolExecutionStatus.FAILURE
+                && !modelBacked
+                && output.modelUsage() != null) {
+            return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "当前工具类型不能声明失败模型Token");
+        }
+
+        if (output.status() == ToolExecutionStatus.FAILURE
+                && modelBacked
+                && output.modelUsage() != null
+                && output.modelDurationMs() == null) {
+            return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "模型驱动工具失败结果缺少内部模型耗时");
+        }
+
+        if (output.status() == ToolExecutionStatus.SUCCESS
+                && contract.implementationType() != ToolImplementationType.MODEL_BACKED
+                && contract.implementationType() != ToolImplementationType.RETRIEVAL_BACKED
+                && output.modelUsage() != null) {
+            return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "当前工具类型不能声明内部模型Token");
+        }
+
+        if (output.status() == ToolExecutionStatus.SUCCESS
+                && output.resultCount() != null
+                && output.resultCount() > contract.maxResultItems()) {
+            return failure(toolCall, ToolExecutionErrorType.OUTPUT_LIMIT_EXCEEDED,
+                    "工具返回数量超过限制", output.modelUsage(), output.modelDurationMs());
         }
 
         try {
@@ -243,10 +223,13 @@ public final class SafeToolExecutor {
             JsonNode outputNode = jsonMapper.readTree(outputJson);
 
             if (outputNode == null) {
-                return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "工具返回结果无法序列化");
+                return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED,
+                        "工具返回结果无法序列化", output.modelUsage(), output.modelDurationMs());
             }
+
             if (exceedsCollectionLimit(outputNode, contract.maxResultItems())) {
-                return failure(toolCall, ToolExecutionErrorType.OUTPUT_LIMIT_EXCEEDED, "工具返回集合超过数量限制");
+                return failure(toolCall, ToolExecutionErrorType.OUTPUT_LIMIT_EXCEEDED,
+                        "工具返回集合超过数量限制", output.modelUsage(), output.modelDurationMs());
             }
 
             ErrorEnvelope error = output.status() == ToolExecutionStatus.FAILURE
@@ -261,8 +244,9 @@ public final class SafeToolExecutor {
 
             if (resultJson.length() > resultLimit) {
                 return output.status() == ToolExecutionStatus.FAILURE
-                        ? fallbackFailure(toolCall)
-                        : failure(toolCall, ToolExecutionErrorType.OUTPUT_LIMIT_EXCEEDED, "工具返回内容超过长度限制");
+                        ? fallbackFailure(toolCall, output.modelUsage(), output.modelDurationMs())
+                        : failure(toolCall, ToolExecutionErrorType.OUTPUT_LIMIT_EXCEEDED,
+                        "工具返回内容超过长度限制", output.modelUsage(), output.modelDurationMs());
             }
 
             if (output.status() == ToolExecutionStatus.FAILURE) {
@@ -270,7 +254,9 @@ public final class SafeToolExecutor {
                         toolCall.id(),
                         toolCall.name(),
                         resultJson,
-                        output.errorType()
+                        output.errorType(),
+                        output.modelUsage(),
+                        output.modelDurationMs()
                 );
             }
 
@@ -279,10 +265,12 @@ public final class SafeToolExecutor {
                     toolCall.name(),
                     resultJson,
                     output.resultCount(),
-                    output.modelUsage()
+                    output.modelUsage(),
+                    output.modelDurationMs()
             );
         } catch (JacksonException exception) {
-            return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "工具返回结果无法序列化");
+            return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED,
+                    "工具返回结果无法序列化", output.modelUsage(), output.modelDurationMs());
         }
     }
 
@@ -297,43 +285,76 @@ public final class SafeToolExecutor {
             case EXECUTION_FAILED -> "工具执行失败";
         };
     }
+
+    /** 递归检查输出中的所有集合是否超过Contract限制。 */
     private boolean exceedsCollectionLimit(JsonNode node, int maxItems) {
-        if (node.isArray() && node.size() > maxItems) {
-            return true;
-        }
+        if (node.isArray() && node.size() > maxItems) return true;
 
         for (JsonNode child : node) {
-            if (exceedsCollectionLimit(child, maxItems)) {
-                return true;
-            }
+            if (exceedsCollectionLimit(child, maxItems)) return true;
         }
 
         return false;
     }
 
-    private ToolExecutionResult failure(ToolCall toolCall, ToolExecutionErrorType errorType, String safeMessage) {
+    /** 创建不包含内部模型观测数据的安全失败结果。 */
+    private ToolExecutionResult failure(ToolCall toolCall, ToolExecutionErrorType errorType,
+                                        String safeMessage) {
+        return failure(toolCall, errorType, safeMessage, null, null);
+    }
+
+    /** 创建保留已观测内部模型成本的安全失败结果。 */
+    private ToolExecutionResult failure(ToolCall toolCall, ToolExecutionErrorType errorType,
+                                        String safeMessage, ModelUsage modelUsage,
+                                        Long modelDurationMs) {
         try {
             String resultJson = jsonMapper.writeValueAsString(new ResultEnvelope(
-                    ToolExecutionStatus.FAILURE, null, new ErrorEnvelope(errorType, safeMessage)));
+                    ToolExecutionStatus.FAILURE,
+                    null,
+                    new ErrorEnvelope(errorType, safeMessage)
+            ));
 
-            if (resultJson.length() > MAX_FAILURE_RESULT_CHARS) return fallbackFailure(toolCall);
-            return ToolExecutionResult.failure(toolCall.id(), toolCall.name(), resultJson, errorType);
+            if (resultJson.length() > MAX_FAILURE_RESULT_CHARS) {
+                return fallbackFailure(toolCall, modelUsage, modelDurationMs);
+            }
+
+            return ToolExecutionResult.failure(
+                    toolCall.id(),
+                    toolCall.name(),
+                    resultJson,
+                    errorType,
+                    modelUsage,
+                    modelDurationMs
+            );
         } catch (JacksonException exception) {
-            return fallbackFailure(toolCall);
+            return fallbackFailure(toolCall, modelUsage, modelDurationMs);
         }
     }
 
+    /** 创建不包含内部模型观测数据的固定兜底失败结果。 */
     private ToolExecutionResult fallbackFailure(ToolCall toolCall) {
-        return ToolExecutionResult.failure(toolCall.id(), toolCall.name(), FALLBACK_FAILURE_JSON,
-                ToolExecutionErrorType.EXECUTION_FAILED);
+        return fallbackFailure(toolCall, null, null);
     }
 
+    /** 创建保留已观测模型成本的固定兜底失败结果。 */
+    private ToolExecutionResult fallbackFailure(ToolCall toolCall, ModelUsage modelUsage,
+                                                Long modelDurationMs) {
+        return ToolExecutionResult.failure(
+                toolCall.id(),
+                toolCall.name(),
+                FALLBACK_FAILURE_JSON,
+                ToolExecutionErrorType.EXECUTION_FAILED,
+                modelUsage,
+                modelDurationMs
+        );
+    }
+
+    /** 返回两个Duration中较小的一个。 */
     private Duration min(Duration first, Duration second) {
-        return first.compareTo(second) <= 0
-                ? first
-                : second;
+        return first.compareTo(second) <= 0 ? first : second;
     }
 
+    /** 将执行超时安全转换为Future等待使用的纳秒数。 */
     private long toTimeoutNanos(Duration timeout) {
         try {
             return timeout.toNanos();
@@ -342,27 +363,15 @@ public final class SafeToolExecutor {
         }
     }
 
+    /** 清理日志关联值中的控制字符并限制长度。 */
     private String safeLogValue(String value) {
-        String sanitized = value
-                .replace('\r', '_')
-                .replace('\n', '_')
-                .replace('\t', '_');
-
-        return sanitized.length() <= 128
-                ? sanitized
-                : sanitized.substring(0, 128);
+        String sanitized = value.replace('\r', '_').replace('\n', '_').replace('\t', '_');
+        return sanitized.length() <= 128 ? sanitized : sanitized.substring(0, 128);
     }
 
-    private record ResultEnvelope(
-            ToolExecutionStatus status,
-            JsonNode data,
-            ErrorEnvelope error
-    ) {
+    private record ResultEnvelope(ToolExecutionStatus status, JsonNode data, ErrorEnvelope error) {
     }
 
-    private record ErrorEnvelope(
-            ToolExecutionErrorType type,
-            String message
-    ) {
+    private record ErrorEnvelope(ToolExecutionErrorType type, String message) {
     }
 }

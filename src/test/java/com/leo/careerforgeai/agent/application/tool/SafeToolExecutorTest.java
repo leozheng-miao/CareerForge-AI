@@ -9,6 +9,7 @@ import com.leo.careerforgeai.agent.domain.tool.ToolExecutionStatus;
 import com.leo.careerforgeai.agent.domain.tool.ToolImplementationType;
 import com.leo.careerforgeai.agent.domain.tool.ToolRiskLevel;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalScope;
+import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolCall;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolDefinition;
 import jakarta.validation.Validation;
@@ -258,9 +259,62 @@ class ToolSafetyTest {
                 ToolExecutionErrorType.OUTPUT_LIMIT_EXCEEDED);
     }
 
-    private SafeToolExecutor executor(TestTool... tools) {
+    @Test
+    @DisplayName("MODEL_BACKED工具失败时保留已观测Token和模型耗时")
+    void shouldPreserveObservedModelCostOnHandledFailure() {
+        ToolContract<TestInput, TestOutput> contract = modelBackedContract("parse_job_requirements");
+
+        AgentTool<TestInput, TestOutput> modelBackedTool = new AgentTool<>() {
+
+            /** 返回测试使用的MODEL_BACKED工具契约。 */
+            @Override
+            public ToolContract<TestInput, TestOutput> contract() {
+                return contract;
+            }
+
+            /** 模拟模型已产生Token但结构化解析失败。 */
+            @Override
+            public AgentToolOutput<TestOutput> execute(TestInput input, ToolExecutionContext context) {
+                return AgentToolOutput.modelBackedFailure(
+                        output("结构化解析失败"),
+                        ToolExecutionErrorType.EXECUTION_FAILED,
+                        new ModelUsage(80, 20, 100),
+                        45
+                );
+            }
+        };
+
+        ToolExecutionResult result = executor(modelBackedTool).execute(
+                new ToolCall("call-1", "parse_job_requirements", "{\"query\":\"Java岗位\"}"),
+                context
+        );
+
+        assertThat(result.status()).isEqualTo(ToolExecutionStatus.FAILURE);
+        assertThat(result.errorType()).isEqualTo(ToolExecutionErrorType.EXECUTION_FAILED);
+        assertThat(result.modelUsage()).isEqualTo(new ModelUsage(80, 20, 100));
+        assertThat(result.modelDurationMs()).isEqualTo(45L);
+    }
+
+    private SafeToolExecutor executor(AgentTool<?, ?>... tools) {
         return new SafeToolExecutor(
                 new ToolRegistry(List.of(tools)), jsonMapper, validator, executorService, clock);
+    }
+
+    /** 创建测试使用的MODEL_BACKED工具契约。 */
+    private ToolContract<TestInput, TestOutput> modelBackedContract(String name) {
+        return new ToolContract<>(
+                new ToolDefinition(name, "测试模型工具", INPUT_SCHEMA),
+                OUTPUT_SCHEMA,
+                TestInput.class,
+                TestOutput.class,
+                ToolImplementationType.MODEL_BACKED,
+                ToolRiskLevel.LOW,
+                true,
+                256,
+                2048,
+                5,
+                Duration.ofSeconds(1)
+        );
     }
 
     private TestTool tool(

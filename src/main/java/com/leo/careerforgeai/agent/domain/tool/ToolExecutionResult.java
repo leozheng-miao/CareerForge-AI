@@ -16,7 +16,8 @@ public record ToolExecutionResult(
         String resultJson,
         ToolExecutionErrorType errorType,
         Integer resultCount,
-        ModelUsage modelUsage
+        ModelUsage modelUsage,
+        Long modelDurationMs
 ) {
 
     public ToolExecutionResult {
@@ -32,8 +33,11 @@ public record ToolExecutionResult(
         if (status == ToolExecutionStatus.FAILURE && errorType == null) {
             throw new IllegalArgumentException("失败结果必须包含 errorType");
         }
-        if (status == ToolExecutionStatus.FAILURE && (resultCount != null || modelUsage != null)) {
-            throw new IllegalArgumentException("失败结果不能声明成功数量或内部模型 Token");
+        if (status == ToolExecutionStatus.FAILURE && resultCount != null) {
+            throw new IllegalArgumentException("失败结果不能声明成功数量");
+        }
+        if (modelDurationMs != null && modelDurationMs < 0) {
+            throw new IllegalArgumentException("modelDurationMs 不能小于 0");
         }
         if (modelUsage != null && (modelUsage.inputTokens() < 0
                 || modelUsage.outputTokens() < 0
@@ -43,30 +47,23 @@ public record ToolExecutionResult(
     }
 
     /** 创建工具成功结果。 */
-    public static ToolExecutionResult success(
-            String toolCallId,
-            String toolName,
-            String resultJson,
-            Integer resultCount,
-            ModelUsage modelUsage
-    ) {
-        return new ToolExecutionResult(
-                toolCallId, toolName, ToolExecutionStatus.SUCCESS,
-                resultJson, null, resultCount, modelUsage
-        );
+    public static ToolExecutionResult success(String toolCallId, String toolName, String resultJson,
+                                              Integer resultCount, ModelUsage modelUsage, Long modelDurationMs) {
+        return new ToolExecutionResult(toolCallId, toolName, ToolExecutionStatus.SUCCESS,
+                resultJson, null, resultCount, modelUsage, modelDurationMs);
     }
 
     /** 创建不包含业务输出元数据的工具失败结果。 */
-    public static ToolExecutionResult failure(
-            String toolCallId,
-            String toolName,
-            String resultJson,
-            ToolExecutionErrorType errorType
-    ) {
-        return new ToolExecutionResult(
-                toolCallId, toolName, ToolExecutionStatus.FAILURE,
-                resultJson, errorType, null, null
-        );
+    public static ToolExecutionResult failure(String toolCallId, String toolName, String resultJson,
+                                              ToolExecutionErrorType errorType) {
+        return failure(toolCallId, toolName, resultJson, errorType, null, null);
+    }
+
+    public static ToolExecutionResult failure(String toolCallId, String toolName, String resultJson,
+                                              ToolExecutionErrorType errorType, ModelUsage modelUsage,
+                                              Long modelDurationMs) {
+        return new ToolExecutionResult(toolCallId, toolName, ToolExecutionStatus.FAILURE,
+                resultJson, errorType, null, modelUsage, modelDurationMs);
     }
 
     /** 转换成下一轮模型请求需要的 Tool Result 消息。 */

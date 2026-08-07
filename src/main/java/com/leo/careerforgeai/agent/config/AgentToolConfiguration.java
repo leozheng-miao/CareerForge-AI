@@ -2,7 +2,9 @@ package com.leo.careerforgeai.agent.config;
 
 import com.leo.careerforgeai.agent.application.tool.ToolRegistry;
 import com.leo.careerforgeai.agent.application.tool.career.CareerMaterialScopePolicy;
+import com.leo.careerforgeai.agent.application.tool.career.ParseJobRequirementsTool;
 import com.leo.careerforgeai.agent.application.tool.career.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.career.application.JobRequirementsParser;
 import com.leo.careerforgeai.knowledge.application.evidence.KnowledgeEvidenceSearchService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,9 +32,21 @@ public class AgentToolConfiguration {
         return new SearchCareerMaterialsTool(evidenceSearchService, scopePolicy);
     }
 
+    /** 注册复用第一阶段结构化岗位解析能力的模型驱动工具。 */
+    @Bean
+    public ParseJobRequirementsTool parseJobRequirementsTool(JobRequirementsParser parser) {
+        return new ParseJobRequirementsTool(parser);
+    }
+
     /** 使用明确列出的工具创建Agent调用白名单。 */
     @Bean
-    public ToolRegistry toolRegistry(SearchCareerMaterialsTool searchCareerMaterialsTool) {
-        return new ToolRegistry(List.of(searchCareerMaterialsTool));
+    public ToolRegistry toolRegistry(
+            SearchCareerMaterialsTool searchCareerMaterialsTool,
+            ParseJobRequirementsTool parseJobRequirementsTool
+    ) {
+        return new ToolRegistry(List.of(
+                searchCareerMaterialsTool,
+                parseJobRequirementsTool
+        ));
     }
 }

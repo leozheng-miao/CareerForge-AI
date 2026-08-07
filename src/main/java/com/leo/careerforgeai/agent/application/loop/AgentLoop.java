@@ -231,7 +231,8 @@ public final class AgentLoop {
                         executionResult.resultJson().length(),
                         executionResult.resultCount(),
                         executionResult.errorType(),
-                        executionResult.modelUsage()
+                        executionResult.modelUsage(),
+                        executionResult.modelDurationMs()
                 ));
 
                 messages.add(executionResult.toMessage());

@@ -15,7 +15,8 @@ public record AgentToolOutput<O>(
         ToolExecutionStatus status,
         ToolExecutionErrorType errorType,
         Integer resultCount,
-        ModelUsage modelUsage
+        ModelUsage modelUsage,
+        Long modelDurationMs
 ) {
 
     public AgentToolOutput {
@@ -29,63 +30,45 @@ public record AgentToolOutput<O>(
         if (status == ToolExecutionStatus.FAILURE && errorType == null) {
             throw new IllegalArgumentException("失败工具输出必须包含 errorType");
         }
-        if (status == ToolExecutionStatus.FAILURE && (resultCount != null || modelUsage != null)) {
-            throw new IllegalArgumentException("失败工具输出不能声明结果数量或内部模型Token");
+        if (status == ToolExecutionStatus.FAILURE && resultCount != null) {
+            throw new IllegalArgumentException("失败工具输出不能声明成功数量");
         }
         if (modelUsage != null && (modelUsage.inputTokens() < 0
                 || modelUsage.outputTokens() < 0
                 || modelUsage.totalTokens() < 0)) {
             throw new IllegalArgumentException("modelUsage 不能包含负数");
         }
+        if (modelDurationMs != null && modelDurationMs < 0) {
+            throw new IllegalArgumentException("modelDurationMs 不能小于 0");
+        }
     }
 
     /** 创建不包含内部模型调用的成功工具输出。 */
     public static <O> AgentToolOutput<O> of(O data, Integer resultCount) {
-        return new AgentToolOutput<>(
-                data, ToolExecutionStatus.SUCCESS, null, resultCount, null);
+        return new AgentToolOutput<>(data, ToolExecutionStatus.SUCCESS, null, resultCount, null, null);
     }
 
     /** 创建可能包含Rerank Token的检索型成功工具输出。 */
-    public static <O> AgentToolOutput<O> retrievalBacked(
-            O data,
-            Integer resultCount,
-            ModelUsage modelUsage
-    ) {
-        return new AgentToolOutput<>(
-                data,
-                ToolExecutionStatus.SUCCESS,
-                null,
-                resultCount,
-                modelUsage
-        );
+    public static <O> AgentToolOutput<O> retrievalBacked(O data, Integer resultCount, ModelUsage modelUsage) {
+        return new AgentToolOutput<>(data, ToolExecutionStatus.SUCCESS, null, resultCount, modelUsage, null);
     }
 
-    /** 创建必须包含内部模型Token的MODEL_BACKED成功工具输出。 */
-    public static <O> AgentToolOutput<O> modelBacked(
-            O data,
-            Integer resultCount,
-            ModelUsage modelUsage
-    ) {
-        return new AgentToolOutput<>(
-                data,
-                ToolExecutionStatus.SUCCESS,
-                null,
-                resultCount,
-                Objects.requireNonNull(modelUsage, "modelUsage 不能为空")
-        );
+    /** 创建包含内部模型Token和独立耗时的MODEL_BACKED成功输出。 */
+    public static <O> AgentToolOutput<O> modelBacked(O data, Integer resultCount, ModelUsage modelUsage, long modelDurationMs) {
+        return new AgentToolOutput<>(data, ToolExecutionStatus.SUCCESS, null, resultCount,
+                Objects.requireNonNull(modelUsage, "modelUsage 不能为空"), modelDurationMs);
     }
 
-    /** 创建包含安全业务数据但在Trace中记为失败的工具输出。 */
-    public static <O> AgentToolOutput<O> handledFailure(
-            O data,
-            ToolExecutionErrorType errorType
-    ) {
-        return new AgentToolOutput<>(
-                data,
-                ToolExecutionStatus.FAILURE,
-                Objects.requireNonNull(errorType, "errorType 不能为空"),
-                null,
-                null
-        );
+    /** 创建不包含内部模型观测数据的安全业务失败输出。 */
+    public static <O> AgentToolOutput<O> handledFailure(O data, ToolExecutionErrorType errorType) {
+        return new AgentToolOutput<>(data, ToolExecutionStatus.FAILURE,
+                Objects.requireNonNull(errorType, "errorType 不能为空"), null, null, null);
+    }
+
+    /** 创建保留已观测内部模型成本的MODEL_BACKED失败输出。 */
+    public static <O> AgentToolOutput<O> modelBackedFailure(O data, ToolExecutionErrorType errorType,
+                                                            ModelUsage modelUsage, long modelDurationMs) {
+        return new AgentToolOutput<>(data, ToolExecutionStatus.FAILURE,
+                Objects.requireNonNull(errorType, "errorType 不能为空"), null, modelUsage, modelDurationMs);
     }
 }

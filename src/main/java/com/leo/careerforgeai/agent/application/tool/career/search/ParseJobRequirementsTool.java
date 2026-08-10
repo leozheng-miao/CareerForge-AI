@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.agent.application.tool.career;
+package com.leo.careerforgeai.agent.application.tool.career.search;
 
 import com.leo.careerforgeai.agent.application.tool.AgentTool;
 import com.leo.careerforgeai.agent.domain.tool.AgentToolOutput;
@@ -7,9 +7,9 @@ import com.leo.careerforgeai.agent.domain.tool.ToolExecutionContext;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionErrorType;
 import com.leo.careerforgeai.agent.domain.tool.ToolImplementationType;
 import com.leo.careerforgeai.agent.domain.tool.ToolRiskLevel;
-import com.leo.careerforgeai.agent.domain.tool.career.ParseJobRequirementsErrorType;
-import com.leo.careerforgeai.agent.domain.tool.career.ParseJobRequirementsInput;
-import com.leo.careerforgeai.agent.domain.tool.career.ParseJobRequirementsOutput;
+import com.leo.careerforgeai.agent.domain.tool.career.parse.ParseJobRequirementsErrorType;
+import com.leo.careerforgeai.agent.domain.tool.career.parse.ParseJobRequirementsInput;
+import com.leo.careerforgeai.agent.domain.tool.career.parse.ParseJobRequirementsOutput;
 import com.leo.careerforgeai.career.application.JobRequirementsParseException;
 import com.leo.careerforgeai.career.application.JobRequirementsParseResult;
 import com.leo.careerforgeai.career.application.JobRequirementsParser;

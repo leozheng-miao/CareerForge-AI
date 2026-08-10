@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.agent.domain.loop;
+package com.leo.careerforgeai.agent.domain.loop.trace;
 
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionErrorType;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionStatus;

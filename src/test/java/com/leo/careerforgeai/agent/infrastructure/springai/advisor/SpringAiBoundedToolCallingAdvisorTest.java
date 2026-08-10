@@ -2,9 +2,9 @@ package com.leo.careerforgeai.agent.infrastructure.springai.advisor;
 
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopPolicy;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionContext;
-import com.leo.careerforgeai.agent.infrastructure.springai.tool.SpringAiToolLoopLimitException;
-import com.leo.careerforgeai.agent.infrastructure.springai.tool.SpringAiToolLoopLimitType;
-import com.leo.careerforgeai.agent.infrastructure.springai.tool.SpringAiToolRunContext;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolLoopLimitException;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolLoopLimitType;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolRunContext;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalScope;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.DisplayName;

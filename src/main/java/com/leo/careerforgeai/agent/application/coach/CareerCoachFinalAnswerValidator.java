@@ -1,15 +1,15 @@
 package com.leo.careerforgeai.agent.application.coach;
 
 import com.leo.careerforgeai.agent.application.coach.dto.CareerCoachModelOutput;
-import com.leo.careerforgeai.agent.application.tool.career.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswer;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopResult;
 import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionStatus;
-import com.leo.careerforgeai.agent.domain.tool.career.CareerMaterialEvidence;
-import com.leo.careerforgeai.agent.domain.tool.career.SearchCareerMaterialsOutput;
-import com.leo.careerforgeai.agent.domain.tool.career.SearchCareerMaterialsStatus;
+import com.leo.careerforgeai.agent.domain.tool.career.search.CareerMaterialEvidence;
+import com.leo.careerforgeai.agent.domain.tool.career.search.SearchCareerMaterialsOutput;
+import com.leo.careerforgeai.agent.domain.tool.career.search.SearchCareerMaterialsStatus;
 import jakarta.validation.Validator;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;

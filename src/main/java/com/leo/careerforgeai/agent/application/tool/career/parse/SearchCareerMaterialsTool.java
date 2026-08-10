@@ -1,16 +1,17 @@
-package com.leo.careerforgeai.agent.application.tool.career;
+package com.leo.careerforgeai.agent.application.tool.career.parse;
 
 import com.leo.careerforgeai.agent.application.tool.AgentTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.CareerMaterialScopePolicy;
 import com.leo.careerforgeai.agent.domain.tool.AgentToolOutput;
 import com.leo.careerforgeai.agent.domain.tool.ToolContract;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionContext;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionErrorType;
 import com.leo.careerforgeai.agent.domain.tool.ToolImplementationType;
 import com.leo.careerforgeai.agent.domain.tool.ToolRiskLevel;
-import com.leo.careerforgeai.agent.domain.tool.career.CareerMaterialEvidence;
-import com.leo.careerforgeai.agent.domain.tool.career.SearchCareerMaterialsErrorType;
-import com.leo.careerforgeai.agent.domain.tool.career.SearchCareerMaterialsInput;
-import com.leo.careerforgeai.agent.domain.tool.career.SearchCareerMaterialsOutput;
+import com.leo.careerforgeai.agent.domain.tool.career.search.CareerMaterialEvidence;
+import com.leo.careerforgeai.agent.domain.tool.career.search.SearchCareerMaterialsErrorType;
+import com.leo.careerforgeai.agent.domain.tool.career.search.SearchCareerMaterialsInput;
+import com.leo.careerforgeai.agent.domain.tool.career.search.SearchCareerMaterialsOutput;
 import com.leo.careerforgeai.knowledge.application.evidence.KnowledgeEvidenceSearchResult;
 import com.leo.careerforgeai.knowledge.application.evidence.KnowledgeEvidenceSearchService;
 import com.leo.careerforgeai.knowledge.domain.document.DocumentChunk;

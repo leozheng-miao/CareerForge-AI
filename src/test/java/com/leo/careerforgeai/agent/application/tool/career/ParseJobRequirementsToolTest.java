@@ -3,6 +3,7 @@ package com.leo.careerforgeai.agent.application.tool.career;
 import com.leo.careerforgeai.agent.application.tool.AgentTool;
 import com.leo.careerforgeai.agent.application.tool.SafeToolExecutor;
 import com.leo.careerforgeai.agent.application.tool.ToolRegistry;
+import com.leo.careerforgeai.agent.application.tool.career.search.ParseJobRequirementsTool;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionContext;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionErrorType;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;

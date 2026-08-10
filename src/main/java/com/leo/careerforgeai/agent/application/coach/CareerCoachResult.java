@@ -2,7 +2,7 @@ package com.leo.careerforgeai.agent.application.coach;
 
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswer;
 import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
-import com.leo.careerforgeai.agent.domain.loop.AgentRunTrace;
+import com.leo.careerforgeai.agent.domain.loop.trace.AgentRunTrace;
 import com.leo.careerforgeai.agent.domain.loop.AgentTerminationReason;
 
 import java.util.Objects;

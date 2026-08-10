@@ -6,7 +6,7 @@ import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopRequest;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopResult;
 import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
-import com.leo.careerforgeai.agent.domain.loop.AgentRunTrace;
+import com.leo.careerforgeai.agent.domain.loop.trace.AgentRunTrace;
 import com.leo.careerforgeai.agent.domain.loop.AgentTerminationReason;
 import com.leo.careerforgeai.knowledge.config.KnowledgeSourceProperties;
 import com.leo.careerforgeai.knowledge.domain.document.KnowledgeDocumentType;

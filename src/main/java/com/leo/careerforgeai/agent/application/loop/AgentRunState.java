@@ -1,11 +1,11 @@
 package com.leo.careerforgeai.agent.application.loop;
 
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopPolicy;
-import com.leo.careerforgeai.agent.domain.loop.AgentModelCallTrace;
+import com.leo.careerforgeai.agent.domain.loop.trace.AgentModelCallTrace;
 import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
-import com.leo.careerforgeai.agent.domain.loop.AgentRunTrace;
+import com.leo.careerforgeai.agent.domain.loop.trace.AgentRunTrace;
 import com.leo.careerforgeai.agent.domain.loop.AgentTerminationReason;
-import com.leo.careerforgeai.agent.domain.loop.AgentToolCallTrace;
+import com.leo.careerforgeai.agent.domain.loop.trace.AgentToolCallTrace;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;
 import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolCall;

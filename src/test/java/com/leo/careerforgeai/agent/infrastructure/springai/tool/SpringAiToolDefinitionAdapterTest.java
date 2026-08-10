@@ -3,6 +3,7 @@ package com.leo.careerforgeai.agent.infrastructure.springai.tool;
 import com.leo.careerforgeai.agent.domain.tool.ToolContract;
 import com.leo.careerforgeai.agent.domain.tool.ToolImplementationType;
 import com.leo.careerforgeai.agent.domain.tool.ToolRiskLevel;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.adapter.SpringAiToolDefinitionAdapter;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolDefinition;
 import org.junit.jupiter.api.Test;
 

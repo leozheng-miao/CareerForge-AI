@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.agent.domain.tool.career;
+package com.leo.careerforgeai.agent.domain.tool.career.search;
 
 import com.leo.careerforgeai.knowledge.domain.document.KnowledgeDocumentType;
 import jakarta.validation.constraints.NotBlank;

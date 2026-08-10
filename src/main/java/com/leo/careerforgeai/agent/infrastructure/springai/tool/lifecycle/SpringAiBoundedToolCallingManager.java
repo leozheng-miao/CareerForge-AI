@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.agent.infrastructure.springai.tool;
+package com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle;
 
 import com.leo.careerforgeai.agent.application.loop.ToolCallFingerprintService;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopPolicy;

@@ -1,5 +1,7 @@
-package com.leo.careerforgeai.agent.domain.loop;
+package com.leo.careerforgeai.agent.domain.loop.trace;
 
+import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
+import com.leo.careerforgeai.agent.domain.loop.AgentTerminationReason;
 import com.leo.careerforgeai.model.domain.ModelUsage;
 
 import java.time.Duration;

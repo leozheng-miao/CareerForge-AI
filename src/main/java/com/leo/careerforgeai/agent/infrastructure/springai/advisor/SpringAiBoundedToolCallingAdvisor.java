@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.agent.infrastructure.springai.advisor;
 
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopPolicy;
-import com.leo.careerforgeai.agent.infrastructure.springai.tool.SpringAiToolRunContext;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolRunContext;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.advisor.ToolCallingAdvisor;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;

@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.agent.api.dto;
 
-import com.leo.careerforgeai.agent.domain.loop.AgentToolCallTrace;
+import com.leo.careerforgeai.agent.domain.loop.trace.AgentToolCallTrace;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionErrorType;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionStatus;
 

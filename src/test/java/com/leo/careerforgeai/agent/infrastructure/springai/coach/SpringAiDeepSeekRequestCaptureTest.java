@@ -5,7 +5,7 @@ import com.leo.careerforgeai.agent.application.coach.CareerCoachScopeProvider;
 import com.leo.careerforgeai.agent.application.tool.ToolRegistry;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopPolicy;
-import com.leo.careerforgeai.agent.infrastructure.springai.tool.SpringAiToolCallbackCatalog;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.adapter.SpringAiToolCallbackCatalog;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

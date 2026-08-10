@@ -2,8 +2,8 @@ package com.leo.careerforgeai.agent.config;
 
 import com.leo.careerforgeai.agent.application.tool.SafeToolExecutor;
 import com.leo.careerforgeai.agent.application.tool.ToolRegistry;
-import com.leo.careerforgeai.agent.infrastructure.springai.tool.SpringAiToolCallbackCatalog;
-import com.leo.careerforgeai.agent.infrastructure.springai.tool.SpringAiToolDefinitionAdapter;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.adapter.SpringAiToolCallbackCatalog;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.adapter.SpringAiToolDefinitionAdapter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

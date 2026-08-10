@@ -3,13 +3,13 @@ package com.leo.careerforgeai.agent.infrastructure.springai.coach;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachDefinition;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachFinalAnswerValidator;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachScopeProvider;
-import com.leo.careerforgeai.agent.application.tool.career.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopPolicy;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;
-import com.leo.careerforgeai.agent.infrastructure.springai.tool.SpringAiToolLoopLimitException;
-import com.leo.careerforgeai.agent.infrastructure.springai.tool.SpringAiToolLoopLimitType;
-import com.leo.careerforgeai.agent.infrastructure.springai.tool.SpringAiToolRunContext;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolLoopLimitException;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolLoopLimitType;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolRunContext;
 import com.leo.careerforgeai.knowledge.config.KnowledgeSourceProperties;
 import com.leo.careerforgeai.knowledge.domain.document.KnowledgeDocumentType;
 import jakarta.validation.Validation;
@@ -44,9 +44,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import org.junit.jupiter.params.ParameterizedTest;
+
 import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.ai.retry.NonTransientAiException;
 import org.springframework.ai.retry.TransientAiException;
 import org.springframework.ai.tool.execution.ToolExecutionException;

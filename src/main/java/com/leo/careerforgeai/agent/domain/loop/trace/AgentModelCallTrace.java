@@ -1,5 +1,6 @@
-package com.leo.careerforgeai.agent.domain.loop;
+package com.leo.careerforgeai.agent.domain.loop.trace;
 
+import com.leo.careerforgeai.agent.domain.loop.AgentModelOutcome;
 import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 

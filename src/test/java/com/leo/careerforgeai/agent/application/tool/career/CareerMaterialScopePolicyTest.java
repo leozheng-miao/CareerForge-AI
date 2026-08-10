@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.agent.application.tool.career;
 
 import com.leo.careerforgeai.agent.application.tool.ToolExecutionException;
+import com.leo.careerforgeai.agent.application.tool.career.search.CareerMaterialScopePolicy;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionErrorType;
 import com.leo.careerforgeai.knowledge.domain.document.KnowledgeDocumentType;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalScope;

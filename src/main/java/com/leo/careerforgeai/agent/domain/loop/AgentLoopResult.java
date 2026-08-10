@@ -1,5 +1,7 @@
 package com.leo.careerforgeai.agent.domain.loop;
 
+import com.leo.careerforgeai.agent.domain.loop.trace.AgentRunTrace;
+import com.leo.careerforgeai.agent.domain.loop.trace.AgentToolCallTrace;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;
 
 import java.util.List;

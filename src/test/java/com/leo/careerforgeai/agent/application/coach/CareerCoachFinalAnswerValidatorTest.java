@@ -1,14 +1,14 @@
 package com.leo.careerforgeai.agent.application.coach;
 
-import com.leo.careerforgeai.agent.application.tool.career.ParseJobRequirementsTool;
-import com.leo.careerforgeai.agent.application.tool.career.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.ParseJobRequirementsTool;
+import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswer;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopResult;
 import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
-import com.leo.careerforgeai.agent.domain.loop.AgentRunTrace;
+import com.leo.careerforgeai.agent.domain.loop.trace.AgentRunTrace;
 import com.leo.careerforgeai.agent.domain.loop.AgentTerminationReason;
-import com.leo.careerforgeai.agent.domain.loop.AgentToolCallTrace;
+import com.leo.careerforgeai.agent.domain.loop.trace.AgentToolCallTrace;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionErrorType;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;
 import com.leo.careerforgeai.agent.domain.tool.ToolImplementationType;

@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.agent.domain.tool.career;
+package com.leo.careerforgeai.agent.domain.tool.career.parse;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

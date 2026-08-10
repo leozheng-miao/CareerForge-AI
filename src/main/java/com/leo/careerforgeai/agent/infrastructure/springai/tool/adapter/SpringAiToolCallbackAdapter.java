@@ -1,9 +1,10 @@
-package com.leo.careerforgeai.agent.infrastructure.springai.tool;
+package com.leo.careerforgeai.agent.infrastructure.springai.tool.adapter;
 
 import com.leo.careerforgeai.agent.application.tool.SafeToolExecutor;
 import com.leo.careerforgeai.agent.domain.tool.ToolContract;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionErrorType;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolRunContext;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolCall;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;

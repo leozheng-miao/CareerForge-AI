@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.agent.domain.tool.career;
+package com.leo.careerforgeai.agent.domain.tool.career.search;
 
 /**
  * @program: CareerForge-AI

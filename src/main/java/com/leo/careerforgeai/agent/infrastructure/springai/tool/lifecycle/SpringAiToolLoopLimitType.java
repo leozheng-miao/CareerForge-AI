@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.agent.infrastructure.springai.tool;
+package com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle;
 
 /**
  * @program: CareerForge-AI

@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.agent.application.tool.career;
+package com.leo.careerforgeai.agent.application.tool.career.search;
 
 import com.leo.careerforgeai.agent.application.tool.ToolExecutionException;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionErrorType;

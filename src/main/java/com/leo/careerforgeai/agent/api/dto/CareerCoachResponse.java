@@ -2,7 +2,7 @@ package com.leo.careerforgeai.agent.api.dto;
 
 import com.leo.careerforgeai.agent.application.coach.CareerCoachResult;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
-import com.leo.careerforgeai.agent.domain.loop.AgentRunTrace;
+import com.leo.careerforgeai.agent.domain.loop.trace.AgentRunTrace;
 import com.leo.careerforgeai.model.domain.ModelUsage;
 
 import java.util.List;

@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.agent.domain.tool.career;
+package com.leo.careerforgeai.agent.domain.tool.career.search;
 
 import java.util.List;
 

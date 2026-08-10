@@ -2,6 +2,9 @@ package com.leo.careerforgeai.agent.infrastructure.springai.tool;
 
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionContext;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolLoopLimitException;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolLoopLimitType;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolRunContext;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalScope;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ToolContext;

@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.agent.infrastructure.springai.tool;
+package com.leo.careerforgeai.agent.infrastructure.springai.tool.adapter;
 
 import com.leo.careerforgeai.agent.application.tool.SafeToolExecutor;
 import com.leo.careerforgeai.agent.application.tool.ToolRegistry;

@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.agent.infrastructure.springai.coach;
 
-import com.leo.careerforgeai.agent.application.tool.career.ParseJobRequirementsTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.ParseJobRequirementsTool;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionStatus;

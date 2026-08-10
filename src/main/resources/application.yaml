@@ -1,6 +1,17 @@
 spring:
   application:
     name: CareerForge-AI
+  ai:
+    chat:
+      client:
+        enabled: ${SPRING_AI_CAREER_COACH_ENABLED:false}
+    model:
+      chat: ${SPRING_AI_CHAT_MODEL:none}
+    deepseek:
+      base-url: ${AI_MODEL_BASE_URL}
+      api-key: ${AI_MODEL_API_KEY}
+      chat:
+        model: ${AI_MODEL_NAME}
   elasticsearch:
     uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
   jackson:
@@ -55,6 +66,8 @@ careerforge:
       model-call-timeout: ${AGENT_MODEL_CALL_TIMEOUT:30s}
       tool-executor-threads: ${AGENT_TOOL_EXECUTOR_THREADS:8}
       tool-executor-queue-capacity: ${AGENT_TOOL_EXECUTOR_QUEUE_CAPACITY:32}
+    spring-ai:
+      enabled: ${SPRING_AI_CAREER_COACH_ENABLED:false}
 server:
   port: 8080
 # springdoc-openapi 项目配置

@@ -46,9 +46,15 @@ public final class CareerCoachFinalAnswerValidator {
         if (loopResult == null || loopResult.status() != AgentRunStatus.COMPLETED) {
             throw failure(CareerCoachFinalAnswerErrorType.AGENT_RESULT_INVALID, "Agent未生成可校验的最终回答");
         }
+        return validate(loopResult.finalContent(), loopResult.toolResults());
+    }
 
-        CareerCoachModelOutput modelOutput = parseModelOutput(loopResult.finalContent());
-        Set<String> allowedChunkIds = collectAllowedChunkIds(loopResult);
+    public CareerCoachAnswer validate(String finalContent, java.util.List<ToolExecutionResult> toolResults) {
+        if (toolResults == null || toolResults.stream().anyMatch(java.util.Objects::isNull)) {
+            throw failure(CareerCoachFinalAnswerErrorType.TOOL_RESULT_INVALID, "Agent工具结果集合不合法");
+        }
+        CareerCoachModelOutput modelOutput = parseModelOutput(finalContent);
+        Set<String> allowedChunkIds = collectAllowedChunkIds(toolResults);
 
         for (String citedChunkId : modelOutput.citedChunkIds()) {
             if (!allowedChunkIds.contains(citedChunkId)) {
@@ -85,10 +91,10 @@ public final class CareerCoachFinalAnswerValidator {
     }
 
     /** 只从本轮成功的search_career_materials结果中收集合法Chunk ID。 */
-    private Set<String> collectAllowedChunkIds(AgentLoopResult loopResult) {
+    private Set<String> collectAllowedChunkIds(java.util.List<ToolExecutionResult> toolResults) {
         LinkedHashSet<String> allowedChunkIds = new LinkedHashSet<>();
 
-        for (ToolExecutionResult toolResult : loopResult.toolResults()) {
+        for (ToolExecutionResult toolResult : toolResults) {
             if (toolResult.status() != ToolExecutionStatus.SUCCESS
                     || !SearchCareerMaterialsTool.NAME.equals(toolResult.toolName())) {
                 continue;

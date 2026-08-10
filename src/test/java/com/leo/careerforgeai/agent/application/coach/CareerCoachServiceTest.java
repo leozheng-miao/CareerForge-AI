@@ -73,7 +73,8 @@ class CareerCoachServiceTest {
                         )
                 )
         );
-        service = new CareerCoachService(agentLoop, finalAnswerValidator, sourceProperties);
+        CareerCoachScopeProvider scopeProvider = new CareerCoachScopeProvider(sourceProperties);
+        service = new CareerCoachService(agentLoop, finalAnswerValidator, scopeProvider);
     }
 
     @Test
@@ -116,7 +117,7 @@ class CareerCoachServiceTest {
         assertThat(request.retrievalScope().documentIds())
                 .containsExactlyInAnyOrder("job-document", "interview-document");
         assertThat(request.outputFormat()).isEqualTo(ModelOutputFormat.JSON_OBJECT);
-        assertThat(request.contextVersion()).isEqualTo("career-coach-native-v1|prompt=1|tools=1");
+        assertThat(request.contextVersion()).isEqualTo(CareerCoachDefinition.CONTEXT_VERSION);
 
         verify(finalAnswerValidator).validate(loopResult);
     }

@@ -215,6 +215,30 @@ class CareerCoachFinalAnswerValidatorTest {
         assertThat(answer.citedChunkIds()).isEmpty();
     }
 
+    @Test
+    @DisplayName("框架无关入口能够校验最终正文和本次工具结果")
+    void shouldValidateFrameworkIndependentResult() {
+        CareerCoachAnswer answer = validator.validate(
+                answeredJson("这是Spring AI对照回答。"),
+                List.of()
+        );
+
+        assertThat(answer.status()).isEqualTo(CareerCoachAnswerStatus.ANSWERED);
+        assertThat(answer.answer()).isEqualTo("这是Spring AI对照回答。");
+        assertThat(answer.citedChunkIds()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("框架无关入口拒绝非法工具结果集合")
+    void shouldRejectInvalidToolResultCollection() {
+        assertThatThrownBy(() -> validator.validate(answeredJson("回答。"), null))
+                .isInstanceOfSatisfying(
+                        CareerCoachFinalAnswerException.class,
+                        exception -> assertThat(exception.getErrorType())
+                                .isEqualTo(CareerCoachFinalAnswerErrorType.TOOL_RESULT_INVALID)
+                );
+    }
+
     /** 创建带一个可选Chunk引用的ANSWERED模型JSON。 */
     private String answeredJson(String answer, String... citedChunkIds) {
         String citations = citedChunkIds.length == 0

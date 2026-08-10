@@ -1,0 +1,12 @@
+spring:
+  config:
+    activate:
+      on-profile: spring-ai-smoke
+  ai:
+    model:
+      chat: deepseek
+
+careerforge:
+  agent:
+    spring-ai:
+      enabled: true

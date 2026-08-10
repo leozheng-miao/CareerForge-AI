@@ -60,6 +60,7 @@ public final class SafeToolExecutor {
         if (toolCall == null) throw new IllegalArgumentException("toolCall 不能为空");
         if (context == null) throw new IllegalArgumentException("context 不能为空");
 
+        // 验证 tool 白名单
         Optional<AgentTool<?, ?>> registered = registry.find(toolCall.name());
         if (registered.isEmpty()) {
             return failure(toolCall, ToolExecutionErrorType.UNKNOWN_TOOL, "工具不可用");
@@ -132,14 +133,20 @@ public final class SafeToolExecutor {
         Future<AgentToolOutput<O>> future;
 
         try {
+            // 放入线程池，对最大工作线程数做限制，防止当前请求线程一直阻塞（执行隔离 + 有界资源 + 超时等待）
+            // tool.execute() 从刚才的白名单结果中执行工具
+            // future 本质上用于 等待结果/检查是否完成/取得结果/捕获任务异常/请求取消任务/限制等待时间
             future = executorService.submit(() -> tool.execute(input, context));
         } catch (RuntimeException exception) {
             return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "工具执行任务无法提交");
         }
 
         try {
+            // 等待 executionTimeout 期间 get 结果
+            // 四种结果： 正常、超时、工具异常、当前等待线程被中断
             AgentToolOutput<O> output = future.get(toTimeoutNanos(executionTimeout), TimeUnit.NANOSECONDS);
 
+            // 防止 ‘迟到的 成功结果 ’ 绕过总体 Deadline
             if (!clock.instant().isBefore(context.deadline())) {
                 return failure(toolCall, ToolExecutionErrorType.TIMEOUT, "Agent Deadline 已到期");
             }

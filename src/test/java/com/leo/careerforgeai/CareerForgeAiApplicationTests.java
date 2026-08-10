@@ -16,6 +16,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
+import com.leo.careerforgeai.agent.infrastructure.mcp.server.tool.McpSearchCareerMaterialsToolProvider;
+import io.modelcontextprotocol.server.McpSyncServer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(properties = {
         "careerforge.model.base-url=http://localhost",
         "careerforge.model.api-key=test-placeholder",
+        "spring.ai.mcp.server.enabled=false",
         "careerforge.model.name=test-model"
 })
 class CareerForgeAiApplicationTests {
@@ -74,6 +77,9 @@ class CareerForgeAiApplicationTests {
         assertThat(applicationContext.getBeansOfType(SpringAiCareerCoachService.class)).isEmpty();
         assertThat(applicationContext.getBeansOfType(ChatModel.class)).isEmpty();
         assertThat(applicationContext.getBeansOfType(ChatClient.Builder.class)).isEmpty();
+        assertThat(applicationContext.getBeansOfType(McpSearchCareerMaterialsToolProvider.class)).isEmpty();
+        assertThat(applicationContext.getBeansOfType(McpSyncServer.class)).isEmpty();
+        assertThat(applicationContext.containsBean("webMvcStreamableServerRouterFunction")).isFalse();
     }
 
     @Test

@@ -1,0 +1,16 @@
+spring:
+  config:
+    activate:
+      on-profile: mcp-smoke
+  ai:
+    mcp:
+      server:
+        enabled: true
+        name: careerforge-career-materials-mcp
+        version: 0.0.1
+        streamable-http:
+          mcp-endpoint: /mcp
+
+server:
+  address: 127.0.0.1
+  port: 8081

@@ -12,6 +12,24 @@ spring:
       api-key: ${AI_MODEL_API_KEY}
       chat:
         model: ${AI_MODEL_NAME}
+    mcp:
+      server:
+        enabled: false
+        protocol: STREAMABLE
+        type: SYNC
+        tool-callback-converter: false
+        expose-mcp-client-tools: false
+        annotation-scanner:
+          enabled: false
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: false
+        request-timeout: 12s
+        resource-change-notification: false
+        prompt-change-notification: false
+        tool-change-notification: false
   elasticsearch:
     uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
   jackson:

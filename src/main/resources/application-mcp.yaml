@@ -1,0 +1,30 @@
+spring:
+  config:
+    activate:
+      on-profile: mcp
+  ai:
+    model:
+      chat: none
+    chat:
+      client:
+        enabled: false
+    mcp:
+      server:
+        enabled: true
+        name: careerforge-career-materials-mcp
+        version: 0.0.1
+        streamable-http:
+          mcp-endpoint: /mcp
+
+server:
+  address: 127.0.0.1
+  port: ${MCP_SERVER_PORT:8081}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+knife4j:
+  enable: false

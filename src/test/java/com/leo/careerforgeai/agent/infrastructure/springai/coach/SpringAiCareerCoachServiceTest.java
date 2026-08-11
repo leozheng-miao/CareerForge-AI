@@ -53,6 +53,8 @@ import org.springframework.ai.tool.execution.ToolExecutionException;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * @program: CareerForge-AI
@@ -254,6 +256,44 @@ class SpringAiCareerCoachServiceTest {
                 .isGreaterThan(restrictivePolicy.maxModelIterations());
     }
 
+    @Test
+    @DisplayName("模型在Agent Deadline后返回时拒绝迟到结果并映射为超时")
+    void shouldRejectFinalContentReturnedAfterAgentDeadline() {
+        Clock lateClock = mock(Clock.class);
+        when(lateClock.instant()).thenReturn(
+                NOW,
+                NOW.plusSeconds(61)
+        );
+
+        RecordingChatModel chatModel = new RecordingChatModel("""
+            {"status":"ANSWERED","answer":"这是迟到的最终回答。","citedChunkIds":[]}
+            """);
+        SpringAiCareerCoachService service = new SpringAiCareerCoachService(
+                ChatClient.create(chatModel),
+                new CareerCoachFinalAnswerValidator(
+                        JsonMapper.builder().build(),
+                        validatorFactory.getValidator()
+                ),
+                scopeProvider(),
+                List.of(new NoOpToolCallback()),
+                policy(),
+                lateClock
+        );
+
+        assertThatThrownBy(() -> service.coach("测试迟到的Spring AI结果"))
+                .isInstanceOfSatisfying(
+                        SpringAiCareerCoachExecutionException.class,
+                        exception -> {
+                            assertThat(exception.getErrorType())
+                                    .isEqualTo(SpringAiCareerCoachErrorType.TIMED_OUT);
+                            assertThat(exception.getToolResults()).isEmpty();
+                            assertThat(exception.getMessage())
+                                    .isEqualTo("Spring AI Career Coach未能完成本次请求");
+                        }
+                );
+    }
+
+
     private CareerCoachScopeProvider scopeProvider() {
         KnowledgeSourceProperties properties = new KnowledgeSourceProperties(
                 "careerforge-career-materials",
@@ -309,12 +349,20 @@ class SpringAiCareerCoachServiceTest {
                         SpringAiCareerCoachErrorType.LIMIT_EXCEEDED
                 ),
                 Arguments.of(
+                        "Agent Deadline到期",
+                        new SpringAiToolLoopLimitException(
+                                SpringAiToolLoopLimitType.DEADLINE_EXCEEDED
+                        ),
+                        SpringAiCareerCoachErrorType.TIMED_OUT
+                ),
+                Arguments.of(
                         "未知框架故障",
                         new IllegalStateException("provider-secret"),
                         SpringAiCareerCoachErrorType.FRAMEWORK_FAILURE
                 )
         );
     }
+
 
     /**
      * @program: CareerForge-AI

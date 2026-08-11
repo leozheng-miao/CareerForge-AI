@@ -11,5 +11,6 @@ public enum SpringAiCareerCoachErrorType {
     NON_TRANSIENT_MODEL_FAILURE,
     TOOL_EXECUTION_FAILURE,
     LIMIT_EXCEEDED,
+    TIMED_OUT,
     FRAMEWORK_FAILURE
 }

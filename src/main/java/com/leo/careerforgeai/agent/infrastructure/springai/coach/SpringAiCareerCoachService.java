@@ -7,6 +7,7 @@ import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswer;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopPolicy;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionContext;
 import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolLoopLimitException;
+import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolLoopLimitType;
 import com.leo.careerforgeai.agent.infrastructure.springai.tool.lifecycle.SpringAiToolRunContext;
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalScope;
 import org.springframework.ai.chat.client.ChatClient;
@@ -89,8 +90,8 @@ public final class SpringAiCareerCoachService {
                     .call()
                     .content();
         } catch (SpringAiToolLoopLimitException exception) {
-            throw executionFailure(runId, SpringAiCareerCoachErrorType.LIMIT_EXCEEDED,
-                    runContext, exception);
+            throw executionFailure(runId, mapLoopErrorType(exception), runContext,
+                    exception);
         } catch (TransientAiException exception) {
             throw executionFailure(runId, SpringAiCareerCoachErrorType.TRANSIENT_MODEL_FAILURE,
                     runContext, exception);
@@ -105,8 +106,16 @@ public final class SpringAiCareerCoachService {
                     runContext, exception);
         }
 
+        Instant finishedAt = clock.instant();
+        // 拒绝迟到的最终回答
+        if (!finishedAt.isBefore(executionContext.deadline())) {
+            throw executionFailure(runId, SpringAiCareerCoachErrorType.TIMED_OUT,
+                    runContext,
+                    new SpringAiToolLoopLimitException(SpringAiToolLoopLimitType.DEADLINE_EXCEEDED)
+            );
+        }
         CareerCoachAnswer answer = finalAnswerValidator.validate(finalContent, runContext.results());
-        long totalDurationMs = Math.max(0, Duration.between(startedAt, clock.instant()).toMillis());
+        long totalDurationMs = Math.max(0, Duration.between(startedAt, finishedAt).toMillis());
         return new SpringAiCareerCoachResult(answer, runId, runContext.results(), totalDurationMs);
     }
 
@@ -118,5 +127,18 @@ public final class SpringAiCareerCoachService {
     ) {
         return new SpringAiCareerCoachExecutionException(
                 runId, errorType, runContext.results(), cause);
+    }
+
+    /** 区分Agent Deadline超时和普通循环限制。 */
+    private SpringAiCareerCoachErrorType mapLoopErrorType(
+            SpringAiToolLoopLimitException exception
+    ) {
+        return switch (exception.getLimitType()) {
+            case DEADLINE_EXCEEDED -> SpringAiCareerCoachErrorType.TIMED_OUT;
+            case MAX_MODEL_ITERATIONS,
+                 MAX_TOTAL_TOOL_CALLS,
+                 MAX_CALLS_PER_TOOL,
+                 REPEATED_TOOL_CALL -> SpringAiCareerCoachErrorType.LIMIT_EXCEEDED;
+        };
     }
 }

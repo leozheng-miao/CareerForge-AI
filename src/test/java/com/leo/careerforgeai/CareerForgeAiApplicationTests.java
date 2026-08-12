@@ -20,6 +20,10 @@ import com.leo.careerforgeai.agent.infrastructure.mcp.server.tool.McpSearchCaree
 import io.modelcontextprotocol.server.McpSyncServer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.flywaydb.core.Flyway;
+
+import javax.sql.DataSource;
 
 /**
  * @program: CareerForge-AI
@@ -104,5 +108,12 @@ class CareerForgeAiApplicationTests {
             assertThat(jsonMapper.readTree(springDefinition.inputSchema()))
                     .isEqualTo(jsonMapper.readTree(nativeDefinition.inputSchemaJson()));
         }
+    }
+
+    @Test
+    void ordinaryTestContextShouldNotCreateDatabaseInfrastructure() {
+        assertThat(applicationContext.getBeansOfType(DataSource.class)).isEmpty();
+        assertThat(applicationContext.getBeansOfType(SqlSessionFactory.class)).isEmpty();
+        assertThat(applicationContext.getBeansOfType(Flyway.class)).isEmpty();
     }
 }

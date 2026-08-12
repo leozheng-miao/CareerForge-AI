@@ -139,7 +139,7 @@ public class TrainingPlanApplicationService {
     private TrainingPlan requireOwnedPlan(ActorId actorId, UUID planId) {
         Objects.requireNonNull(planId, "planId 不能为空");
 
-        return repository.findTrainingaPlan(actorId, planId)
+        return repository.findTrainingPlan(actorId, planId)
                 .orElseThrow(() -> new IllegalArgumentException("训练计划不存在或不属于当前用户"));
     }
 

@@ -1,13 +1,13 @@
 package com.leo.careerforgeai.memory.infrastructure.persistence.adapter;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.leo.careerforgeai.memory.application.port.MemoryDecisionRepository;
-import com.leo.careerforgeai.memory.application.port.MemoryRepository;
-import com.leo.careerforgeai.memory.domain.MemoryDecision;
-import com.leo.careerforgeai.memory.domain.MemoryItem;
-import com.leo.careerforgeai.memory.domain.MemoryNormalizedKey;
-import com.leo.careerforgeai.memory.domain.MemoryStatus;
-import com.leo.careerforgeai.memory.domain.MemoryType;
+import com.leo.careerforgeai.memory.application.port.profile.MemoryDecisionRepository;
+import com.leo.careerforgeai.memory.application.port.profile.MemoryRepository;
+import com.leo.careerforgeai.memory.domain.profile.MemoryDecision;
+import com.leo.careerforgeai.memory.domain.profile.MemoryItem;
+import com.leo.careerforgeai.memory.domain.profile.MemoryNormalizedKey;
+import com.leo.careerforgeai.memory.domain.profile.MemoryStatus;
+import com.leo.careerforgeai.memory.domain.profile.MemoryType;
 import com.leo.careerforgeai.memory.infrastructure.persistence.converter.MemoryPersistenceConverter;
 import com.leo.careerforgeai.memory.infrastructure.persistence.entity.MemoryDecisionEntity;
 import com.leo.careerforgeai.memory.infrastructure.persistence.entity.MemoryItemEntity;

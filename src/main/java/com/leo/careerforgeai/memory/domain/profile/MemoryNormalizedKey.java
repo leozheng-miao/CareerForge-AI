@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.memory.domain;
+package com.leo.careerforgeai.memory.domain.profile;
 
 import java.util.Locale;
 import java.util.Map;

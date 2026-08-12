@@ -1,6 +1,6 @@
-package com.leo.careerforgeai.memory.application.port;
+package com.leo.careerforgeai.memory.application.port.profile;
 
-import com.leo.careerforgeai.memory.domain.MemoryDecision;
+import com.leo.careerforgeai.memory.domain.profile.MemoryDecision;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
 import java.util.List;

@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.memory.infrastructure.persistence.adapter;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.leo.careerforgeai.memory.application.port.CoachingConversationRepository;
+import com.leo.careerforgeai.memory.application.port.conversation.CoachingConversationRepository;
 import com.leo.careerforgeai.memory.domain.conversation.CoachingSession;
 import com.leo.careerforgeai.memory.domain.conversation.ConversationTurn;
 import com.leo.careerforgeai.memory.infrastructure.persistence.converter.CoachingConversationPersistenceConverter;

@@ -1,5 +1,9 @@
 package com.leo.careerforgeai.memory.domain;
 
+import com.leo.careerforgeai.memory.domain.profile.MemoryDecisionType;
+import com.leo.careerforgeai.memory.domain.profile.MemoryStateMachine;
+import com.leo.careerforgeai.memory.domain.profile.MemoryStatus;
+import com.leo.careerforgeai.memory.domain.profile.MemoryTransitionException;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;

@@ -1,6 +1,6 @@
-package com.leo.careerforgeai.memory.application;
+package com.leo.careerforgeai.memory.application.conversation;
 
-import com.leo.careerforgeai.memory.application.port.CoachingConversationRepository;
+import com.leo.careerforgeai.memory.application.port.conversation.CoachingConversationRepository;
 import com.leo.careerforgeai.memory.domain.conversation.CoachingSession;
 import com.leo.careerforgeai.memory.domain.conversation.ConversationTurn;
 import com.leo.careerforgeai.memory.domain.conversation.ConversationTurnRole;

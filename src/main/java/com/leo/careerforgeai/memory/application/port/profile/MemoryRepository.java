@@ -1,8 +1,8 @@
-package com.leo.careerforgeai.memory.application.port;
+package com.leo.careerforgeai.memory.application.port.profile;
 
-import com.leo.careerforgeai.memory.domain.MemoryItem;
-import com.leo.careerforgeai.memory.domain.MemoryNormalizedKey;
-import com.leo.careerforgeai.memory.domain.MemoryType;
+import com.leo.careerforgeai.memory.domain.profile.MemoryItem;
+import com.leo.careerforgeai.memory.domain.profile.MemoryNormalizedKey;
+import com.leo.careerforgeai.memory.domain.profile.MemoryType;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
 import java.util.List;

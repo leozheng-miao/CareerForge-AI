@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.memory.application;
 
-import com.leo.careerforgeai.memory.application.port.CoachingConversationRepository;
+import com.leo.careerforgeai.memory.application.conversation.CoachingSessionApplicationService;
+import com.leo.careerforgeai.memory.application.port.conversation.CoachingConversationRepository;
 import com.leo.careerforgeai.memory.domain.conversation.CoachingSession;
 import com.leo.careerforgeai.memory.domain.conversation.CoachingSessionStatus;
 import com.leo.careerforgeai.memory.domain.conversation.ConversationTurn;

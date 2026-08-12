@@ -1,13 +1,13 @@
 package com.leo.careerforgeai.memory.infrastructure.persistence.converter;
 
-import com.leo.careerforgeai.memory.domain.MemoryDecision;
-import com.leo.careerforgeai.memory.domain.MemoryDecisionType;
-import com.leo.careerforgeai.memory.domain.MemoryItem;
-import com.leo.careerforgeai.memory.domain.MemoryNormalizedKey;
-import com.leo.careerforgeai.memory.domain.MemorySource;
-import com.leo.careerforgeai.memory.domain.MemorySourceType;
-import com.leo.careerforgeai.memory.domain.MemoryStatus;
-import com.leo.careerforgeai.memory.domain.MemoryType;
+import com.leo.careerforgeai.memory.domain.profile.MemoryDecision;
+import com.leo.careerforgeai.memory.domain.profile.MemoryDecisionType;
+import com.leo.careerforgeai.memory.domain.profile.MemoryItem;
+import com.leo.careerforgeai.memory.domain.profile.MemoryNormalizedKey;
+import com.leo.careerforgeai.memory.domain.profile.MemorySource;
+import com.leo.careerforgeai.memory.domain.profile.MemorySourceType;
+import com.leo.careerforgeai.memory.domain.profile.MemoryStatus;
+import com.leo.careerforgeai.memory.domain.profile.MemoryType;
 import com.leo.careerforgeai.memory.infrastructure.persistence.entity.MemoryDecisionEntity;
 import com.leo.careerforgeai.memory.infrastructure.persistence.entity.MemoryItemEntity;
 import com.leo.careerforgeai.shared.actor.ActorId;

@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.memory.domain;
+package com.leo.careerforgeai.memory.domain.profile;
 
 import com.leo.careerforgeai.shared.actor.ActorId;
 

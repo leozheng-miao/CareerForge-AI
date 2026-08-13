@@ -141,4 +141,27 @@ class ToolCallingRequestTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("协议级长度限制");
     }
+
+    @Test
+    void shouldAcceptCompletedAssistantTextInConversationHistory() {
+        ToolCallingRequest request = new ToolCallingRequest(
+                List.of(
+                        new ToolCallingTextMessage(ModelRole.SYSTEM, "系统规则"),
+                        new ToolCallingTextMessage(ModelRole.USER, "什么是乐观锁"),
+                        new ToolCallingTextMessage(ModelRole.ASSISTANT, "乐观锁通常通过版本号检测并发更新"),
+                        new ToolCallingTextMessage(ModelRole.USER, "请给出一个例子")
+                ),
+                List.of(SEARCH_TOOL),
+                ToolChoiceMode.AUTO,
+                ModelOutputFormat.JSON_OBJECT,
+                512
+        );
+
+        assertThat(request.messages()).hasSize(4);
+        assertThat(request.messages().get(2))
+                .isEqualTo(new ToolCallingTextMessage(
+                        ModelRole.ASSISTANT,
+                        "乐观锁通常通过版本号检测并发更新"
+                ));
+    }
 }

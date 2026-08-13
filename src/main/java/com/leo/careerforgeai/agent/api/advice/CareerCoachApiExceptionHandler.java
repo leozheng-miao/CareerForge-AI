@@ -12,14 +12,18 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
+import com.leo.careerforgeai.agent.api.CoachingSessionController;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 /**
  * @program: CareerForge-AI
  * @description: 将Career Coach参数、运行终止和最终回答校验异常转换为安全API错误。
  * @author: Miao Zheng
  * @date: 2026-08-07 06:20
  **/
-@RestControllerAdvice(assignableTypes = CareerCoachController.class)
+@RestControllerAdvice(assignableTypes = {
+        CareerCoachController.class,
+        CoachingSessionController.class
+})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 public class CareerCoachApiExceptionHandler {
@@ -59,5 +63,24 @@ public class CareerCoachApiExceptionHandler {
     public BaseResponse<?> handleFinalAnswerFailure(CareerCoachFinalAnswerException exception) {
         log.warn("Career Coach最终回答校验失败，errorType={}", exception.getErrorType());
         return ResultUtils.error(ErrorCode.OPERATION_ERROR, "Career Coach回答校验失败，请重新尝试");
+    }
+
+    /** 将非法UUID等路径参数转换为安全参数错误。 */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public BaseResponse<?> handleTypeMismatch(
+            MethodArgumentTypeMismatchException exception
+    ) {
+        log.warn("Career Coach路径参数类型错误，parameter={}", exception.getName());
+        return ResultUtils.error(ErrorCode.PARAMS_ERROR, "请求路径参数格式不合法");
+    }
+
+    /** 将关闭会话、过期版本和并发冲突转换为安全操作错误。 */
+    @ExceptionHandler(IllegalStateException.class)
+    public BaseResponse<?> handleInvalidState(IllegalStateException exception) {
+        log.warn("Career Coach会话状态冲突，error={}", exception.getMessage());
+        return ResultUtils.error(
+                ErrorCode.OPERATION_ERROR,
+                "会话状态或版本已经变化，请刷新后重试"
+        );
     }
 }

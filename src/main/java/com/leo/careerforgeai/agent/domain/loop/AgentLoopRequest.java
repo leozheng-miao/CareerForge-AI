@@ -37,6 +37,9 @@ public record AgentLoopRequest(
         if (initialMessages.stream().noneMatch(message -> message.role() == ModelRole.USER)) {
             throw new IllegalArgumentException("至少需要一条 USER 消息");
         }
+        if (initialMessages.getLast().role() != ModelRole.USER) {
+            throw new IllegalArgumentException("最后一条初始消息必须是当前USER消息");
+        }
 
         Objects.requireNonNull(retrievalScope, "retrievalScope 不能为空");
         Objects.requireNonNull(outputFormat, "outputFormat 不能为空");

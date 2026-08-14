@@ -2,6 +2,7 @@ package com.leo.careerforgeai.memory.domain.profile;
 
 import com.leo.careerforgeai.shared.actor.ActorId;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -25,6 +26,9 @@ import java.util.UUID;
  * @param contentHash Memory正文的小写SHA-256
  * @param status 当前确认生命周期状态
  * @param source Memory的可追溯来源
+ * @param extractionModelRequestId 产生该候选的模型请求ID，非模型候选允许为空
+ * @param extractionConfidence 模型自评置信度，只用于候选审计或排序
+ * @param sourceAgentRunId 主要来源Turn关联的Agent Run ID，用户Turn来源时为空
  * @param evidenceRefs 关联的对话、文档或项目证据ID
  * @param supersedesId 当前Memory准备替代的旧Memory ID
  * @param version 乐观锁版本，新建时为0
@@ -40,6 +44,9 @@ public record MemoryItem(
         String contentHash,
         MemoryStatus status,
         MemorySource source,
+        String extractionModelRequestId,
+        BigDecimal extractionConfidence,
+        String sourceAgentRunId,
         List<String> evidenceRefs,
         UUID supersedesId,
         long version,
@@ -94,6 +101,19 @@ public record MemoryItem(
                     "updatedAt 不能早于createdAt"
             );
         }
+
+        extractionModelRequestId = normalizeOptional(
+                extractionModelRequestId,
+                "extractionModelRequestId",
+                128
+        );
+
+        sourceAgentRunId = normalizeOptional(sourceAgentRunId, "sourceAgentRunId", 128);
+        if (extractionConfidence != null
+                && (extractionConfidence.compareTo(BigDecimal.ZERO) < 0
+                || extractionConfidence.compareTo(BigDecimal.ONE) > 0)) {
+            throw new IllegalArgumentException("extractionConfidence必须在0到1之间");
+        }
     }
 
     /**
@@ -121,6 +141,9 @@ public record MemoryItem(
                 calculateContentHash(normalizedContent),
                 MemoryStatus.PENDING,
                 source,
+                null,
+                null,
+                null,
                 evidenceRefs,
                 null,
                 0,
@@ -163,8 +186,58 @@ public record MemoryItem(
                 calculateContentHash(normalizedContent),
                 MemoryStatus.PENDING,
                 source,
+                null,
+                null,
+                null,
                 evidenceRefs,
                 existingMemory.memoryId(),
+                0,
+                now,
+                now
+        );
+    }
+
+    /**
+     * 创建经过Extractor校验的PENDING候选。
+     * 模型请求ID只用于来源审计，不能作为用户确认依据。
+     */
+    public static MemoryItem createExtractedPending(
+            UUID memoryId,
+            ActorId ownerId,
+            MemoryType type,
+            MemoryNormalizedKey normalizedKey,
+            String content,
+            MemorySource source,
+            String extractionModelRequestId,
+            BigDecimal extractionConfidence,
+            String sourceAgentRunId,
+            List<String> evidenceRefs,
+            Instant now
+    ) {
+        Objects.requireNonNull(source, "source不能为空");
+        Objects.requireNonNull(extractionConfidence, "extractionConfidence不能为空");
+        if (source.sourceType() != MemorySourceType.CONVERSATION_TURN) {
+            throw new IllegalArgumentException("会话提取候选必须来源于Conversation Turn");
+        }
+        if (extractionModelRequestId == null || extractionModelRequestId.isBlank()) {
+            throw new IllegalArgumentException("extractionModelRequestId不能为空");
+        }
+
+        String normalizedContent = normalizeContent(content);
+        return new MemoryItem(
+                memoryId,
+                ownerId,
+                type,
+                normalizedKey,
+                normalizedContent,
+                calculateContentHash(normalizedContent),
+                MemoryStatus.PENDING,
+                source,
+                extractionModelRequestId,
+                extractionConfidence,
+                sourceAgentRunId,
+                evidenceRefs,
+                null,
                 0,
                 now,
                 now
@@ -177,37 +250,23 @@ public record MemoryItem(
     public MemoryItem applyDecision(MemoryDecision decision) {
         Objects.requireNonNull(decision, "decision 不能为空");
 
-        if (!memoryId.equals(decision.memoryId())
-                || !ownerId.equals(decision.ownerId())) {
-            throw new IllegalArgumentException(
-                    "决策不属于当前Memory"
-            );
+        if (!memoryId.equals(decision.memoryId()) || !ownerId.equals(decision.ownerId())) {
+            throw new IllegalArgumentException("决策不属于当前Memory");
         }
         if (version != decision.expectedMemoryVersion()) {
-            throw new IllegalArgumentException(
-                    "决策使用了过期Memory版本"
-            );
+            throw new IllegalArgumentException("决策使用了过期Memory版本");
         }
         if (status != decision.fromStatus()) {
-            throw new IllegalArgumentException(
-                    "决策起始状态与当前Memory不一致"
-            );
+            throw new IllegalArgumentException("决策起始状态与当前Memory不一致");
         }
         if (decision.decidedAt().isBefore(updatedAt)) {
-            throw new IllegalArgumentException(
-                    "决策时间不能早于Memory更新时间"
-            );
+            throw new IllegalArgumentException("决策时间不能早于Memory更新时间");
         }
 
-        MemoryStatus targetStatus = MemoryStateMachine.transition(
-                status,
-                decision.decisionType()
-        );
+        MemoryStatus targetStatus = MemoryStateMachine.transition(status, decision.decisionType());
 
         if (targetStatus != decision.toStatus()) {
-            throw new IllegalArgumentException(
-                    "决策目标状态不一致"
-            );
+            throw new IllegalArgumentException("决策目标状态不一致");
         }
 
         return new MemoryItem(
@@ -219,6 +278,9 @@ public record MemoryItem(
                 contentHash,
                 targetStatus,
                 source,
+                extractionModelRequestId,
+                extractionConfidence,
+                sourceAgentRunId,
                 evidenceRefs,
                 supersedesId,
                 version + 1,
@@ -293,6 +355,28 @@ public record MemoryItem(
         }
 
         return List.copyOf(normalizedRefs);
+    }
+
+    private static String normalizeOptional(
+            String value,
+            String fieldName,
+            int maxLength
+    ) {
+        if (value == null) {
+            return null;
+        }
+
+        String normalized = value.strip();
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException(fieldName + "不能为空字符串");
+        }
+        if (normalized.length() > maxLength) {
+            throw new IllegalArgumentException(fieldName + "超过长度限制");
+        }
+        if (normalized.chars().anyMatch(Character::isISOControl)) {
+            throw new IllegalArgumentException(fieldName + "不能包含控制字符");
+        }
+        return normalized;
     }
 
     private static String calculateContentHash(String content) {

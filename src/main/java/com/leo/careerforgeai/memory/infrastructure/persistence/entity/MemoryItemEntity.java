@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
@@ -65,6 +66,18 @@ public class MemoryItemEntity {
     /** 提取时来源内容的小写SHA-256。 */
     @TableField("source_hash")
     private String sourceHash;
+
+    /** 产生该候选的模型请求ID，非模型候选允许为空。 */
+    @TableField("extraction_model_request_id")
+    private String extractionModelRequestId;
+
+    /** 模型自评置信度，只用于候选审计或排序。 */
+    @TableField("extraction_confidence")
+    private BigDecimal extractionConfidence;
+
+    /** 主要来源Turn关联的Agent Run ID，用户Turn来源时为空。 */
+    @TableField("source_agent_run_id")
+    private String sourceAgentRunId;
 
     /** 证据ID列表的JSON数组。 */
     @TableField("evidence_refs_json")

@@ -60,6 +60,9 @@ public class MemoryPersistenceConverter {
         entity.setSourceType(memoryItem.source().sourceType().name());
         entity.setSourceId(memoryItem.source().sourceId());
         entity.setSourceHash(memoryItem.source().sourceHash());
+        entity.setExtractionModelRequestId(memoryItem.extractionModelRequestId());
+        entity.setExtractionConfidence(memoryItem.extractionConfidence());
+        entity.setSourceAgentRunId(memoryItem.sourceAgentRunId());
         entity.setEvidenceRefsJson(
                 serializeEvidenceRefs(memoryItem.evidenceRefs())
         );
@@ -96,6 +99,9 @@ public class MemoryPersistenceConverter {
                         entity.getSourceId(),
                         entity.getSourceHash()
                 ),
+                entity.getExtractionModelRequestId(),
+                entity.getExtractionConfidence(),
+                entity.getSourceAgentRunId(),
                 deserializeEvidenceRefs(
                         entity.getEvidenceRefsJson()
                 ),

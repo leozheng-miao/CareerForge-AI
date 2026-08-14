@@ -11,6 +11,7 @@ import com.leo.careerforgeai.agent.domain.loop.AgentTerminationReason;
 import com.leo.careerforgeai.agent.domain.loop.trace.AgentRunTrace;
 import com.leo.careerforgeai.memory.application.conversation.CoachingSessionApplicationService;
 import com.leo.careerforgeai.memory.domain.conversation.CoachingSession;
+import com.leo.careerforgeai.memory.domain.conversation.ConversationTurn;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.web.GlobalExceptionHandler;
 import jakarta.validation.Validation;
@@ -327,6 +328,41 @@ class CoachingSessionControllerTest {
                 .andExpect(content().string(
                         not(containsString("internal"))
                 ));
+    }
+
+    @Test
+    void shouldReturnOwnedTurnsWithServerCalculatedExtractionEligibility() throws Exception {
+        UUID turnId = UUID.fromString("20000000-0000-0000-0000-000000000001");
+        UUID exchangeId = UUID.fromString("30000000-0000-0000-0000-000000000001");
+        ConversationTurn turn = ConversationTurn.completedUser(
+                turnId,
+                SESSION_ID,
+                exchangeId,
+                ACTOR_ID,
+                1,
+                "我每周可以学习10小时",
+                NOW
+        );
+
+        when(sessionApplicationService.getRecentTurns(SESSION_ID))
+                .thenReturn(List.of(turn));
+
+        mockMvc.perform(get(BASE_URL + "/" + SESSION_ID + "/turns"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data[0].turnId").value(turnId.toString()))
+                .andExpect(jsonPath("$.data[0].turnSequence").value(1))
+                .andExpect(jsonPath("$.data[0].role").value("USER"))
+                .andExpect(jsonPath("$.data[0].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data[0].content").value("我每周可以学习10小时"))
+                .andExpect(jsonPath("$.data[0].memoryExtractionEligible").value(true))
+                .andExpect(jsonPath("$.data[0].createdAt").exists())
+                .andExpect(jsonPath("$.data[0].ownerId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].contentHash").doesNotExist())
+                .andExpect(jsonPath("$.data[0].exchangeId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].agentRunId").doesNotExist());
+
+        verify(sessionApplicationService).getRecentTurns(SESSION_ID);
     }
 
     private ConversationalCareerCoachResult

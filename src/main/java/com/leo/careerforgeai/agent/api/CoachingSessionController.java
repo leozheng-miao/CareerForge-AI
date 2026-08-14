@@ -2,12 +2,14 @@ package com.leo.careerforgeai.agent.api;
 
 import com.leo.careerforgeai.agent.api.dto.CoachingMessageResponse;
 import com.leo.careerforgeai.agent.api.dto.CoachingSessionResponse;
+import com.leo.careerforgeai.agent.api.dto.CoachingTurnResponse;
 import com.leo.careerforgeai.agent.api.dto.CreateCoachingSessionRequest;
 import com.leo.careerforgeai.agent.api.dto.SendCoachingMessageRequest;
 import com.leo.careerforgeai.agent.application.coach.ConversationalCareerCoachApplicationService;
 import com.leo.careerforgeai.memory.application.conversation.CoachingSessionApplicationService;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -57,6 +60,21 @@ public class CoachingSessionController {
                         sessionApplicationService.getSession(sessionId)
                 )
         );
+    }
+
+    /** 查询当前Actor会话最近的Turn，供会话展示和Memory来源选择。 */
+    @GetMapping("/{sessionId}/turns")
+    @Operation(summary = "查询当前用户会话最近的Turn")
+    public BaseResponse<List<CoachingTurnResponse>> getRecentTurns(
+            @PathVariable UUID sessionId
+    ) {
+        List<CoachingTurnResponse> turns = sessionApplicationService
+                .getRecentTurns(sessionId)
+                .stream()
+                .map(CoachingTurnResponse::from)
+                .toList();
+
+        return ResultUtils.success(turns);
     }
 
     /** 在当前Actor拥有的ACTIVE会话中发送一条消息。 */

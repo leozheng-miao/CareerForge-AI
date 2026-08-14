@@ -4,6 +4,7 @@ import com.leo.careerforgeai.memory.application.port.profile.MemoryDecisionRepos
 import com.leo.careerforgeai.memory.application.port.profile.MemoryRepository;
 import com.leo.careerforgeai.memory.application.profile.MemoryDecisionApplicationService;
 import com.leo.careerforgeai.memory.domain.profile.MemoryDecision;
+import com.leo.careerforgeai.memory.domain.profile.MemoryDecisionType;
 import com.leo.careerforgeai.memory.domain.profile.MemoryItem;
 import com.leo.careerforgeai.memory.domain.profile.MemoryNormalizedKey;
 import com.leo.careerforgeai.memory.domain.profile.MemorySource;
@@ -28,6 +29,11 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.leo.careerforgeai.memory.application.port.conversation.CoachingConversationRepository;
+import com.leo.careerforgeai.memory.domain.conversation.ConversationTurn;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * @program: CareerForge-AI
@@ -44,13 +50,19 @@ class MemoryDecisionApplicationServiceTest {
     private MutableCurrentActorProvider actorProvider;
     private InMemoryMemoryPersistence persistence;
     private MemoryDecisionApplicationService service;
+    private CoachingConversationRepository conversationRepository;
+    private long nextTurnSequence;
 
     @BeforeEach
     void setUp() {
         actorProvider = new MutableCurrentActorProvider(ACTOR_A);
+        conversationRepository = mock(CoachingConversationRepository.class);
         persistence = new InMemoryMemoryPersistence();
+        nextTurnSequence = 1;
+
         service = new MemoryDecisionApplicationService(
                 actorProvider,
+                conversationRepository,
                 persistence,
                 persistence,
                 Clock.fixed(NOW, ZoneOffset.UTC)
@@ -103,11 +115,20 @@ class MemoryDecisionApplicationServiceTest {
     }
 
     @Test
-    void shouldConfirmReplacementAndSupersedeOldMemory() {
-        MemoryItem originalCandidate = pendingMemory(UUID.randomUUID(), ACTOR_A, null, "我每周可以学习10小时");
+    void shouldConfirmReplacementAndReplayRepeatedRequest() {
+        MemoryItem originalCandidate = pendingMemory(
+                UUID.randomUUID(),
+                ACTOR_A,
+                null,
+                "我每周可以学习10小时"
+        );
         persistence.insert(originalCandidate);
+        MemoryItem confirmedOriginal = service.confirm(
+                originalCandidate.memoryId(),
+                0,
+                "确认原始时间"
+        );
 
-        MemoryItem confirmedOriginal = service.confirm(originalCandidate.memoryId(), 0, "确认原始时间");
         MemoryItem replacementCandidate = pendingMemory(
                 UUID.randomUUID(),
                 ACTOR_A,
@@ -116,22 +137,39 @@ class MemoryDecisionApplicationServiceTest {
         );
         persistence.insert(replacementCandidate);
 
+        long expectedExistingVersion = confirmedOriginal.version();
+        long expectedReplacementVersion = replacementCandidate.version();
+
         MemoryItem confirmedReplacement = service.confirmReplacement(
                 confirmedOriginal.memoryId(),
-                confirmedOriginal.version(),
+                expectedExistingVersion,
                 replacementCandidate.memoryId(),
-                replacementCandidate.version(),
+                expectedReplacementVersion,
                 "每周可用时间发生变化"
         );
+        MemoryItem replayedReplacement = service.confirmReplacement(
+                confirmedOriginal.memoryId(),
+                expectedExistingVersion,
+                replacementCandidate.memoryId(),
+                expectedReplacementVersion,
+                "重复提交不能覆盖原审计"
+        );
 
-        MemoryItem storedOriginal = persistence.findById(ACTOR_A, confirmedOriginal.memoryId()).orElseThrow();
+        MemoryItem storedOriginal = persistence
+                .findById(ACTOR_A, confirmedOriginal.memoryId())
+                .orElseThrow();
 
         assertThat(confirmedReplacement.status()).isEqualTo(MemoryStatus.CONFIRMED);
+        assertThat(confirmedReplacement.supersedesId()).isEqualTo(confirmedOriginal.memoryId());
         assertThat(storedOriginal.status()).isEqualTo(MemoryStatus.SUPERSEDED);
-        assertThat(persistence.findByMemoryId(ACTOR_A, replacementCandidate.memoryId())).hasSize(1);
-        assertThat(persistence.findByMemoryId(ACTOR_A, confirmedOriginal.memoryId())).hasSize(2);
+        assertThat(replayedReplacement).isEqualTo(confirmedReplacement);
+        assertThat(persistence.findByMemoryId(ACTOR_A, replacementCandidate.memoryId()))
+                .extracting(MemoryDecision::decisionType)
+                .containsExactly(MemoryDecisionType.CONFIRM);
+        assertThat(persistence.findByMemoryId(ACTOR_A, confirmedOriginal.memoryId()))
+                .extracting(MemoryDecision::decisionType)
+                .containsExactly(MemoryDecisionType.CONFIRM, MemoryDecisionType.SUPERSEDE);
     }
-
     @Test
     void shouldExcludeRevokedMemoryFromEffectiveProfileRead() {
         MemoryItem candidate = pendingMemory(
@@ -152,12 +190,151 @@ class MemoryDecisionApplicationServiceTest {
                 confirmed.version(),
                 "用户撤销该Memory"
         );
+        MemoryItem replayed = service.revoke(
+                candidate.memoryId(),
+                confirmed.version(),
+                "重复撤销不能覆盖原审计"
+        );
 
         assertThat(revoked.status()).isEqualTo(MemoryStatus.REVOKED);
+        assertThat(replayed).isEqualTo(revoked);
         assertThat(persistence.findConfirmedByOwner(ACTOR_A)).isEmpty();
+        assertThat(persistence.findByMemoryId(ACTOR_A, candidate.memoryId()))
+                .extracting(MemoryDecision::decisionType)
+                .containsExactly(MemoryDecisionType.CONFIRM, MemoryDecisionType.REVOKE);
     }
 
-    private MemoryItem pendingMemory(UUID memoryId, ActorId ownerId, UUID supersedesId, String content) {
+    @Test
+    void shouldReplayRepeatedConfirmationWithoutAnotherDecision() {
+        MemoryItem candidate = pendingMemory(
+                UUID.randomUUID(),
+                ACTOR_A,
+                null,
+                "我每周可以学习10小时"
+        );
+        persistence.insert(candidate);
+
+        MemoryItem firstResult = service.confirm(candidate.memoryId(), 0, "用户确认");
+        MemoryItem replayedResult = service.confirm(candidate.memoryId(), 0, "重复提交不会修改原审计");
+
+        assertThat(replayedResult).isEqualTo(firstResult);
+        assertThat(persistence.findByMemoryId(ACTOR_A, candidate.memoryId())).hasSize(1);
+    }
+
+    @Test
+    void shouldRejectOwnedPendingMemoryAndReplayRepeatedRejection() {
+        MemoryItem candidate = pendingMemory(
+                UUID.randomUUID(),
+                ACTOR_A,
+                null,
+                "我每周可以学习10小时"
+        );
+        persistence.insert(candidate);
+
+        MemoryItem rejected = service.reject(candidate.memoryId(), 0, "用户拒绝");
+        MemoryItem replayed = service.reject(candidate.memoryId(), 0, "重复拒绝");
+
+        assertThat(rejected.status()).isEqualTo(MemoryStatus.REJECTED);
+        assertThat(rejected.version()).isEqualTo(1);
+        assertThat(replayed).isEqualTo(rejected);
+        assertThat(persistence.findByMemoryId(ACTOR_A, candidate.memoryId())).hasSize(1);
+    }
+
+    @Test
+    void shouldRejectConflictingDecisionAfterConfirmation() {
+        MemoryItem candidate = pendingMemory(
+                UUID.randomUUID(),
+                ACTOR_A,
+                null,
+                "我每周可以学习10小时"
+        );
+        persistence.insert(candidate);
+        service.confirm(candidate.memoryId(), 0, "用户确认");
+
+        assertThatThrownBy(() -> service.reject(candidate.memoryId(), 0, "冲突拒绝"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Memory版本已经过期");
+
+        assertThat(persistence.findByMemoryId(ACTOR_A, candidate.memoryId())).hasSize(1);
+    }
+
+    @Test
+    void shouldRejectConfirmationWhenSourceTurnCannotBeRead() {
+        MemoryItem candidate = pendingMemory(
+                UUID.randomUUID(),
+                ACTOR_A,
+                null,
+                "我每周可以学习10小时"
+        );
+        persistence.insert(candidate);
+
+        UUID sourceTurnId = UUID.fromString(candidate.source().sourceId());
+        when(conversationRepository.findTurn(ACTOR_A, sourceTurnId))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.confirm(candidate.memoryId(), 0, "用户确认"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Memory来源Turn不存在或不属于当前用户");
+
+        assertThat(persistence.findById(ACTOR_A, candidate.memoryId()))
+                .get()
+                .extracting(MemoryItem::status)
+                .isEqualTo(MemoryStatus.PENDING);
+        assertThat(persistence.findByMemoryId(ACTOR_A, candidate.memoryId())).isEmpty();
+    }
+
+    @Test
+    void shouldRejectSilentConfirmationWhenSingleValueSlotAlreadyConfirmed() {
+        MemoryItem existingCandidate = pendingMemory(
+                UUID.randomUUID(),
+                ACTOR_A,
+                null,
+                "我每周可以学习10小时"
+        );
+        persistence.insert(existingCandidate);
+        MemoryItem confirmed = service.confirm(existingCandidate.memoryId(), 0, "确认原值");
+
+        MemoryItem conflictingCandidate = pendingMemory(
+                UUID.randomUUID(),
+                ACTOR_A,
+                null,
+                "我每周可以学习6小时"
+        );
+        persistence.insert(conflictingCandidate);
+
+        assertThatThrownBy(() -> service.confirm(
+                conflictingCandidate.memoryId(),
+                0,
+                "不能静默覆盖"
+        ))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("同一槽位已有CONFIRMED Memory，请使用显式替代");
+
+        assertThat(persistence.findById(ACTOR_A, confirmed.memoryId()))
+                .get()
+                .extracting(MemoryItem::status)
+                .isEqualTo(MemoryStatus.CONFIRMED);
+        assertThat(persistence.findById(ACTOR_A, conflictingCandidate.memoryId()))
+                .get()
+                .extracting(MemoryItem::status)
+                .isEqualTo(MemoryStatus.PENDING);
+        assertThat(persistence.findByMemoryId(ACTOR_A, conflictingCandidate.memoryId())).isEmpty();
+    }
+
+    private MemoryItem pendingMemory(
+            UUID memoryId,
+            ActorId ownerId,
+            UUID supersedesId,
+            String content
+    ) {
+        ConversationTurn sourceTurn = completedUserTurn(ownerId, content);
+        MemorySource source = new MemorySource(
+                MemorySourceType.CONVERSATION_TURN,
+                sourceTurn.turnId().toString(),
+                sourceTurn.contentHash()
+        );
+        List<String> evidenceRefs = List.of(sourceTurn.turnId().toString());
+
         if (supersedesId == null) {
             return MemoryItem.createPending(
                     memoryId,
@@ -165,33 +342,37 @@ class MemoryDecisionApplicationServiceTest {
                     MemoryType.TIME_CONSTRAINT,
                     MemoryNormalizedKey.timeConstraint(TimeConstraintKey.WEEKLY_HOURS),
                     content,
-                    source(memoryId),
-                    List.of("turn-user-1"),
+                    source,
+                    evidenceRefs,
                     NOW.minusSeconds(10)
             );
         }
 
         MemoryItem existingMemory = persistence.findById(ownerId, supersedesId).orElseThrow();
-
         return MemoryItem.createPendingReplacement(
                 memoryId,
                 existingMemory,
                 content,
-                source(memoryId),
-                List.of("turn-user-2"),
+                source,
+                evidenceRefs,
                 NOW.minusSeconds(5)
         );
     }
 
-    private MemorySource source(UUID memoryId) {
-        String sourceHash = memoryId.toString().replace("-", "");
-        sourceHash = (sourceHash + sourceHash).substring(0, 64);
-
-        return new MemorySource(
-                MemorySourceType.CONVERSATION_TURN,
-                "turn-" + memoryId,
-                sourceHash
+    private ConversationTurn completedUserTurn(ActorId ownerId, String content) {
+        ConversationTurn turn = ConversationTurn.completedUser(
+                UUID.randomUUID(),
+                UUID.fromString("10000000-0000-0000-0000-000000000001"),
+                UUID.randomUUID(),
+                ownerId,
+                nextTurnSequence++,
+                content,
+                NOW.minusSeconds(20)
         );
+
+        when(conversationRepository.findTurn(ownerId, turn.turnId()))
+                .thenReturn(Optional.of(turn));
+        return turn;
     }
 
     /**
@@ -215,6 +396,14 @@ class MemoryDecisionApplicationServiceTest {
         @Override
         public Optional<MemoryItem> findById(ActorId ownerId, UUID memoryId) {
             return Optional.ofNullable(memories.get(new OwnedMemoryKey(ownerId, memoryId)));
+        }
+
+        @Override
+        public List<MemoryItem> findPendingByOwner(ActorId ownerId) {
+            return memories.values().stream()
+                    .filter(memory -> memory.ownerId().equals(ownerId))
+                    .filter(memory -> memory.status() == MemoryStatus.PENDING)
+                    .toList();
         }
 
         @Override

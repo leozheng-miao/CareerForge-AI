@@ -12,9 +12,9 @@ import java.util.UUID;
 
 /**
  * @program: CareerForge-AI
- * @description: 返回供当前用户审阅的Memory候选及必要来源信息
+ * @description: 返回供当前用户审阅的Memory候选、替代关系及必要来源信息
  * @author: Miao Zheng
- * @date: 2026-08-13
+ * @date: 2026-08-14
  * @param memoryId 服务端生成的Memory标识
  * @param type Memory业务类型
  * @param normalizedKey Java生成的业务槽位
@@ -24,6 +24,7 @@ import java.util.UUID;
  * @param sourceId 主要来源Turn ID
  * @param evidenceRefs 证据Turn ID列表
  * @param extractionConfidence 模型自评置信度，不代表用户确认
+ * @param supersedesId 当前候选准备替代的旧Memory ID，普通候选为空
  * @param version 后续确认操作使用的乐观锁版本
  * @param createdAt 候选创建时间
  **/
@@ -37,6 +38,7 @@ public record MemoryCandidateResponse(
         String sourceId,
         List<String> evidenceRefs,
         BigDecimal extractionConfidence,
+        UUID supersedesId,
         long version,
         Instant createdAt
 ) {
@@ -52,6 +54,7 @@ public record MemoryCandidateResponse(
                 item.source().sourceId(),
                 item.evidenceRefs(),
                 item.extractionConfidence(),
+                item.supersedesId(),
                 item.version(),
                 item.createdAt()
         );

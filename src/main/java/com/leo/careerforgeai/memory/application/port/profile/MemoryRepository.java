@@ -21,10 +21,10 @@ public interface MemoryRepository {
     void insert(MemoryItem memoryItem);
 
     /** 按Memory ID和当前用户共同查询，防止跨owner读取。 */
-    Optional<MemoryItem> findById(
-            ActorId ownerId,
-            UUID memoryId
-    );
+    Optional<MemoryItem> findById(ActorId ownerId, UUID memoryId);
+
+    /** 查询当前用户等待确认的PENDING Memory候选。 */
+    List<MemoryItem> findPendingByOwner(ActorId ownerId);
 
     /** 查询当前用户所有仍然生效的CONFIRMED Memory。 */
     List<MemoryItem> findConfirmedByOwner(ActorId ownerId);

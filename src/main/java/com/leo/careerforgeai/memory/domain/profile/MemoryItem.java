@@ -245,6 +245,56 @@ public record MemoryItem(
     }
 
     /**
+     * 创建经过Extractor校验并准备显式替代旧Memory的PENDING候选。
+     * 旧Memory只用于继承服务端owner、类型和槽位，模型不能指定supersedesId。
+     */
+    public static MemoryItem createExtractedPendingReplacement(
+            UUID memoryId,
+            MemoryItem existingMemory,
+            String content,
+            MemorySource source,
+            String extractionModelRequestId,
+            BigDecimal extractionConfidence,
+            String sourceAgentRunId,
+            List<String> evidenceRefs,
+            Instant now
+    ) {
+        Objects.requireNonNull(existingMemory, "existingMemory不能为空");
+        Objects.requireNonNull(source, "source不能为空");
+        Objects.requireNonNull(extractionConfidence, "extractionConfidence不能为空");
+
+        if (existingMemory.status() != MemoryStatus.CONFIRMED) {
+            throw new IllegalArgumentException("只能为CONFIRMED Memory创建替代候选");
+        }
+        if (source.sourceType() != MemorySourceType.CONVERSATION_TURN) {
+            throw new IllegalArgumentException("会话提取候选必须来源于Conversation Turn");
+        }
+        if (extractionModelRequestId == null || extractionModelRequestId.isBlank()) {
+            throw new IllegalArgumentException("extractionModelRequestId不能为空");
+        }
+
+        String normalizedContent = normalizeContent(content);
+        return new MemoryItem(
+                memoryId,
+                existingMemory.ownerId(),
+                existingMemory.type(),
+                existingMemory.normalizedKey(),
+                normalizedContent,
+                calculateContentHash(normalizedContent),
+                MemoryStatus.PENDING,
+                source,
+                extractionModelRequestId,
+                extractionConfidence,
+                sourceAgentRunId,
+                evidenceRefs,
+                existingMemory.memoryId(),
+                0,
+                now,
+                now
+        );
+    }
+
+    /**
      * 应用已经完成业务校验的用户决策，返回新版本Memory。
      */
     public MemoryItem applyDecision(MemoryDecision decision) {

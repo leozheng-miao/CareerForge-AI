@@ -120,9 +120,7 @@ public class PendingMemoryCandidateWriter {
             Map<UUID, ConversationTurn> sourceTurnMap,
             MemoryExtractionResult extractionResult
     ) {
-        ConversationTurn sourceTurn =
-                sourceTurnMap.get(extracted.sourceTurnId());
-
+        ConversationTurn sourceTurn = sourceTurnMap.get(extracted.sourceTurnId());
         if (sourceTurn == null) {
             throw invalidOutput(
                     "Memory候选主要来源不在服务端Turn集合",
@@ -159,11 +157,51 @@ public class PendingMemoryCandidateWriter {
                         candidate.normalizedKey()
                 );
 
-        return findReusableCandidate(existingCandidates, candidate)
-                .orElseGet(() -> {
-                    memoryRepository.insert(candidate);
-                    return candidate;
-                });
+        Optional<MemoryItem> reusableCandidate =
+                findReusableCandidate(existingCandidates, candidate);
+
+        if (reusableCandidate.isPresent()) {
+            return reusableCandidate.get();
+        }
+
+        MemoryItem candidateToInsert =
+                createReplacementProposalIfNeeded(existingCandidates, candidate);
+
+        memoryRepository.insert(candidateToInsert);
+        return candidateToInsert;
+    }
+
+    private MemoryItem createReplacementProposalIfNeeded(
+            List<MemoryItem> existingCandidates,
+            MemoryItem candidate
+    ) {
+        if (candidate.type() == MemoryType.SKILL_EVIDENCE) {
+            return candidate;
+        }
+
+        List<MemoryItem> confirmedMemories = existingCandidates.stream()
+                .filter(existing -> existing.status() == MemoryStatus.CONFIRMED)
+                .toList();
+
+        if (confirmedMemories.size() > 1) {
+            throw new IllegalStateException("单值Memory槽位存在多个CONFIRMED记录");
+        }
+        if (confirmedMemories.isEmpty()) {
+            return candidate;
+        }
+
+        MemoryItem existingMemory = confirmedMemories.getFirst();
+        return MemoryItem.createExtractedPendingReplacement(
+                candidate.memoryId(),
+                existingMemory,
+                candidate.content(),
+                candidate.source(),
+                candidate.extractionModelRequestId(),
+                candidate.extractionConfidence(),
+                candidate.sourceAgentRunId(),
+                candidate.evidenceRefs(),
+                candidate.createdAt()
+        );
     }
 
     private Optional<MemoryItem> findReusableCandidate(

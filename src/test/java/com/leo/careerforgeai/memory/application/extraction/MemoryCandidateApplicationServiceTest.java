@@ -10,6 +10,8 @@ import com.leo.careerforgeai.memory.domain.conversation.CoachingSession;
 import com.leo.careerforgeai.memory.domain.conversation.ConversationTurn;
 import com.leo.careerforgeai.memory.domain.extraction.MemoryExtractionInputIdentity;
 import com.leo.careerforgeai.memory.domain.extraction.MemoryExtractionReceipt;
+import com.leo.careerforgeai.memory.domain.profile.MemoryDecision;
+import com.leo.careerforgeai.memory.domain.profile.MemoryDecisionType;
 import com.leo.careerforgeai.memory.domain.profile.MemoryItem;
 import com.leo.careerforgeai.memory.domain.profile.MemoryNormalizedKey;
 import com.leo.careerforgeai.memory.domain.profile.MemorySource;
@@ -348,9 +350,70 @@ class MemoryCandidateApplicationServiceTest {
                     .isNotEqualTo(existing.memoryId());
             assertThat(candidate.source().sourceId())
                     .isEqualTo(otherTurn.turnId().toString());
+            assertThat(candidate.supersedesId()).isNull();
         });
 
         verify(repository).insert(result.candidates().getFirst());
+    }
+
+    @Test
+    void shouldCreateReplacementProposalForConfirmedSingleValueSlot() {
+        MemoryRepository repository = mock(MemoryRepository.class);
+        MemoryExtractionReceiptRepository receipts =
+                mock(MemoryExtractionReceiptRepository.class);
+        PendingMemoryCandidateWriter realWriter = writer(repository, receipts);
+
+        MemoryItem originalCandidate = pendingCandidate();
+        MemoryDecision confirmDecision = MemoryDecision.create(
+                UUID.randomUUID(),
+                originalCandidate,
+                ACTOR_A,
+                MemoryDecisionType.CONFIRM,
+                null,
+                "用户确认原值",
+                NOW
+        );
+        MemoryItem confirmedMemory = originalCandidate.applyDecision(confirmDecision);
+        ConversationTurn newSourceTurn = otherUserTurn();
+
+        when(repository.findByOwnerAndNormalizedKey(
+                ACTOR_A,
+                confirmedMemory.type(),
+                confirmedMemory.normalizedKey()
+        )).thenReturn(List.of(confirmedMemory));
+
+        MemoryCandidateApplicationResult result = realWriter.save(
+                ACTOR_A,
+                List.of(newSourceTurn),
+                inputIdentity(newSourceTurn),
+                extractionResult(
+                        "我每周可以学习8小时",
+                        newSourceTurn.turnId()
+                )
+        );
+
+        assertThat(result.candidates()).singleElement().satisfies(replacement -> {
+            assertThat(replacement.status()).isEqualTo(MemoryStatus.PENDING);
+            assertThat(replacement.supersedesId())
+                    .isEqualTo(confirmedMemory.memoryId());
+            assertThat(replacement.ownerId())
+                    .isEqualTo(confirmedMemory.ownerId());
+            assertThat(replacement.type())
+                    .isEqualTo(confirmedMemory.type());
+            assertThat(replacement.normalizedKey())
+                    .isEqualTo(confirmedMemory.normalizedKey());
+            assertThat(replacement.content())
+                    .isEqualTo("我每周可以学习8小时");
+            assertThat(replacement.source().sourceId())
+                    .isEqualTo(newSourceTurn.turnId().toString());
+            assertThat(replacement.extractionModelRequestId())
+                    .isEqualTo("memory-request-1");
+        });
+
+        MemoryItem replacement = result.candidates().getFirst();
+        verify(repository).insert(replacement);
+        verify(receipts).insert(any(MemoryExtractionReceipt.class));
+        assertThat(confirmedMemory.status()).isEqualTo(MemoryStatus.CONFIRMED);
     }
 
     private void stubOwnedTurn(ConversationTurn turn) {

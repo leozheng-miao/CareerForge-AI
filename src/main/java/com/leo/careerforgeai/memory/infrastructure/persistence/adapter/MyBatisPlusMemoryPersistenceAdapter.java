@@ -96,6 +96,22 @@ public class MyBatisPlusMemoryPersistenceAdapter
     }
 
     @Override
+    public List<MemoryItem> findPendingByOwner(ActorId ownerId) {
+        Objects.requireNonNull(ownerId, "ownerId 不能为空");
+
+        LambdaQueryWrapper<MemoryItemEntity> query = new LambdaQueryWrapper<>();
+        query.eq(MemoryItemEntity::getOwnerId, ownerId.value())
+                .eq(MemoryItemEntity::getMemoryStatus, MemoryStatus.PENDING.name())
+                .orderByAsc(MemoryItemEntity::getCreatedAt)
+                .orderByAsc(MemoryItemEntity::getMemoryId);
+
+        return memoryItemMapper.selectList(query)
+                .stream()
+                .map(converter::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<MemoryItem> findConfirmedByOwner(
             ActorId ownerId
     ) {

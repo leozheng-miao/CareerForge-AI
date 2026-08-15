@@ -279,6 +279,221 @@ class MySqlMemoryPersistenceSmoke {
                 .containsExactly(occupiedDecisionVersion);
     }
 
+    /**
+     * @program: CareerForge-AI
+     * @description: 验证MySQL按owner和CONFIRMED状态精确读取Memory，并保留同技能不同来源证据
+     * @author: Miao Zheng
+     * @date: 2026-08-15
+     **/
+    @Test
+    void shouldReadConfirmedMemoryBaselineByOwnerStatusSkillGroupAndSource() {
+        Instant baseTime = NOW.plusSeconds(1_000);
+
+        UUID springSource1Id = UUID.fromString("10000000-0000-0000-0000-000000000001");
+        UUID springSource2Id = UUID.fromString("10000000-0000-0000-0000-000000000002");
+        UUID kafkaSourceId = UUID.fromString("10000000-0000-0000-0000-000000000003");
+        UUID pendingId = UUID.fromString("20000000-0000-0000-0000-000000000001");
+        UUID rejectedId = UUID.fromString("20000000-0000-0000-0000-000000000002");
+        UUID supersededId = UUID.fromString("20000000-0000-0000-0000-000000000003");
+        UUID revokedId = UUID.fromString("20000000-0000-0000-0000-000000000004");
+        UUID anotherOwnerId = UUID.fromString("30000000-0000-0000-0000-000000000001");
+
+        MemoryItem springSource1 = skillMemory(
+                springSource1Id,
+                SMOKE_ACTOR,
+                "Spring Boot",
+                "在项目中使用Spring Boot开发REST接口",
+                "source-turn-1",
+                MemoryStatus.CONFIRMED,
+                baseTime
+        );
+        MemoryItem springSource2 = skillMemory(
+                springSource2Id,
+                SMOKE_ACTOR,
+                "SpringBoot",
+                "使用Spring Boot实现过统一异常处理",
+                "source-turn-2",
+                MemoryStatus.CONFIRMED,
+                baseTime.plusSeconds(10)
+        );
+        MemoryItem kafkaSource = skillMemory(
+                kafkaSourceId,
+                SMOKE_ACTOR,
+                "Kafka",
+                "理解Kafka消费者组和分区消费关系",
+                "source-turn-3",
+                MemoryStatus.CONFIRMED,
+                baseTime.plusSeconds(20)
+        );
+        MemoryItem pending = skillMemory(
+                pendingId,
+                SMOKE_ACTOR,
+                "Spring Boot",
+                "尚未确认的Spring Boot候选",
+                "source-turn-pending",
+                MemoryStatus.PENDING,
+                baseTime.plusSeconds(30)
+        );
+        MemoryItem rejected = skillMemory(
+                rejectedId,
+                SMOKE_ACTOR,
+                "Spring Boot",
+                "已经拒绝的Spring Boot候选",
+                "source-turn-rejected",
+                MemoryStatus.REJECTED,
+                baseTime.plusSeconds(40)
+        );
+        MemoryItem superseded = skillMemory(
+                supersededId,
+                SMOKE_ACTOR,
+                "Spring Boot",
+                "已经被新证据替代的Spring Boot记忆",
+                "source-turn-superseded",
+                MemoryStatus.SUPERSEDED,
+                baseTime.plusSeconds(50)
+        );
+        MemoryItem revoked = skillMemory(
+                revokedId,
+                SMOKE_ACTOR,
+                "Spring Boot",
+                "用户已经撤销的Spring Boot记忆",
+                "source-turn-revoked",
+                MemoryStatus.REVOKED,
+                baseTime.plusSeconds(60)
+        );
+        MemoryItem anotherOwnerMemory = skillMemory(
+                anotherOwnerId,
+                OTHER_ACTOR,
+                "Spring Boot",
+                "其他owner的Spring Boot证据",
+                "source-turn-other-owner",
+                MemoryStatus.CONFIRMED,
+                baseTime.plusSeconds(70)
+        );
+
+        List.of(
+                springSource1,
+                springSource2,
+                kafkaSource,
+                pending,
+                rejected,
+                superseded,
+                revoked,
+                anotherOwnerMemory
+        ).forEach(memoryRepository::insert);
+
+        List<MemoryItem> actual = memoryRepository.findConfirmedByOwner(SMOKE_ACTOR);
+        List<UUID> inactiveIds = List.of(pendingId, rejectedId, supersededId, revokedId);
+
+        assertThat(actual)
+                .allMatch(memory -> memory.ownerId().equals(SMOKE_ACTOR))
+                .allMatch(memory -> memory.status() == MemoryStatus.CONFIRMED);
+
+        assertThat(actual)
+                .extracting(MemoryItem::memoryId)
+                .containsExactlyInAnyOrder(
+                        springSource1Id,
+                        springSource2Id,
+                        kafkaSourceId
+                );
+
+        assertThat(actual)
+                .noneMatch(memory -> inactiveIds.contains(memory.memoryId()))
+                .noneMatch(memory -> memory.memoryId().equals(anotherOwnerId));
+
+        MemoryNormalizedKey springBootKey =
+                MemoryNormalizedKey.skillEvidence("Spring Boot");
+
+        assertThat(actual.stream()
+                .filter(memory -> memory.type() == MemoryType.SKILL_EVIDENCE)
+                .filter(memory -> memory.normalizedKey().equals(springBootKey))
+                .toList())
+                .extracting(memory -> memory.source().sourceId())
+                .containsExactlyInAnyOrder("source-turn-1", "source-turn-2");
+
+        assertThat(actual).hasSize(3);
+    }
+
+    private MemoryItem skillMemory(
+            UUID memoryId,
+            ActorId ownerId,
+            String skillName,
+            String content,
+            String sourceId,
+            MemoryStatus targetStatus,
+            Instant createdAt
+    ) {
+        MemoryItem pending = MemoryItem.createPending(
+                memoryId,
+                ownerId,
+                MemoryType.SKILL_EVIDENCE,
+                MemoryNormalizedKey.skillEvidence(skillName),
+                content,
+                new MemorySource(
+                        MemorySourceType.CONVERSATION_TURN,
+                        sourceId,
+                        "a".repeat(64)
+                ),
+                List.of(sourceId),
+                createdAt
+        );
+
+        if (targetStatus == MemoryStatus.PENDING) {
+            return pending;
+        }
+        if (targetStatus == MemoryStatus.REJECTED) {
+            return applyDecision(
+                    pending,
+                    MemoryDecisionType.REJECT,
+                    null,
+                    createdAt.plusSeconds(1)
+            );
+        }
+
+        MemoryItem confirmed = applyDecision(
+                pending,
+                MemoryDecisionType.CONFIRM,
+                null,
+                createdAt.plusSeconds(1)
+        );
+
+        return switch (targetStatus) {
+            case CONFIRMED -> confirmed;
+            case SUPERSEDED -> applyDecision(
+                    confirmed,
+                    MemoryDecisionType.SUPERSEDE,
+                    UUID.randomUUID(),
+                    createdAt.plusSeconds(2)
+            );
+            case REVOKED -> applyDecision(
+                    confirmed,
+                    MemoryDecisionType.REVOKE,
+                    null,
+                    createdAt.plusSeconds(2)
+            );
+            case PENDING, REJECTED ->
+                    throw new IllegalStateException("目标状态处理分支异常");
+        };
+    }
+
+    private MemoryItem applyDecision(
+            MemoryItem memory,
+            MemoryDecisionType decisionType,
+            UUID replacementMemoryId,
+            Instant decidedAt
+    ) {
+        MemoryDecision decision = MemoryDecision.create(
+                UUID.randomUUID(),
+                memory,
+                memory.ownerId(),
+                decisionType,
+                replacementMemoryId,
+                "MySQL精确读取固定Case",
+                decidedAt
+        );
+        return memory.applyDecision(decision);
+    }
+
     private MemoryItem pendingMemory(UUID memoryId, String content) {
         return MemoryItem.createPending(
                 memoryId,
@@ -310,26 +525,28 @@ class MySqlMemoryPersistenceSmoke {
     }
 
     private void cleanSmokeData() {
-        jdbcTemplate.update(
-                "DELETE FROM memory_extraction_receipt WHERE owner_id = ?",
-                SMOKE_ACTOR.value()
-        );
-        jdbcTemplate.update(
-                "DELETE FROM memory_decision WHERE owner_id = ?",
-                SMOKE_ACTOR.value()
-        );
-        jdbcTemplate.update(
-                "DELETE FROM memory_item WHERE owner_id = ?",
-                SMOKE_ACTOR.value()
-        );
-        jdbcTemplate.update(
-                "DELETE FROM coaching_turn WHERE owner_id = ?",
-                SMOKE_ACTOR.value()
-        );
-        jdbcTemplate.update(
-                "DELETE FROM coaching_session WHERE owner_id = ?",
-                SMOKE_ACTOR.value()
-        );
+        for (ActorId actorId : List.of(SMOKE_ACTOR, OTHER_ACTOR)) {
+            jdbcTemplate.update(
+                    "DELETE FROM memory_extraction_receipt WHERE owner_id = ?",
+                    actorId.value()
+            );
+            jdbcTemplate.update(
+                    "DELETE FROM memory_decision WHERE owner_id = ?",
+                    actorId.value()
+            );
+            jdbcTemplate.update(
+                    "DELETE FROM memory_item WHERE owner_id = ?",
+                    actorId.value()
+            );
+            jdbcTemplate.update(
+                    "DELETE FROM coaching_turn WHERE owner_id = ?",
+                    actorId.value()
+            );
+            jdbcTemplate.update(
+                    "DELETE FROM coaching_session WHERE owner_id = ?",
+                    actorId.value()
+            );
+        }
     }
 
     /**

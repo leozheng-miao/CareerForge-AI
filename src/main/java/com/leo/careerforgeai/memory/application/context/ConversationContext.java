@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.memory.application.context;
 
 import com.leo.careerforgeai.memory.domain.profile.MemoryNormalizedKey;
+import com.leo.careerforgeai.memory.domain.profile.MemorySourceType;
 import com.leo.careerforgeai.memory.domain.profile.MemoryType;
 
 import java.util.List;
@@ -128,45 +129,37 @@ public record ConversationContext(
      * @program: CareerForge-AI
      * @description: 表示允许进入Context的最小已确认Memory投影
      * @author: Miao Zheng
-     * @date: 2026-08-12
+     * @date: 2026-08-15
      * @param memoryId Memory ID
      * @param type Memory业务类型
      * @param normalizedKey 业务槽位或技能分组
+     * @param sourceType Memory可信来源类型
+     * @param sourceId Memory主要来源ID
      * @param content 用户确认的Memory正文
      **/
     public record ConfirmedMemoryFact(
             UUID memoryId,
             MemoryType type,
             MemoryNormalizedKey normalizedKey,
+            MemorySourceType sourceType,
+            String sourceId,
             String content
     ) {
 
         public ConfirmedMemoryFact {
             Objects.requireNonNull(memoryId, "memoryId 不能为空");
             Objects.requireNonNull(type, "type 不能为空");
-            Objects.requireNonNull(
-                    normalizedKey,
-                    "normalizedKey 不能为空"
-            );
+            Objects.requireNonNull(normalizedKey, "normalizedKey 不能为空");
+            Objects.requireNonNull(sourceType, "sourceType 不能为空");
 
             if (!normalizedKey.supports(type)) {
-                throw new IllegalArgumentException(
-                        "normalizedKey与Memory类型不匹配"
-                );
+                throw new IllegalArgumentException("normalizedKey与Memory类型不匹配");
             }
 
-            content = normalizeRequired(
-                    content,
-                    "content",
-                    2_000
-            );
+            sourceId = normalizeIdentifier(sourceId, "sourceId", 128);
+            content = normalizeRequired(content, "content", 2_000);
         }
 
-        public int contentChars() {
-            return type.name().length()
-                    + normalizedKey.value().length()
-                    + content.length();
-        }
     }
 
     /**
@@ -259,5 +252,17 @@ public record ConversationContext(
                 && character != '\n'
                 && character != '\r'
                 && character != '\t';
+    }
+
+    private static String normalizeIdentifier(
+            String value,
+            String fieldName,
+            int maxLength
+    ) {
+        String normalized = normalizeRequired(value, fieldName, maxLength);
+        if (normalized.chars().anyMatch(Character::isISOControl)) {
+            throw new IllegalArgumentException(fieldName + " 包含非法控制字符");
+        }
+        return normalized;
     }
 }

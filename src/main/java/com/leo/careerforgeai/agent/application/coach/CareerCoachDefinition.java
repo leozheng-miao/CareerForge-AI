@@ -10,7 +10,7 @@ public final class CareerCoachDefinition {
 
     public static final int MAX_USER_MESSAGE_CHARS = 12_000;
 
-    public static final String CONTEXT_VERSION = "career-coach-v2|prompt=2|tools=1|conversation-context=1";
+    public static final String CONTEXT_VERSION = "career-coach-v2|prompt=2|tools=1|conversation-context=2";
 
     public static final String SYSTEM_PROMPT = """
             你是 CareerForge AI 的职业辅导单 Agent。

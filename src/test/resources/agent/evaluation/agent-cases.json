@@ -1,7 +1,7 @@
 {
   "schemaVersion": "agent-evaluation-v1",
   "evaluationSetVersion": "careerforge-agent-eval-v1",
-  "contextVersion": "career-coach-v1|prompt=1|tools=1",
+  "contextVersion": "career-coach-v2|prompt=2|tools=1|conversation-context=2",
   "realRunsPerCase": 3,
   "cases": [
     {

@@ -5,6 +5,7 @@ import com.leo.careerforgeai.memory.domain.conversation.ConversationTurn;
 import com.leo.careerforgeai.memory.domain.conversation.ConversationTurnStatus;
 import com.leo.careerforgeai.memory.domain.profile.MemoryItem;
 import com.leo.careerforgeai.memory.domain.conversation.ConversationTurnRole;
+import com.leo.careerforgeai.memory.domain.profile.MemoryType;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -44,11 +46,10 @@ public class ConversationContextAssembler {
         List<ConversationContext.ConversationExchange> completeExchanges =
                 buildCompleteExchanges(currentUserTurn, recentTurns);
 
-        List<MemoryItem> confirmedMemories = ownerMemories.stream()
-                .filter(memory -> memory.status().isEffectiveProfileMemory())
-                .sorted(Comparator.comparing(MemoryItem::updatedAt).reversed()
-                        .thenComparing(memory -> memory.memoryId().toString()))
-                .toList();
+        List<MemoryItem> confirmedMemories = selectConfirmedMemories(
+                currentUserTurn.content(),
+                ownerMemories
+        );
 
         int currentChars = currentUserTurn.content().length();
         ensureCurrentMessageFits(currentChars);
@@ -73,30 +74,57 @@ public class ConversationContextAssembler {
             totalChars = candidateChars;
         }
 
-        List<ConversationContext.ConfirmedMemoryFact> selectedMemories = new ArrayList<>();
+        int nonMemoryChars = totalChars;
+        int selectedMemoryContextChars = 0;
+
+        List<ConversationContext.ConfirmedMemoryFact> selectedMemories =
+                new ArrayList<>();
+
         if (mayIncludeMemoryContext) {
             for (MemoryItem memory : confirmedMemories) {
                 if (selectedMemories.size() >= policy.maxMemories()) {
                     break;
                 }
 
-                ConversationContext.ConfirmedMemoryFact memoryFact = new ConversationContext.ConfirmedMemoryFact(
-                        memory.memoryId(),
-                        memory.type(),
-                        memory.normalizedKey(),
-                        memory.content()
-                );
+                ConversationContext.ConfirmedMemoryFact memoryFact =
+                        new ConversationContext.ConfirmedMemoryFact(
+                                memory.memoryId(),
+                                memory.type(),
+                                memory.normalizedKey(),
+                                memory.source().sourceType(),
+                                memory.source().sourceId(),
+                                memory.content()
+                        );
 
-                int candidateChars = totalChars + memoryFact.contentChars();
-                int candidateMessageCount = selectedExchanges.size() * 2 + 2;
-                if (candidateMessageCount > policy.maxMessages() || !fitsBudget(candidateChars)) {
+                List<ConversationContext.ConfirmedMemoryFact> candidateMemories =
+                        new ArrayList<>(selectedMemories);
+                candidateMemories.add(memoryFact);
+
+                int candidateMemoryContextChars =
+                        ConfirmedMemoryContextFormatter
+                                .format(candidateMemories)
+                                .length();
+
+                int candidateChars =
+                        nonMemoryChars + candidateMemoryContextChars;
+
+                int candidateMessageCount =
+                        selectedExchanges.size() * 2 + 2;
+
+                if (candidateMessageCount > policy.maxMessages()) {
                     break;
+                }
+                if (!fitsBudget(candidateChars)) {
+                    continue;
                 }
 
                 selectedMemories.add(memoryFact);
-                totalChars = candidateChars;
+                selectedMemoryContextChars =
+                        candidateMemoryContextChars;
             }
         }
+
+        totalChars = nonMemoryChars + selectedMemoryContextChars;
 
         List<ConversationContext.ConversationExchange> selectedExchangeList = List.copyOf(selectedExchanges);
         int messageCount = selectedExchangeList.size() * 2 + 1 + (selectedMemories.isEmpty() ? 0 : 1);
@@ -158,6 +186,75 @@ public class ConversationContextAssembler {
                 throw new IllegalArgumentException("Memory列表包含其他用户的数据");
             }
         }
+    }
+
+    /**
+     * 按相关性、类型优先级、更新时间和稳定ID排序，并消除完全重复Memory。
+     * 相同技能但来源不同的证据不属于重复数据，必须继续保留。
+     */
+    private List<MemoryItem> selectConfirmedMemories(
+            String currentMessage,
+            List<MemoryItem> ownerMemories
+    ) {
+        String normalizedMessage = currentMessage.toLowerCase(Locale.ROOT);
+
+        Comparator<MemoryItem> selectionOrder = Comparator
+                .comparingInt((MemoryItem memory) ->
+                        memoryPriority(memory, normalizedMessage))
+                .thenComparing(
+                        Comparator.comparing(MemoryItem::updatedAt).reversed()
+                )
+                .thenComparing(memory -> memory.memoryId().toString());
+
+        Map<String, MemoryItem> uniqueMemories = new LinkedHashMap<>();
+
+        ownerMemories.stream()
+                .filter(memory -> memory.status().isEffectiveProfileMemory())
+                .sorted(selectionOrder)
+                .forEach(memory -> uniqueMemories.putIfAbsent(
+                        exactMemoryIdentity(memory),
+                        memory
+                ));
+
+        return List.copyOf(uniqueMemories.values());
+    }
+
+    /**
+     * 当前消息精确提到的技能证据优先，其次保留影响训练可行性的结构化Memory。
+     * 当前阶段只建立确定性精确匹配基线，不进行语义推断。
+     */
+    private int memoryPriority(
+            MemoryItem memory,
+            String normalizedMessage
+    ) {
+        if (memory.type() == MemoryType.SKILL_EVIDENCE
+                && normalizedMessage.contains(
+                memory.normalizedKey().value().toLowerCase(Locale.ROOT)
+        )) {
+            return 0;
+        }
+
+        return switch (memory.type()) {
+            case TIME_CONSTRAINT -> 1;
+            case CAREER_GOAL -> 2;
+            case LEARNING_PREFERENCE -> 3;
+            case SKILL_EVIDENCE -> 4;
+        };
+    }
+
+    /**
+     * 完全重复身份与数据库唯一约束保持一致。
+     * sourceId不同表示不同证据来源，不能被错误合并。
+     */
+    private String exactMemoryIdentity(MemoryItem memory) {
+        return String.join(
+                "\u0000",
+                memory.ownerId().value(),
+                memory.type().name(),
+                memory.normalizedKey().value(),
+                memory.source().sourceId(),
+                memory.contentHash()
+        );
     }
 
     private List<ConversationContext.ConversationExchange> buildCompleteExchanges(

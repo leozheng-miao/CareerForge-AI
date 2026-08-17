@@ -19,7 +19,8 @@ import java.util.UUID;
  * @param ownerId 快照所属用户
  * @param targetRoleId 计算差距时使用的目标岗位ID
  * @param targetRoleVersion 计算差距时使用的目标岗位版本
- * @param profileVersion 计算差距时使用的用户画像版本，0表示空画像
+ * @param profileVersion 计算差距时使用的技能画像有效状态变更版本
+ * @param algorithmVersion 生成快照时使用的确定性算法或Prompt版本
  * @param items 经过Java校验的差距明细
  * @param createdAt 快照创建时间
  **/
@@ -29,11 +30,13 @@ public record SkillGapSnapshot(
         UUID targetRoleId,
         long targetRoleVersion,
         long profileVersion,
+        String algorithmVersion,
         List<GapItem> items,
         Instant createdAt
 ) {
 
     public static final int MAX_ITEMS = 100;
+    public static final int MAX_ALGORITHM_VERSION_LENGTH = 64;
 
     public SkillGapSnapshot {
         Objects.requireNonNull(snapshotId, "snapshotId 不能为空");
@@ -47,7 +50,7 @@ public record SkillGapSnapshot(
         if (profileVersion < 0) {
             throw new IllegalArgumentException("profileVersion不能小于0");
         }
-
+        algorithmVersion = normalizeAlgorithmVersion(algorithmVersion);
         items = normalizeItems(items);
     }
 
@@ -60,17 +63,13 @@ public record SkillGapSnapshot(
             UUID targetRoleId,
             long targetRoleVersion,
             long profileVersion,
+            String algorithmVersion,
             List<GapItem> items,
             Instant createdAt
     ) {
         return new SkillGapSnapshot(
-                snapshotId,
-                ownerId,
-                targetRoleId,
-                targetRoleVersion,
-                profileVersion,
-                items,
-                createdAt
+                snapshotId, ownerId, targetRoleId, targetRoleVersion,
+                profileVersion, algorithmVersion, items, createdAt
         );
     }
 
@@ -98,6 +97,20 @@ public record SkillGapSnapshot(
         }
 
         return List.copyOf(items);
+    }
+
+    private static String normalizeAlgorithmVersion(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("algorithmVersion不能为空");
+        }
+        String normalized = value.strip();
+        if (normalized.length() > MAX_ALGORITHM_VERSION_LENGTH) {
+            throw new IllegalArgumentException("algorithmVersion超过长度限制");
+        }
+        if (normalized.chars().anyMatch(Character::isISOControl)) {
+            throw new IllegalArgumentException("algorithmVersion不能包含控制字符");
+        }
+        return normalized;
     }
 
     /**

@@ -267,6 +267,16 @@ public class MyBatisPlusMemoryPersistenceAdapter
                 .toList();
     }
 
+    @Override
+    public long countSkillProfileChanges(ActorId ownerId) {
+        Objects.requireNonNull(ownerId, "ownerId不能为空");
+        long profileVersion = memoryDecisionMapper.countSkillProfileChanges(ownerId.value());
+        if (profileVersion < 0) {
+            throw new IllegalStateException("技能画像版本不能小于0");
+        }
+        return profileVersion;
+    }
+
     private static void requireOwnerAndId(
             ActorId ownerId,
             UUID memoryId

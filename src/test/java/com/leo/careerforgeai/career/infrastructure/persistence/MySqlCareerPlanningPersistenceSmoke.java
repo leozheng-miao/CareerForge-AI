@@ -1,6 +1,8 @@
 package com.leo.careerforgeai.career.infrastructure.persistence;
 
 import com.leo.careerforgeai.CareerForgeAiApplication;
+import com.leo.careerforgeai.career.application.DeterministicSkillGapMatcher;
+import com.leo.careerforgeai.career.application.SkillGapSnapshotApplicationService;
 import com.leo.careerforgeai.career.application.TrainingPlanApplicationService;
 import com.leo.careerforgeai.career.application.port.CareerPlanningRepository;
 import com.leo.careerforgeai.career.domain.JobRequirements;
@@ -8,6 +10,17 @@ import com.leo.careerforgeai.career.domain.SkillGapSnapshot;
 import com.leo.careerforgeai.career.domain.TargetRole;
 import com.leo.careerforgeai.career.domain.TrainingPlan;
 import com.leo.careerforgeai.career.domain.TrainingPlanItem;
+import com.leo.careerforgeai.memory.application.port.profile.MemoryDecisionRepository;
+import com.leo.careerforgeai.memory.application.port.profile.MemoryRepository;
+import com.leo.careerforgeai.memory.application.profile.ConfirmedSkillProfile;
+import com.leo.careerforgeai.memory.application.profile.MemoryProfileQueryApplicationService;
+import com.leo.careerforgeai.memory.domain.profile.MemoryDecision;
+import com.leo.careerforgeai.memory.domain.profile.MemoryDecisionType;
+import com.leo.careerforgeai.memory.domain.profile.MemoryItem;
+import com.leo.careerforgeai.memory.domain.profile.MemoryNormalizedKey;
+import com.leo.careerforgeai.memory.domain.profile.MemorySource;
+import com.leo.careerforgeai.memory.domain.profile.MemorySourceType;
+import com.leo.careerforgeai.memory.domain.profile.MemoryType;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
 import org.flywaydb.core.Flyway;
@@ -28,7 +41,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -63,18 +79,30 @@ class MySqlCareerPlanningPersistenceSmoke {
     private final JdbcTemplate jdbcTemplate;
     private final CareerPlanningRepository repository;
     private final TrainingPlanApplicationService trainingPlanService;
+    private final SkillGapSnapshotApplicationService skillGapService;
+    private final MemoryProfileQueryApplicationService memoryProfileQueryService;
+    private final MemoryRepository memoryRepository;
+    private final MemoryDecisionRepository memoryDecisionRepository;
 
     @Autowired
     MySqlCareerPlanningPersistenceSmoke(
             Flyway flyway,
             JdbcTemplate jdbcTemplate,
             CareerPlanningRepository repository,
-            TrainingPlanApplicationService trainingPlanService
+            TrainingPlanApplicationService trainingPlanService,
+            SkillGapSnapshotApplicationService skillGapService,
+            MemoryProfileQueryApplicationService memoryProfileQueryService,
+            MemoryRepository memoryRepository,
+            MemoryDecisionRepository memoryDecisionRepository
     ) {
         this.flyway = flyway;
         this.jdbcTemplate = jdbcTemplate;
         this.repository = repository;
         this.trainingPlanService = trainingPlanService;
+        this.skillGapService = skillGapService;
+        this.memoryProfileQueryService = memoryProfileQueryService;
+        this.memoryRepository = memoryRepository;
+        this.memoryDecisionRepository = memoryDecisionRepository;
     }
 
     @BeforeEach
@@ -91,7 +119,7 @@ class MySqlCareerPlanningPersistenceSmoke {
     void shouldMigratePersistFilterByOwnerAndReadPlanAfterRestart() {
         assertThat(flyway.info().current()).isNotNull();
         assertThat(flyway.info().current().getVersion().getVersion())
-                .isEqualTo("3");
+                .isEqualTo("9");
 
         Integer tableCount = jdbcTemplate.queryForObject(
                 """
@@ -237,6 +265,126 @@ class MySqlCareerPlanningPersistenceSmoke {
         )).contains(existingPlan);
     }
 
+    @Test
+    void shouldGenerateReplayHistoricalGapAfterProfileChangesAndReloadByOwner() {
+        UUID targetRoleId = UUID.randomUUID();
+        repository.insertTargetRole(targetRole(targetRoleId));
+
+        MemoryItem javaProject = insertConfirmedSkill(
+                UUID.randomUUID(),
+                "Java",
+                MemorySourceType.PROJECT_EVIDENCE,
+                CREATED_AT.plusSeconds(10)
+        );
+        MemoryItem springSelfReport = insertConfirmedSkill(
+                UUID.randomUUID(),
+                "Spring Boot",
+                MemorySourceType.CONVERSATION_TURN,
+                CREATED_AT.plusSeconds(20)
+        );
+
+        ConfirmedSkillProfile profile =
+                memoryProfileQueryService.findConfirmedSkillProfile();
+
+        assertThat(profile.ownerId()).isEqualTo(SMOKE_ACTOR);
+        assertThat(profile.profileVersion()).isEqualTo(2);
+        assertThat(profile.skillEvidence())
+                .extracting(MemoryItem::memoryId)
+                .containsExactly(javaProject.memoryId(), springSelfReport.memoryId());
+
+        SkillGapSnapshot first = skillGapService.generate(
+                targetRoleId,
+                1,
+                profile.profileVersion()
+        );
+
+        Map<String, SkillGapSnapshot.GapItem> itemsByRef =
+                first.items().stream().collect(Collectors.toMap(
+                        SkillGapSnapshot.GapItem::requirementRef,
+                        Function.identity()
+                ));
+
+        assertThat(first.ownerId()).isEqualTo(SMOKE_ACTOR);
+        assertThat(first.targetRoleId()).isEqualTo(targetRoleId);
+        assertThat(first.targetRoleVersion()).isEqualTo(1);
+        assertThat(first.profileVersion()).isEqualTo(2);
+        assertThat(first.algorithmVersion())
+                .isEqualTo(DeterministicSkillGapMatcher.ALGORITHM_VERSION);
+        assertThat(first.items()).hasSize(5);
+
+        assertThat(itemsByRef.get("programmingLanguages[0]").status())
+                .isEqualTo(SkillGapSnapshot.GapStatus.MATCHED);
+        assertThat(itemsByRef.get("programmingLanguages[0]").evidenceMemoryIds())
+                .containsExactly(javaProject.memoryId());
+
+        assertThat(itemsByRef.get("backendAndInfrastructureRequirements[0]").status())
+                .isEqualTo(SkillGapSnapshot.GapStatus.UNVERIFIED);
+        assertThat(itemsByRef.get("backendAndInfrastructureRequirements[0]").evidenceMemoryIds())
+                .containsExactly(springSelfReport.memoryId());
+
+        assertThat(itemsByRef.get("agentRequirements[0]").status())
+                .isEqualTo(SkillGapSnapshot.GapStatus.MISSING);
+        assertThat(itemsByRef.get("ragRequirements[0]").status())
+                .isEqualTo(SkillGapSnapshot.GapStatus.MISSING);
+        assertThat(itemsByRef.get("engineeringRequirements[0]").status())
+                .isEqualTo(SkillGapSnapshot.GapStatus.MISSING);
+
+        MemoryItem laterSkill = insertConfirmedSkill(
+                UUID.randomUUID(),
+                "Docker",
+                MemorySourceType.PROJECT_EVIDENCE,
+                CREATED_AT.plusSeconds(30)
+        );
+        ConfirmedSkillProfile changedProfile =
+                memoryProfileQueryService.findConfirmedSkillProfile();
+
+        assertThat(changedProfile.profileVersion()).isEqualTo(3);
+        assertThat(changedProfile.skillEvidence())
+                .extracting(MemoryItem::memoryId)
+                .contains(laterSkill.memoryId());
+
+        SkillGapSnapshot replay = skillGapService.generate(
+                targetRoleId,
+                1,
+                profile.profileVersion()
+        );
+
+        assertThat(replay).isEqualTo(first);
+        assertThat(repository.findSkillGapSnapshot(
+                SMOKE_ACTOR,
+                first.snapshotId()
+        )).contains(first);
+        assertThat(repository.findSkillGapSnapshotByInputVersions(
+                SMOKE_ACTOR,
+                targetRoleId,
+                1,
+                2,
+                DeterministicSkillGapMatcher.ALGORITHM_VERSION
+        )).contains(first);
+        assertThat(repository.findSkillGapSnapshot(
+                OTHER_ACTOR,
+                first.snapshotId()
+        )).isEmpty();
+
+        Integer snapshotCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM skill_gap_snapshot
+                WHERE owner_id = ?
+                  AND target_role_id = ?
+                  AND target_role_version = 1
+                  AND profile_version = 2
+                  AND algorithm_version = ?
+                """,
+                Integer.class,
+                SMOKE_ACTOR.value(),
+                targetRoleId.toString(),
+                DeterministicSkillGapMatcher.ALGORITHM_VERSION
+        );
+
+        assertThat(snapshotCount).isEqualTo(1);
+    }
+
     private TargetRole targetRole(UUID targetRoleId) {
         return TargetRole.createConfirmed(
                 targetRoleId,
@@ -272,6 +420,7 @@ class MySqlCareerPlanningPersistenceSmoke {
                 targetRoleId,
                 1,
                 0,
+                "deterministic-skill-gap-v1",
                 List.of(gapItem),
                 CREATED_AT.plusSeconds(1)
         );
@@ -361,6 +510,59 @@ class MySqlCareerPlanningPersistenceSmoke {
                 "DELETE FROM target_role WHERE owner_id = ?",
                 SMOKE_ACTOR.value()
         );
+
+        jdbcTemplate.update(
+                "DELETE FROM memory_decision WHERE owner_id = ?",
+                SMOKE_ACTOR.value()
+        );
+        jdbcTemplate.update(
+                "DELETE FROM memory_item WHERE owner_id = ?",
+                SMOKE_ACTOR.value()
+        );
+    }
+
+    private MemoryItem insertConfirmedSkill(
+            UUID memoryId,
+            String skill,
+            MemorySourceType sourceType,
+            Instant createdAt
+    ) {
+        String sourceId = "mysql-gap-smoke-" + memoryId;
+        MemoryItem pending = MemoryItem.createPending(
+                memoryId,
+                SMOKE_ACTOR,
+                MemoryType.SKILL_EVIDENCE,
+                MemoryNormalizedKey.skillEvidence(skill),
+                "已使用" + skill + "完成受控项目开发",
+                new MemorySource(
+                        sourceType,
+                        sourceId,
+                        "b".repeat(64)
+                ),
+                List.of(sourceId),
+                createdAt
+        );
+        memoryRepository.insert(pending);
+
+        MemoryDecision decision = MemoryDecision.create(
+                UUID.randomUUID(),
+                pending,
+                SMOKE_ACTOR,
+                MemoryDecisionType.CONFIRM,
+                null,
+                "MySQL Gap Smoke受控确认",
+                createdAt.plusSeconds(1)
+        );
+        MemoryItem confirmed = pending.applyDecision(decision);
+
+        assertThat(memoryRepository.updateIfVersionMatches(
+                SMOKE_ACTOR,
+                confirmed,
+                pending.version()
+        )).isTrue();
+
+        memoryDecisionRepository.insert(decision);
+        return confirmed;
     }
 
     /**

@@ -457,6 +457,18 @@ class MemoryDecisionApplicationServiceTest {
                     .toList();
         }
 
+        @Override
+        public long countSkillProfileChanges(ActorId ownerId) {
+            return decisions.stream()
+                    .filter(decision -> decision.ownerId().equals(ownerId))
+                    .filter(decision -> decision.decisionType() != MemoryDecisionType.REJECT)
+                    .filter(decision -> {
+                        MemoryItem memory = memories.get(new OwnedMemoryKey(ownerId, decision.memoryId()));
+                        return memory != null && memory.type() == MemoryType.SKILL_EVIDENCE;
+                    })
+                    .count();
+        }
+
         private record OwnedMemoryKey(ActorId ownerId, UUID memoryId) {
         }
     }

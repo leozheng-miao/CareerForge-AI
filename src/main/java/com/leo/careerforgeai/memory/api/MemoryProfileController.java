@@ -1,5 +1,6 @@
 package com.leo.careerforgeai.memory.api;
 
+import com.leo.careerforgeai.memory.api.dto.ConfirmedSkillProfileResponse;
 import com.leo.careerforgeai.memory.api.dto.MemoryCandidateResponse;
 import com.leo.careerforgeai.memory.application.profile.MemoryProfileQueryApplicationService;
 import com.leo.careerforgeai.shared.web.BaseResponse;
@@ -47,5 +48,15 @@ public class MemoryProfileController {
                 .stream()
                 .map(MemoryCandidateResponse::from)
                 .toList());
+    }
+
+    @GetMapping("/confirmed-skills")
+    @Operation(summary = "查询当前用户确定版本的已确认技能证据")
+    public BaseResponse<ConfirmedSkillProfileResponse> findConfirmedSkillProfile() {
+        return ResultUtils.success(
+                ConfirmedSkillProfileResponse.from(
+                        queryService.findConfirmedSkillProfile()
+                )
+        );
     }
 }

@@ -86,6 +86,7 @@ class CareerPlanningDomainTest {
                 TARGET_ROLE_ID,
                 1,
                 3,
+                "deterministic-skill-gap-v1",
                 List.of(partialGap),
                 NOW
         );
@@ -94,6 +95,7 @@ class CareerPlanningDomainTest {
         assertThat(snapshot.targetRoleVersion()).isEqualTo(1);
         assertThat(snapshot.profileVersion()).isEqualTo(3);
         assertThat(snapshot.items()).containsExactly(partialGap);
+        assertThat(snapshot.algorithmVersion()).isEqualTo("deterministic-skill-gap-v1");
     }
 
     @Test

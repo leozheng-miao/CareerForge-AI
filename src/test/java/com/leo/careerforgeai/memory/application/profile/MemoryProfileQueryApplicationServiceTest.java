@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 
 /**
  * @program: CareerForge-AI
@@ -125,6 +126,75 @@ class MemoryProfileQueryApplicationServiceTest {
         assertThatThrownBy(service::findConfirmedProfile)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("CONFIRMED Memory查询结果违反owner或状态边界");
+    }
+
+    @Test
+    void shouldBuildVersionedConfirmedSkillProfile() {
+        MemoryItem skill = confirmedSkillMemory(UUID.randomUUID(), ACTOR_A, "Spring Boot");
+        MemoryItem timeConstraint = confirmedMemory(UUID.randomUUID(), ACTOR_A, "我每周可以学习10小时");
+        when(memoryRepository.countSkillProfileChanges(ACTOR_A)).thenReturn(3L);
+        when(memoryRepository.findConfirmedByOwner(ACTOR_A)).thenReturn(List.of(timeConstraint, skill));
+
+        ConfirmedSkillProfile result = service.findConfirmedSkillProfile();
+
+        assertThat(result.ownerId()).isEqualTo(ACTOR_A);
+        assertThat(result.profileVersion()).isEqualTo(3);
+        assertThat(result.skillEvidence()).containsExactly(skill);
+        verify(memoryRepository, times(2)).countSkillProfileChanges(ACTOR_A);
+    }
+
+    @Test
+    void shouldAllowEmptySkillProfileAfterEarlierRevocations() {
+        when(memoryRepository.countSkillProfileChanges(ACTOR_A)).thenReturn(4L);
+        when(memoryRepository.findConfirmedByOwner(ACTOR_A)).thenReturn(List.of());
+
+        ConfirmedSkillProfile result = service.findConfirmedSkillProfile();
+
+        assertThat(result.profileVersion()).isEqualTo(4);
+        assertThat(result.skillEvidence()).isEmpty();
+    }
+
+    @Test
+    void shouldFailClosedWhenSkillProfileChangesDuringRead() {
+        when(memoryRepository.countSkillProfileChanges(ACTOR_A)).thenReturn(2L, 3L);
+        when(memoryRepository.findConfirmedByOwner(ACTOR_A)).thenReturn(List.of());
+
+        assertThatThrownBy(service::findConfirmedSkillProfile)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("技能画像读取期间发生变化，请重试");
+    }
+
+    @Test
+    void shouldFailClosedWhenConfirmedEvidenceHasNoDecisionHistory() {
+        MemoryItem skill = confirmedSkillMemory(UUID.randomUUID(), ACTOR_A, "Spring Boot");
+        when(memoryRepository.countSkillProfileChanges(ACTOR_A)).thenReturn(0L);
+        when(memoryRepository.findConfirmedByOwner(ACTOR_A)).thenReturn(List.of(skill));
+
+        assertThatThrownBy(service::findConfirmedSkillProfile)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("profileVersion小于当前技能证据数量");
+    }
+
+    private MemoryItem confirmedSkillMemory(UUID memoryId, ActorId ownerId, String skillName) {
+        MemoryItem candidate = MemoryItem.createPending(
+                memoryId,
+                ownerId,
+                MemoryType.SKILL_EVIDENCE,
+                MemoryNormalizedKey.skillEvidence(skillName),
+                "项目中使用" + skillName + "开发并完成自动化测试",
+                new MemorySource(MemorySourceType.PROJECT_EVIDENCE, "project-" + memoryId, "b".repeat(64)),
+                List.of("project-" + memoryId),
+                NOW
+        );
+        return candidate.applyDecision(MemoryDecision.create(
+                UUID.randomUUID(),
+                candidate,
+                ownerId,
+                MemoryDecisionType.CONFIRM,
+                null,
+                "用户确认项目证据",
+                NOW.plusSeconds(1)
+        ));
     }
 
     private MemoryItem confirmedMemory(

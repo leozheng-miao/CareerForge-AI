@@ -3,6 +3,7 @@ package com.leo.careerforgeai.memory.application.profile;
 import com.leo.careerforgeai.memory.application.port.profile.MemoryRepository;
 import com.leo.careerforgeai.memory.domain.profile.MemoryItem;
 import com.leo.careerforgeai.memory.domain.profile.MemoryStatus;
+import com.leo.careerforgeai.memory.domain.profile.MemoryType;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -70,5 +71,22 @@ public class MemoryProfileQueryApplicationService {
             );
         }
         return List.copyOf(memories);
+    }
+
+    /** 读取当前用户确定版本的全部CONFIRMED技能证据。 */
+    @Transactional(readOnly = true)
+    public ConfirmedSkillProfile findConfirmedSkillProfile() {
+        ActorId actorId = Objects.requireNonNull(currentActorProvider.currentActor(), "currentActor不能为空");
+        long versionBefore = memoryRepository.countSkillProfileChanges(actorId);
+        List<MemoryItem> skillEvidence = requireOwnedStatus(
+                memoryRepository.findConfirmedByOwner(actorId),
+                actorId,
+                MemoryStatus.CONFIRMED
+        ).stream().filter(memory -> memory.type() == MemoryType.SKILL_EVIDENCE).toList();
+        long versionAfter = memoryRepository.countSkillProfileChanges(actorId);
+        if (versionBefore != versionAfter) {
+            throw new IllegalStateException("技能画像读取期间发生变化，请重试");
+        }
+        return new ConfirmedSkillProfile(actorId, versionAfter, skillEvidence);
     }
 }

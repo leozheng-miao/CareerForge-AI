@@ -38,6 +38,9 @@ public class SkillGapSnapshotEntity {
     @TableField("profile_version")
     private Long profileVersion;
 
+    @TableField("algorithm_version")
+    private String algorithmVersion;
+
     /** GapItem列表的JSON快照。 */
     @TableField("items_json")
     private String itemsJson;

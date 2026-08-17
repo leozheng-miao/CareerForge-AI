@@ -3,9 +3,11 @@ package com.leo.careerforgeai.career.infrastructure.persistence.converter;
 import com.leo.careerforgeai.career.domain.JobRequirements;
 import com.leo.careerforgeai.career.domain.SkillGapSnapshot;
 import com.leo.careerforgeai.career.domain.TargetRole;
+import com.leo.careerforgeai.career.domain.TargetRoleDraft;
 import com.leo.careerforgeai.career.domain.TrainingPlan;
 import com.leo.careerforgeai.career.domain.TrainingPlanItem;
 import com.leo.careerforgeai.career.infrastructure.persistence.entity.SkillGapSnapshotEntity;
+import com.leo.careerforgeai.career.infrastructure.persistence.entity.TargetRoleDraftEntity;
 import com.leo.careerforgeai.career.infrastructure.persistence.entity.TargetRoleEntity;
 import com.leo.careerforgeai.career.infrastructure.persistence.entity.TrainingPlanEntity;
 import com.leo.careerforgeai.career.infrastructure.persistence.entity.TrainingPlanItemEntity;
@@ -94,6 +96,7 @@ public class CareerPlanningPersistenceConverter {
         entity.setTargetRoleId(snapshot.targetRoleId().toString());
         entity.setTargetRoleVersion(snapshot.targetRoleVersion());
         entity.setProfileVersion(snapshot.profileVersion());
+        entity.setAlgorithmVersion(snapshot.algorithmVersion());
         entity.setItemsJson(serialize(snapshot.items(), "gapItems"));
         entity.setCreatedAt(snapshot.createdAt());
         return entity;
@@ -109,6 +112,7 @@ public class CareerPlanningPersistenceConverter {
                 UUID.fromString(entity.getTargetRoleId()),
                 requireLong(entity.getTargetRoleVersion(), "targetRoleVersion"),
                 requireLong(entity.getProfileVersion(), "profileVersion"),
+                entity.getAlgorithmVersion(),
                 deserialize(entity.getItemsJson(), GAP_ITEM_LIST_TYPE, "itemsJson"),
                 entity.getCreatedAt()
         );
@@ -168,6 +172,64 @@ public class CareerPlanningPersistenceConverter {
         entity.setCreatedAt(item.createdAt());
         entity.setUpdatedAt(item.updatedAt());
         return entity;
+    }
+
+    /** 将目标岗位草案转换为数据库Entity。 */
+    public TargetRoleDraftEntity toEntity(TargetRoleDraft draft) {
+        Objects.requireNonNull(draft, "draft不能为空");
+
+        TargetRoleDraftEntity entity = new TargetRoleDraftEntity();
+        entity.setDraftId(draft.draftId().toString());
+        entity.setOwnerId(draft.ownerId().value());
+        entity.setSourceRef(draft.sourceRef());
+        entity.setSourceHash(draft.sourceHash());
+        entity.setParserVersion(draft.parserVersion());
+        entity.setPromptVersion(draft.promptVersion());
+        entity.setRequirementsJson(
+                serialize(draft.requirementsSnapshot(), "requirements")
+        );
+        entity.setDraftStatus(draft.status().name());
+        entity.setVersion(draft.version());
+        entity.setCreatedAt(draft.createdAt());
+        entity.setConfirmedTargetRoleId(
+                draft.confirmedTargetRoleId() == null
+                        ? null
+                        : draft.confirmedTargetRoleId().toString()
+        );
+        entity.setConfirmedTargetRoleVersion(
+                draft.confirmedTargetRoleVersion()
+        );
+        entity.setConfirmedAt(draft.confirmedAt());
+        return entity;
+    }
+
+    /** 将数据库Entity还原为目标岗位草案。 */
+    public TargetRoleDraft toDomain(TargetRoleDraftEntity entity) {
+        Objects.requireNonNull(entity, "entity不能为空");
+
+        return new TargetRoleDraft(
+                UUID.fromString(entity.getDraftId()),
+                new ActorId(entity.getOwnerId()),
+                entity.getSourceRef(),
+                entity.getSourceHash(),
+                entity.getParserVersion(),
+                entity.getPromptVersion(),
+                deserialize(
+                        entity.getRequirementsJson(),
+                        JobRequirements.class,
+                        "requirementsJson"
+                ),
+                TargetRoleDraft.Status.valueOf(entity.getDraftStatus()),
+                requireLong(entity.getVersion(), "version"),
+                entity.getCreatedAt(),
+                entity.getConfirmedTargetRoleId() == null
+                        ? null
+                        : UUID.fromString(
+                        entity.getConfirmedTargetRoleId()
+                ),
+                entity.getConfirmedTargetRoleVersion(),
+                entity.getConfirmedAt()
+        );
     }
 
     /**

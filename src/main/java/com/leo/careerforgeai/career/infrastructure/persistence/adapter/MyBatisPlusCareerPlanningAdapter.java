@@ -4,14 +4,17 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.leo.careerforgeai.career.application.port.CareerPlanningRepository;
 import com.leo.careerforgeai.career.domain.SkillGapSnapshot;
 import com.leo.careerforgeai.career.domain.TargetRole;
+import com.leo.careerforgeai.career.domain.TargetRoleDraft;
 import com.leo.careerforgeai.career.domain.TrainingPlan;
 import com.leo.careerforgeai.career.domain.TrainingPlanItem;
 import com.leo.careerforgeai.career.infrastructure.persistence.converter.CareerPlanningPersistenceConverter;
 import com.leo.careerforgeai.career.infrastructure.persistence.entity.SkillGapSnapshotEntity;
+import com.leo.careerforgeai.career.infrastructure.persistence.entity.TargetRoleDraftEntity;
 import com.leo.careerforgeai.career.infrastructure.persistence.entity.TargetRoleEntity;
 import com.leo.careerforgeai.career.infrastructure.persistence.entity.TrainingPlanEntity;
 import com.leo.careerforgeai.career.infrastructure.persistence.entity.TrainingPlanItemEntity;
 import com.leo.careerforgeai.career.infrastructure.persistence.mapper.SkillGapSnapshotMapper;
+import com.leo.careerforgeai.career.infrastructure.persistence.mapper.TargetRoleDraftMapper;
 import com.leo.careerforgeai.career.infrastructure.persistence.mapper.TargetRoleMapper;
 import com.leo.careerforgeai.career.infrastructure.persistence.mapper.TrainingPlanItemMapper;
 import com.leo.careerforgeai.career.infrastructure.persistence.mapper.TrainingPlanMapper;
@@ -42,6 +45,7 @@ import java.util.UUID;
 @ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
 public class MyBatisPlusCareerPlanningAdapter implements CareerPlanningRepository {
 
+    private final TargetRoleDraftMapper targetRoleDraftMapper;
     private final TargetRoleMapper targetRoleMapper;
     private final SkillGapSnapshotMapper gapSnapshotMapper;
     private final TrainingPlanMapper trainingPlanMapper;
@@ -49,12 +53,14 @@ public class MyBatisPlusCareerPlanningAdapter implements CareerPlanningRepositor
     private final CareerPlanningPersistenceConverter converter;
 
     public MyBatisPlusCareerPlanningAdapter(
+            TargetRoleDraftMapper targetRoleDraftMapper,
             TargetRoleMapper targetRoleMapper,
             SkillGapSnapshotMapper gapSnapshotMapper,
             TrainingPlanMapper trainingPlanMapper,
             TrainingPlanItemMapper trainingPlanItemMapper,
             CareerPlanningPersistenceConverter converter
     ) {
+        this.targetRoleDraftMapper = Objects.requireNonNull(targetRoleDraftMapper, "targetRoleDraftMapper不能为空");
         this.targetRoleMapper = Objects.requireNonNull(targetRoleMapper, "targetRoleMapper 不能为空");
         this.gapSnapshotMapper = Objects.requireNonNull(gapSnapshotMapper, "gapSnapshotMapper 不能为空");
         this.trainingPlanMapper = Objects.requireNonNull(trainingPlanMapper, "trainingPlanMapper 不能为空");
@@ -115,24 +121,29 @@ public class MyBatisPlusCareerPlanningAdapter implements CareerPlanningRepositor
             ActorId ownerId,
             UUID targetRoleId,
             long targetRoleVersion,
-            long profileVersion
+            long profileVersion,
+            String algorithmVersion
     ) {
         requireOwnerAndId(ownerId, targetRoleId, "targetRoleId");
-
         if (targetRoleVersion < 1) {
             throw new IllegalArgumentException("targetRoleVersion必须从1开始");
         }
         if (profileVersion < 0) {
             throw new IllegalArgumentException("profileVersion不能小于0");
         }
+        if (algorithmVersion == null || algorithmVersion.isBlank()) {
+            throw new IllegalArgumentException("algorithmVersion不能为空");
+        }
 
         LambdaQueryWrapper<SkillGapSnapshotEntity> query = new LambdaQueryWrapper<>();
         query.eq(SkillGapSnapshotEntity::getOwnerId, ownerId.value())
                 .eq(SkillGapSnapshotEntity::getTargetRoleId, targetRoleId.toString())
                 .eq(SkillGapSnapshotEntity::getTargetRoleVersion, targetRoleVersion)
-                .eq(SkillGapSnapshotEntity::getProfileVersion, profileVersion);
+                .eq(SkillGapSnapshotEntity::getProfileVersion, profileVersion)
+                .eq(SkillGapSnapshotEntity::getAlgorithmVersion, algorithmVersion);
 
-        return Optional.ofNullable(gapSnapshotMapper.selectOne(query)).map(converter::toDomain);
+        return Optional.ofNullable(gapSnapshotMapper.selectOne(query))
+                .map(converter::toDomain);
     }
 
     /**
@@ -194,6 +205,29 @@ public class MyBatisPlusCareerPlanningAdapter implements CareerPlanningRepositor
         return Optional.of(loadCompletePlan(planEntity));
     }
 
+    @Override
+    public void insertTargetRoleDraft(TargetRoleDraft draft) {
+        Objects.requireNonNull(draft, "draft不能为空");
+
+        int affectedRows = targetRoleDraftMapper.insert(converter.toEntity(draft));
+        requireSingleAffectedRow(affectedRows, "插入TargetRoleDraft失败");
+    }
+
+    @Override
+    public Optional<TargetRoleDraft> findTargetRoleDraft(
+            ActorId ownerId,
+            UUID draftId
+    ) {
+        requireOwnerAndId(ownerId, draftId, "draftId");
+
+        LambdaQueryWrapper<TargetRoleDraftEntity> query = new LambdaQueryWrapper<>();
+
+        query.eq(TargetRoleDraftEntity::getOwnerId, ownerId.value())
+                .eq(TargetRoleDraftEntity::getDraftId, draftId.toString());
+
+        return Optional.ofNullable(targetRoleDraftMapper.selectOne(query)).map(converter::toDomain);
+    }
+
     /**
      * 先用计划主表version争抢聚合更新权，再更新发生变化的计划项。
      * 计划项更新失败时抛出异常，使主表更新一并回滚。
@@ -248,6 +282,79 @@ public class MyBatisPlusCareerPlanningAdapter implements CareerPlanningRepositor
 
         updateChangedItems(ownerId, currentPlan, updatedPlan);
         return true;
+    }
+
+    @Override
+    @Transactional
+    public void confirmTargetRoleDraft(
+            ActorId ownerId,
+            TargetRoleDraft confirmedDraft,
+            TargetRole targetRole,
+            long expectedDraftVersion
+    ) {
+        Objects.requireNonNull(ownerId, "ownerId不能为空");
+        Objects.requireNonNull(
+                confirmedDraft,
+                "confirmedDraft不能为空"
+        );
+        Objects.requireNonNull(targetRole, "targetRole不能为空");
+
+        if (!ownerId.equals(confirmedDraft.ownerId())
+                || !ownerId.equals(targetRole.ownerId())) {
+            throw new IllegalArgumentException(
+                    "ownerId与目标岗位确认数据不一致"
+            );
+        }
+        if (expectedDraftVersion < 0) {
+            throw new IllegalArgumentException(
+                    "expectedDraftVersion不能小于0"
+            );
+        }
+        if (confirmedDraft.status()
+                != TargetRoleDraft.Status.CONFIRMED) {
+            throw new IllegalArgumentException(
+                    "只能持久化CONFIRMED目标岗位草案"
+            );
+        }
+        if (confirmedDraft.version()
+                != expectedDraftVersion + 1) {
+            throw new IllegalArgumentException(
+                    "确认后草案version必须增加1"
+            );
+        }
+        if (!targetRole.targetRoleId().equals(
+                confirmedDraft.confirmedTargetRoleId()
+        ) || targetRole.targetRoleVersion()
+                != confirmedDraft.confirmedTargetRoleVersion()) {
+            throw new IllegalArgumentException(
+                    "草案确认结果与TargetRole不一致"
+            );
+        }
+
+        int targetAffectedRows = targetRoleMapper.insert(
+                converter.toEntity(targetRole)
+        );
+        requireSingleAffectedRow(
+                targetAffectedRows,
+                "插入TargetRole失败"
+        );
+
+        int draftAffectedRows =
+                targetRoleDraftMapper.confirmIfVersionMatches(
+                        confirmedDraft.draftId().toString(),
+                        ownerId.value(),
+                        targetRole.targetRoleId().toString(),
+                        targetRole.targetRoleVersion(),
+                        confirmedDraft.version(),
+                        confirmedDraft.confirmedAt(),
+                        expectedDraftVersion
+                );
+
+        if (draftAffectedRows != 1) {
+            throw new IllegalStateException(
+                    "目标岗位草案确认发生并发冲突"
+            );
+        }
     }
 
     private TrainingPlan loadCompletePlan(TrainingPlanEntity planEntity) {

@@ -48,4 +48,7 @@ public interface MemoryRepository {
             MemoryItem updatedMemory,
             long expectedVersion
     );
+
+    /** 统计当前用户会改变CONFIRMED技能画像的历史决策数量。 */
+    long countSkillProfileChanges(ActorId ownerId);
 }

@@ -77,6 +77,8 @@ class CareerPlanningPersistenceConverterTest {
         );
 
         assertThat(restored).isEqualTo(snapshot);
+        assertThat(restored.algorithmVersion())
+                .isEqualTo("deterministic-skill-gap-v1");
     }
 
     @Test
@@ -120,6 +122,7 @@ class CareerPlanningPersistenceConverterTest {
                 TARGET_ROLE_ID,
                 1,
                 3,
+                "deterministic-skill-gap-v1",
                 List.of(gapItem),
                 NOW
         );

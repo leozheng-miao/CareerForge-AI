@@ -10,6 +10,7 @@ import com.leo.careerforgeai.career.infrastructure.persistence.converter.CareerP
 import com.leo.careerforgeai.career.infrastructure.persistence.entity.TrainingPlanEntity;
 import com.leo.careerforgeai.career.infrastructure.persistence.entity.TrainingPlanItemEntity;
 import com.leo.careerforgeai.career.infrastructure.persistence.mapper.SkillGapSnapshotMapper;
+import com.leo.careerforgeai.career.infrastructure.persistence.mapper.TargetRoleDraftMapper;
 import com.leo.careerforgeai.career.infrastructure.persistence.mapper.TargetRoleMapper;
 import com.leo.careerforgeai.career.infrastructure.persistence.mapper.TrainingPlanItemMapper;
 import com.leo.careerforgeai.career.infrastructure.persistence.mapper.TrainingPlanMapper;
@@ -67,6 +68,7 @@ class MyBatisPlusCareerPlanningAdapterTest {
     private TrainingPlanItemMapper trainingPlanItemMapper;
     private CareerPlanningPersistenceConverter converter;
     private MyBatisPlusCareerPlanningAdapter adapter;
+    private TargetRoleDraftMapper targetRoleDraftMapper;
 
     @BeforeAll
     static void initializeMyBatisPlusMetadata() {
@@ -91,7 +93,10 @@ class MyBatisPlusCareerPlanningAdapterTest {
                 JsonMapper.builder().build()
         );
 
+        targetRoleDraftMapper = mock(TargetRoleDraftMapper.class);
+
         adapter = new MyBatisPlusCareerPlanningAdapter(
+                targetRoleDraftMapper,
                 targetRoleMapper,
                 gapSnapshotMapper,
                 trainingPlanMapper,

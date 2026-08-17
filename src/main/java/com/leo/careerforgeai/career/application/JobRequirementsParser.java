@@ -36,6 +36,12 @@ public class JobRequirementsParser {
     private final JsonMapper jsonMapper;
     private final Validator validator;
 
+    public static final String PARSER_VERSION =
+            "job-requirements-parser-v1";
+
+    public static final String PROMPT_VERSION =
+            "job-requirements-prompt-v1";
+
     private static final String SYSTEM_PROMPT = """
             你是 CareerForge AI 的岗位要求解析器。
 
@@ -220,5 +226,13 @@ public class JobRequirementsParser {
                 output.responsibilities(),
                 output.interviewTopics()
         );
+    }
+
+    public String parserVersion() {
+        return PARSER_VERSION;
+    }
+
+    public String promptVersion() {
+        return PROMPT_VERSION;
     }
 }

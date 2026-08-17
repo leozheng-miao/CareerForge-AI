@@ -2,6 +2,8 @@ package com.leo.careerforgeai.career.application;
 
 
 import com.leo.careerforgeai.career.application.port.CareerPlanningRepository;
+import com.leo.careerforgeai.career.application.targetrole.TargetRoleApplicationService;
+import com.leo.careerforgeai.career.application.targetrole.TargetRoleVersionConflictException;
 import com.leo.careerforgeai.career.domain.JobRequirements;
 import com.leo.careerforgeai.career.domain.TargetRole;
 import com.leo.careerforgeai.career.domain.TargetRoleDraft;

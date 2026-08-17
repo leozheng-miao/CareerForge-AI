@@ -3,7 +3,7 @@ package com.leo.careerforgeai.agent.infrastructure.mcp.client;
 
 import com.leo.careerforgeai.CareerForgeAiApplication;
 import com.leo.careerforgeai.agent.application.tool.SafeToolExecutor;
-import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.SearchCareerMaterialsTool;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;
 import com.leo.careerforgeai.knowledge.application.evidence.KnowledgeEvidenceSearchService;
 import io.modelcontextprotocol.spec.McpSchema;

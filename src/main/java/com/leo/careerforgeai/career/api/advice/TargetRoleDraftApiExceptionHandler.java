@@ -1,9 +1,9 @@
 package com.leo.careerforgeai.career.api.advice;
 
-import com.leo.careerforgeai.career.api.TargetRoleController;
-import com.leo.careerforgeai.career.api.TargetRoleDraftController;
-import com.leo.careerforgeai.career.application.JobRequirementsParseException;
-import com.leo.careerforgeai.career.application.TargetRoleVersionConflictException;
+import com.leo.careerforgeai.career.api.targetrole.TargetRoleController;
+import com.leo.careerforgeai.career.api.targetrole.TargetRoleDraftController;
+import com.leo.careerforgeai.career.application.requirement.JobRequirementsParseException;
+import com.leo.careerforgeai.career.application.targetrole.TargetRoleVersionConflictException;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.shared.exception.ErrorCode;
 import com.leo.careerforgeai.shared.web.BaseResponse;

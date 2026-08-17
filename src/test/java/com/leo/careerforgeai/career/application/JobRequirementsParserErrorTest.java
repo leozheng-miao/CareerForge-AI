@@ -1,5 +1,8 @@
 package com.leo.careerforgeai.career.application;
 
+import com.leo.careerforgeai.career.application.requirement.JobRequirementsParseException;
+import com.leo.careerforgeai.career.application.requirement.JobRequirementsParseResult;
+import com.leo.careerforgeai.career.application.requirement.JobRequirementsParser;
 import com.leo.careerforgeai.model.application.ModelGateway;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelUsage;

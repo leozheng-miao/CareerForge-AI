@@ -1,12 +1,15 @@
 package com.leo.careerforgeai.agent.application.coach;
 
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerErrorType;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerException;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerValidator;
 import com.leo.careerforgeai.agent.application.loop.AgentLoop;
 import com.leo.careerforgeai.agent.application.loop.HeuristicAgentTokenEstimator;
 import com.leo.careerforgeai.agent.application.loop.ToolCallFingerprintService;
 import com.leo.careerforgeai.agent.application.tool.AgentTool;
 import com.leo.careerforgeai.agent.application.tool.SafeToolExecutor;
 import com.leo.careerforgeai.agent.application.tool.ToolRegistry;
-import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.SearchCareerMaterialsTool;
 import com.leo.careerforgeai.agent.application.tool.career.search.CareerMaterialScopePolicy;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopPolicy;

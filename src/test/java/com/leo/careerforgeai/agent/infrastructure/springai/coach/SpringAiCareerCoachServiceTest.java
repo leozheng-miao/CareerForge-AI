@@ -1,9 +1,9 @@
 package com.leo.careerforgeai.agent.infrastructure.springai.coach;
 
 import com.leo.careerforgeai.agent.application.coach.CareerCoachDefinition;
-import com.leo.careerforgeai.agent.application.coach.CareerCoachFinalAnswerValidator;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerValidator;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachScopeProvider;
-import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.SearchCareerMaterialsTool;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopPolicy;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;

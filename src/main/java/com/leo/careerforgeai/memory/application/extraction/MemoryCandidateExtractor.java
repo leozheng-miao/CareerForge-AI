@@ -1,13 +1,13 @@
 package com.leo.careerforgeai.memory.application.extraction;
 
-import com.leo.careerforgeai.memory.application.extraction.dto.ExtractedMemoryCandidate;
-import com.leo.careerforgeai.memory.application.extraction.dto.MemoryCandidateModelOutput;
+import com.leo.careerforgeai.memory.application.extraction.dto.model.ExtractedMemoryCandidate;
+import com.leo.careerforgeai.memory.application.extraction.dto.model.MemoryCandidateModelOutput;
 import com.leo.careerforgeai.memory.application.extraction.dto.MemoryExtractionErrorType;
 import com.leo.careerforgeai.memory.application.extraction.dto.MemoryExtractionException;
 import com.leo.careerforgeai.memory.application.extraction.dto.MemoryExtractionFailureStage;
-import com.leo.careerforgeai.memory.application.extraction.dto.MemoryExtractionModelOutput;
-import com.leo.careerforgeai.memory.application.extraction.dto.MemoryExtractionResult;
-import com.leo.careerforgeai.memory.application.extraction.dto.MemoryExtractionTurnInput;
+import com.leo.careerforgeai.memory.application.extraction.dto.model.MemoryExtractionModelOutput;
+import com.leo.careerforgeai.memory.application.extraction.dto.model.MemoryExtractionResult;
+import com.leo.careerforgeai.memory.application.extraction.dto.model.MemoryExtractionTurnInput;
 import com.leo.careerforgeai.memory.domain.conversation.ConversationTurn;
 import com.leo.careerforgeai.memory.domain.profile.LearningPreferenceKey;
 import com.leo.careerforgeai.memory.domain.profile.MemoryNormalizedKey;

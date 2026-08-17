@@ -1,5 +1,6 @@
 package com.leo.careerforgeai.career.application;
 
+import com.leo.careerforgeai.career.application.skillgap.DeterministicSkillGapMatcher;
 import com.leo.careerforgeai.career.domain.JobRequirements;
 import com.leo.careerforgeai.career.domain.SkillGapSnapshot.GapItem;
 import com.leo.careerforgeai.career.domain.SkillGapSnapshot.GapStatus;

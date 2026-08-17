@@ -2,7 +2,7 @@ package com.leo.careerforgeai.agent.infrastructure.mcp.server.tool;
 
 import com.leo.careerforgeai.agent.application.coach.CareerCoachScopeProvider;
 import com.leo.careerforgeai.agent.application.tool.SafeToolExecutor;
-import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.SearchCareerMaterialsTool;
 import com.leo.careerforgeai.agent.application.tool.career.search.CareerMaterialScopePolicy;
 import com.leo.careerforgeai.agent.domain.tool.ToolContract;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionContext;
@@ -24,7 +24,6 @@ import tools.jackson.databind.json.JsonMapper;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 

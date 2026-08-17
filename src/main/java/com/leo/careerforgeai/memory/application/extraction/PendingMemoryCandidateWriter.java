@@ -1,10 +1,10 @@
 package com.leo.careerforgeai.memory.application.extraction;
 
-import com.leo.careerforgeai.memory.application.extraction.dto.ExtractedMemoryCandidate;
+import com.leo.careerforgeai.memory.application.extraction.dto.model.ExtractedMemoryCandidate;
 import com.leo.careerforgeai.memory.application.extraction.dto.MemoryExtractionErrorType;
 import com.leo.careerforgeai.memory.application.extraction.dto.MemoryExtractionException;
 import com.leo.careerforgeai.memory.application.extraction.dto.MemoryExtractionFailureStage;
-import com.leo.careerforgeai.memory.application.extraction.dto.MemoryExtractionResult;
+import com.leo.careerforgeai.memory.application.extraction.dto.model.MemoryExtractionResult;
 import com.leo.careerforgeai.memory.application.port.extraction.MemoryExtractionReceiptRepository;
 import com.leo.careerforgeai.memory.application.port.profile.MemoryRepository;
 import com.leo.careerforgeai.memory.domain.conversation.ConversationTurn;

@@ -1,8 +1,8 @@
 package com.leo.careerforgeai.agent.evaluation.dataset;
 
 import com.leo.careerforgeai.agent.application.coach.CareerCoachDefinition;
-import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
-import com.leo.careerforgeai.agent.application.tool.career.search.ParseJobRequirementsTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.application.tool.career.parse.ParseJobRequirementsTool;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentTerminationReason;

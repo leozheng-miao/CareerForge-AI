@@ -1,6 +1,9 @@
 package com.leo.careerforgeai.career.application;
 
 import com.leo.careerforgeai.career.application.port.CareerPlanningRepository;
+import com.leo.careerforgeai.career.application.skillgap.DeterministicSkillGapMatcher;
+import com.leo.careerforgeai.career.application.skillgap.SkillGapInputVersionConflictException;
+import com.leo.careerforgeai.career.application.skillgap.SkillGapSnapshotApplicationService;
 import com.leo.careerforgeai.career.domain.JobRequirements;
 import com.leo.careerforgeai.career.domain.SkillGapSnapshot;
 import com.leo.careerforgeai.career.domain.SkillGapSnapshot.GapItem;

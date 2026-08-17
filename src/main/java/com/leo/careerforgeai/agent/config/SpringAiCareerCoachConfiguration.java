@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.agent.config;
 
 import com.leo.careerforgeai.agent.application.coach.CareerCoachDefinition;
-import com.leo.careerforgeai.agent.application.coach.CareerCoachFinalAnswerValidator;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerValidator;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachScopeProvider;
 import com.leo.careerforgeai.agent.application.loop.ToolCallFingerprintService;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopPolicy;

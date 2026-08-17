@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.memory.application.extraction;
 
-import com.leo.careerforgeai.memory.application.extraction.dto.MemoryExtractionResult;
-import com.leo.careerforgeai.memory.application.extraction.dto.MemoryExtractionTurnInput;
+import com.leo.careerforgeai.memory.application.extraction.dto.model.MemoryExtractionResult;
+import com.leo.careerforgeai.memory.application.extraction.dto.model.MemoryExtractionTurnInput;
 import com.leo.careerforgeai.memory.application.port.conversation.CoachingConversationRepository;
 import com.leo.careerforgeai.memory.application.port.extraction.MemoryExtractionReceiptRepository;
 import com.leo.careerforgeai.memory.application.port.profile.MemoryRepository;

@@ -2,7 +2,7 @@ package com.leo.careerforgeai.agent.api.advice;
 
 import com.leo.careerforgeai.agent.api.CareerCoachController;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachExecutionException;
-import com.leo.careerforgeai.agent.application.coach.CareerCoachFinalAnswerException;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerException;
 import com.leo.careerforgeai.shared.exception.ErrorCode;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;

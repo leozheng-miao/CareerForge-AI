@@ -2,8 +2,8 @@ package com.leo.careerforgeai.agent.api;
 
 import com.leo.careerforgeai.agent.api.advice.CareerCoachApiExceptionHandler;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachResult;
-import com.leo.careerforgeai.agent.application.coach.ConversationalCareerCoachApplicationService;
-import com.leo.careerforgeai.agent.application.coach.ConversationalCareerCoachResult;
+import com.leo.careerforgeai.agent.application.coach.conversation.ConversationalCareerCoachApplicationService;
+import com.leo.careerforgeai.agent.application.coach.conversation.ConversationalCareerCoachResult;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswer;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;

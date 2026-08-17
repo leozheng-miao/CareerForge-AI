@@ -1,9 +1,9 @@
 package com.leo.careerforgeai.career.infrastructure.persistence;
 
 import com.leo.careerforgeai.CareerForgeAiApplication;
-import com.leo.careerforgeai.career.application.DeterministicSkillGapMatcher;
-import com.leo.careerforgeai.career.application.SkillGapSnapshotApplicationService;
-import com.leo.careerforgeai.career.application.TrainingPlanApplicationService;
+import com.leo.careerforgeai.career.application.skillgap.DeterministicSkillGapMatcher;
+import com.leo.careerforgeai.career.application.skillgap.SkillGapSnapshotApplicationService;
+import com.leo.careerforgeai.career.application.training.TrainingPlanApplicationService;
 import com.leo.careerforgeai.career.application.port.CareerPlanningRepository;
 import com.leo.careerforgeai.career.domain.JobRequirements;
 import com.leo.careerforgeai.career.domain.SkillGapSnapshot;

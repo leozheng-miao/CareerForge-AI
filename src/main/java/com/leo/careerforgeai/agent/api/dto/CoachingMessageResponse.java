@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.agent.api.dto;
 
-import com.leo.careerforgeai.agent.application.coach.ConversationalCareerCoachResult;
+import com.leo.careerforgeai.agent.application.coach.conversation.ConversationalCareerCoachResult;
 
 import java.util.Objects;
 import java.util.UUID;

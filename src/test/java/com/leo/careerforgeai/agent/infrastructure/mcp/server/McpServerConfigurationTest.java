@@ -2,7 +2,7 @@ package com.leo.careerforgeai.agent.infrastructure.mcp.server;
 
 import com.leo.careerforgeai.CareerForgeAiApplication;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachService;
-import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.SearchCareerMaterialsTool;
 import com.leo.careerforgeai.agent.infrastructure.mcp.server.tool.McpSearchCareerMaterialsToolProvider;
 import com.leo.careerforgeai.knowledge.application.evidence.KnowledgeEvidenceSearchService;
 import io.modelcontextprotocol.server.McpSyncServer;

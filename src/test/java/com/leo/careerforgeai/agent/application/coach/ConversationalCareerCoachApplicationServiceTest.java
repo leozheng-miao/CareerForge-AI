@@ -1,5 +1,9 @@
 package com.leo.careerforgeai.agent.application.coach;
 
+import com.leo.careerforgeai.agent.application.coach.conversation.ConversationalCareerCoachApplicationService;
+import com.leo.careerforgeai.agent.application.coach.conversation.ConversationalCareerCoachResult;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerErrorType;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerException;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswer;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopResult;

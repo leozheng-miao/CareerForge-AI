@@ -2,7 +2,7 @@ package com.leo.careerforgeai.agent.infrastructure.mcp.server.tool;
 
 import com.leo.careerforgeai.agent.application.coach.CareerCoachScopeProvider;
 import com.leo.careerforgeai.agent.application.tool.SafeToolExecutor;
-import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.SearchCareerMaterialsTool;
 import com.leo.careerforgeai.agent.domain.tool.ToolContract;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionContext;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionResult;

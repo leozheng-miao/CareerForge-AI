@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.agent.evaluation.experiment;
 
 import com.leo.careerforgeai.agent.application.coach.CareerCoachExecutionException;
-import com.leo.careerforgeai.agent.application.coach.CareerCoachFinalAnswerValidator;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerValidator;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachResult;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachScopeProvider;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachService;
@@ -11,9 +11,9 @@ import com.leo.careerforgeai.agent.application.loop.ToolCallFingerprintService;
 import com.leo.careerforgeai.agent.application.tool.AgentTool;
 import com.leo.careerforgeai.agent.application.tool.SafeToolExecutor;
 import com.leo.careerforgeai.agent.application.tool.ToolRegistry;
-import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.SearchCareerMaterialsTool;
 import com.leo.careerforgeai.agent.application.tool.career.search.CareerMaterialScopePolicy;
-import com.leo.careerforgeai.agent.application.tool.career.search.ParseJobRequirementsTool;
+import com.leo.careerforgeai.agent.application.tool.career.parse.ParseJobRequirementsTool;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopPolicy;
 import com.leo.careerforgeai.agent.domain.loop.trace.AgentRunTrace;
@@ -35,7 +35,7 @@ import com.leo.careerforgeai.agent.evaluation.execution.RecordingToolCallingGate
 import com.leo.careerforgeai.agent.evaluation.metrics.AgentCaseMeasurement;
 import com.leo.careerforgeai.agent.evaluation.metrics.AgentCaseMetricsCalculator;
 import com.leo.careerforgeai.agent.evaluation.metrics.AgentMetricsAggregator;
-import com.leo.careerforgeai.career.application.JobRequirementsParser;
+import com.leo.careerforgeai.career.application.requirement.JobRequirementsParser;
 import com.leo.careerforgeai.career.domain.JobRequirements;
 import com.leo.careerforgeai.knowledge.application.evidence.KnowledgeEvidenceSearchService;
 import com.leo.careerforgeai.knowledge.config.KnowledgeSourceProperties;

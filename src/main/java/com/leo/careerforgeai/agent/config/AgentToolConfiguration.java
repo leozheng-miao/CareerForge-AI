@@ -2,9 +2,9 @@ package com.leo.careerforgeai.agent.config;
 
 import com.leo.careerforgeai.agent.application.tool.ToolRegistry;
 import com.leo.careerforgeai.agent.application.tool.career.search.CareerMaterialScopePolicy;
-import com.leo.careerforgeai.agent.application.tool.career.search.ParseJobRequirementsTool;
-import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
-import com.leo.careerforgeai.career.application.JobRequirementsParser;
+import com.leo.careerforgeai.agent.application.tool.career.parse.ParseJobRequirementsTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.career.application.requirement.JobRequirementsParser;
 import com.leo.careerforgeai.knowledge.application.evidence.KnowledgeEvidenceSearchService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

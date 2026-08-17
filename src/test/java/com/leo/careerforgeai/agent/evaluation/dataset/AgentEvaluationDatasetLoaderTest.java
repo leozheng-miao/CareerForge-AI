@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.agent.evaluation.dataset;
 
-import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
-import com.leo.careerforgeai.agent.application.tool.career.search.ParseJobRequirementsTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.application.tool.career.parse.ParseJobRequirementsTool;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 

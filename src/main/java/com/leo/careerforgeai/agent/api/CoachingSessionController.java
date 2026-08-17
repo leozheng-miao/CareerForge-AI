@@ -5,7 +5,7 @@ import com.leo.careerforgeai.agent.api.dto.CoachingSessionResponse;
 import com.leo.careerforgeai.agent.api.dto.CoachingTurnResponse;
 import com.leo.careerforgeai.agent.api.dto.CreateCoachingSessionRequest;
 import com.leo.careerforgeai.agent.api.dto.SendCoachingMessageRequest;
-import com.leo.careerforgeai.agent.application.coach.ConversationalCareerCoachApplicationService;
+import com.leo.careerforgeai.agent.application.coach.conversation.ConversationalCareerCoachApplicationService;
 import com.leo.careerforgeai.memory.application.conversation.CoachingSessionApplicationService;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;

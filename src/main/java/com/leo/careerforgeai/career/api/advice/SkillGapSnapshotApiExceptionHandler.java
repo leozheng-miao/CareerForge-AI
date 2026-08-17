@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.career.api.advice;
 
-import com.leo.careerforgeai.career.api.SkillGapSnapshotController;
-import com.leo.careerforgeai.career.application.SkillGapInputVersionConflictException;
+import com.leo.careerforgeai.career.api.skillgap.SkillGapSnapshotController;
+import com.leo.careerforgeai.career.application.skillgap.SkillGapInputVersionConflictException;
 import com.leo.careerforgeai.shared.exception.ErrorCode;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;

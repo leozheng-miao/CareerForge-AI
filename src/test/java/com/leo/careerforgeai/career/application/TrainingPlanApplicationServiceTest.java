@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.career.application;
 
 import com.leo.careerforgeai.career.application.port.CareerPlanningRepository;
+import com.leo.careerforgeai.career.application.training.TrainingPlanApplicationService;
 import com.leo.careerforgeai.career.domain.TrainingPlan;
 import com.leo.careerforgeai.career.domain.TrainingPlanItem;
 import com.leo.careerforgeai.shared.actor.ActorId;

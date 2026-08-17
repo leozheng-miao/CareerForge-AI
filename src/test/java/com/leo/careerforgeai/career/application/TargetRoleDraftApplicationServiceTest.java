@@ -2,6 +2,10 @@
 package com.leo.careerforgeai.career.application;
 
 import com.leo.careerforgeai.career.application.port.CareerPlanningRepository;
+import com.leo.careerforgeai.career.application.requirement.JobRequirementsParseException;
+import com.leo.careerforgeai.career.application.requirement.JobRequirementsParseResult;
+import com.leo.careerforgeai.career.application.requirement.JobRequirementsParser;
+import com.leo.careerforgeai.career.application.targetrole.TargetRoleDraftApplicationService;
 import com.leo.careerforgeai.career.domain.JobRequirements;
 import com.leo.careerforgeai.career.domain.TargetRoleDraft;
 import com.leo.careerforgeai.model.domain.ModelUsage;

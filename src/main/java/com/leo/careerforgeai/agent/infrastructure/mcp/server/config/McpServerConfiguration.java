@@ -2,7 +2,7 @@ package com.leo.careerforgeai.agent.infrastructure.mcp.server.config;
 
 import com.leo.careerforgeai.agent.application.coach.CareerCoachScopeProvider;
 import com.leo.careerforgeai.agent.application.tool.SafeToolExecutor;
-import com.leo.careerforgeai.agent.application.tool.career.parse.SearchCareerMaterialsTool;
+import com.leo.careerforgeai.agent.application.tool.career.search.SearchCareerMaterialsTool;
 import com.leo.careerforgeai.agent.infrastructure.mcp.server.tool.McpSearchCareerMaterialsToolProvider;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import org.springframework.beans.factory.InitializingBean;

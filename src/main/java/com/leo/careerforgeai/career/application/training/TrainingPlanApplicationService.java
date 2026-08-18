@@ -50,9 +50,10 @@ public class TrainingPlanApplicationService {
     /** 查询当前用户业务版本最高的训练计划。 */
     @Transactional(readOnly = true)
     public Optional<TrainingPlan> getLatest() {
-        return repository.findLatestTrainingPlan(currentActor());
+        ActorId actorId = currentActor();
+        return repository.findLatestTrainingPlan(actorId)
+                .map(plan -> requireOwnedResult(actorId, plan));
     }
-
     /** 用户确认待确认计划，使其进入ACTIVE状态。 */
     @Transactional
     public TrainingPlan activate(UUID planId, long expectedVersion) {
@@ -120,7 +121,7 @@ public class TrainingPlanApplicationService {
         }
 
         if (currentPlan.version() != expectedVersion) {
-            throw new IllegalStateException("训练计划版本已经过期");
+            throw new TrainingPlanVersionConflictException("训练计划版本已经过期");
         }
 
         boolean updated = repository.updateTrainingPlanIfVersionMatches(
@@ -130,20 +131,27 @@ public class TrainingPlanApplicationService {
         );
 
         if (!updated) {
-            throw new IllegalStateException("训练计划并发更新冲突");
+            throw new TrainingPlanVersionConflictException("训练计划并发更新冲突");
         }
 
         return updatedPlan;
     }
 
-    private TrainingPlan requireOwnedPlan(ActorId actorId, UUID planId) {
-        Objects.requireNonNull(planId, "planId 不能为空");
-
-        return repository.findTrainingPlan(actorId, planId)
-                .orElseThrow(() -> new IllegalArgumentException("训练计划不存在或不属于当前用户"));
-    }
-
     private ActorId currentActor() {
         return Objects.requireNonNull(currentActorProvider.currentActor(), "currentActor 不能为空");
+    }
+
+    private TrainingPlan requireOwnedPlan(ActorId actorId, UUID planId) {
+        Objects.requireNonNull(planId, "planId不能为空");
+        TrainingPlan plan = repository.findTrainingPlan(actorId, planId)
+                .orElseThrow(() -> new IllegalArgumentException("训练计划不存在或不属于当前用户"));
+        return requireOwnedResult(actorId, plan);
+    }
+
+    private TrainingPlan requireOwnedResult(ActorId actorId, TrainingPlan plan) {
+        if (!actorId.equals(plan.ownerId())) {
+            throw new IllegalStateException("TrainingPlan查询结果违反owner边界");
+        }
+        return plan;
     }
 }

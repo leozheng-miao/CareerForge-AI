@@ -5,27 +5,28 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
+ * @param itemId                 计划项UUID
+ * @param weekNumber             所属周次，从1开始
+ * @param title                  任务标题
+ * @param taskDescription        具体任务说明
+ * @param estimatedMinutes       预计投入分钟数
+ * @param completionCriteria     完成标准
+ * @param evidenceRequirement    用户完成任务时需要提交的证据说明
+ * @param gapItemIds             关联的能力差距明细ID
+ * @param foundationGoal         未关联Gap时的基础准备目标
+ * @param resourceRefs           受控学习资源引用
+ * @param status                 当前任务进度
+ * @param completionEvidenceRefs 用户实际提交的证据引用
+ * @param version                乐观锁版本
+ * @param createdAt              创建时间
+ * @param updatedAt              最后更新时间
  * @program: CareerForge-AI
  * @description: 表示训练计划中的具体任务、关联差距、验收要求和确定性进度
  * @author: Miao Zheng
  * @date: 2026-08-12
- * @param itemId 计划项UUID
- * @param weekNumber 所属周次，从1开始
- * @param title 任务标题
- * @param taskDescription 具体任务说明
- * @param estimatedMinutes 预计投入分钟数
- * @param completionCriteria 完成标准
- * @param evidenceRequirement 用户完成任务时需要提交的证据说明
- * @param gapItemIds 关联的能力差距明细ID
- * @param foundationGoal 未关联Gap时的基础准备目标
- * @param resourceRefs 受控学习资源引用
- * @param status 当前任务进度
- * @param completionEvidenceRefs 用户实际提交的证据引用
- * @param version 乐观锁版本
- * @param createdAt 创建时间
- * @param updatedAt 最后更新时间
  **/
 public record TrainingPlanItem(
         UUID itemId,
@@ -50,6 +51,9 @@ public record TrainingPlanItem(
     public static final int MAX_GAP_REFS = 20;
     public static final int MAX_RESOURCE_REFS = 20;
     public static final int MAX_EVIDENCE_REFS = 20;
+    private static final Pattern COMPLETION_EVIDENCE_REF_PATTERN = Pattern.compile(
+            "^(github|test-report):[A-Za-z0-9][A-Za-z0-9._/-]{0,180}$"
+    );
 
     public TrainingPlanItem {
         Objects.requireNonNull(itemId, "itemId 不能为空");
@@ -161,9 +165,6 @@ public record TrainingPlanItem(
         );
     }
 
-    /**
-     * 由用户提交证据并完成任务，模型不能自行调用该状态转换。
-     */
     public TrainingPlanItem complete(List<String> evidenceRefs, Instant now) {
         requireValidOperationTime(now);
         List<String> normalizedEvidenceRefs = normalizeStringRefs(
@@ -176,11 +177,14 @@ public record TrainingPlanItem(
             throw new IllegalArgumentException("完成计划项必须提交证据");
         }
         if (status == ItemStatus.COMPLETED) {
-            if (completionEvidenceRefs.equals(normalizedEvidenceRefs)) {
-                return this;
-            }
+            if (completionEvidenceRefs.equals(normalizedEvidenceRefs)) return this;
             throw new IllegalStateException("已完成计划项不能替换完成证据");
         }
+        if (status != ItemStatus.IN_PROGRESS) {
+            throw new IllegalStateException("只有IN_PROGRESS计划项可以完成");
+        }
+
+        validateCompletionEvidenceRefs(normalizedEvidenceRefs);
 
         return new TrainingPlanItem(
                 itemId,
@@ -293,6 +297,11 @@ public record TrainingPlanItem(
 
         return normalizeRequired(value, fieldName, maxLength);
     }
+    private static void validateCompletionEvidenceRefs(List<String> evidenceRefs) {
+        if (evidenceRefs.stream().anyMatch(ref -> !COMPLETION_EVIDENCE_REF_PATTERN.matcher(ref).matches())) {
+            throw new IllegalArgumentException("完成证据引用格式不受支持");
+        }
+    }
 
     /**
      * @program: CareerForge-AI
@@ -302,23 +311,29 @@ public record TrainingPlanItem(
      **/
     public enum ItemStatus {
 
-        /** 尚未开始。 */
+        /**
+         * 尚未开始。
+         */
         NOT_STARTED,
 
-        /** 用户已经开始执行。 */
+        /**
+         * 用户已经开始执行。
+         */
         IN_PROGRESS,
 
-        /** 用户提交证据后确认完成。 */
+        /**
+         * 用户提交证据后确认完成。
+         */
         COMPLETED
     }
 
     /**
+     * @param resourceType 资源类型
+     * @param resourceId   本次计划输入白名单中的资源ID
      * @program: CareerForge-AI
      * @description: 表示计划项引用的受控知识资源
      * @author: Miao Zheng
      * @date: 2026-08-12
-     * @param resourceType 资源类型
-     * @param resourceId 本次计划输入白名单中的资源ID
      **/
     public record ResourceRef(ResourceType resourceType, String resourceId) {
 
@@ -341,10 +356,14 @@ public record TrainingPlanItem(
      **/
     public enum ResourceType {
 
-        /** 阶段二知识库中的完整来源文档。 */
+        /**
+         * 阶段二知识库中的完整来源文档。
+         */
         KNOWLEDGE_DOCUMENT,
 
-        /** 阶段二知识库中的具体文本片段。 */
+        /**
+         * 阶段二知识库中的具体文本片段。
+         */
         KNOWLEDGE_CHUNK
     }
 }

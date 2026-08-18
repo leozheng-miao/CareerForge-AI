@@ -116,10 +116,9 @@ class MySqlCareerPlanningPersistenceSmoke {
     }
 
     @Test
-    void shouldMigratePersistFilterByOwnerAndReadPlanAfterRestart() {
+    void shouldMigratePersistCompletePlanAndReadAfterRestart() {
         assertThat(flyway.info().current()).isNotNull();
-        assertThat(flyway.info().current().getVersion().getVersion())
-                .isEqualTo("9");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
 
         Integer tableCount = jdbcTemplate.queryForObject(
                 """
@@ -139,7 +138,6 @@ class MySqlCareerPlanningPersistenceSmoke {
                 """,
                 Integer.class
         );
-
         assertThat(tableCount).isEqualTo(8);
 
         UUID targetRoleId = UUID.randomUUID();
@@ -149,70 +147,62 @@ class MySqlCareerPlanningPersistenceSmoke {
         UUID itemId = UUID.randomUUID();
 
         TargetRole targetRole = targetRole(targetRoleId);
-        SkillGapSnapshot snapshot = gapSnapshot(
-                snapshotId,
-                targetRoleId,
-                gapItemId
-        );
-        TrainingPlan pendingPlan = pendingPlan(
-                planId,
-                1,
-                snapshotId,
-                gapItemId,
-                itemId
-        );
+        SkillGapSnapshot snapshot = gapSnapshot(snapshotId, targetRoleId, gapItemId);
+        TrainingPlan pendingPlan = pendingPlan(planId, 1, snapshotId, gapItemId, itemId);
 
         repository.insertTargetRole(targetRole);
         repository.insertSkillGapSnapshot(snapshot);
         repository.insertTrainingPlan(pendingPlan);
 
-        assertThat(repository.findTargetRole(
-                SMOKE_ACTOR,
-                targetRoleId
-        )).contains(targetRole);
+        assertThat(repository.findTargetRole(SMOKE_ACTOR, targetRoleId)).contains(targetRole);
+        assertThat(repository.findSkillGapSnapshot(SMOKE_ACTOR, snapshotId)).contains(snapshot);
+        assertThat(repository.findTrainingPlan(OTHER_ACTOR, planId)).isEmpty();
 
-        assertThat(repository.findSkillGapSnapshot(
-                SMOKE_ACTOR,
-                snapshotId
-        )).contains(snapshot);
-
-        assertThat(repository.findTrainingPlan(
-                OTHER_ACTOR,
-                planId
-        )).isEmpty();
-
-        TrainingPlan activePlan = trainingPlanService.activate(
+        TrainingPlan activePlan = trainingPlanService.activate(planId, pendingPlan.version());
+        TrainingPlan startedPlan = trainingPlanService.startItem(planId, activePlan.version(), itemId);
+        TrainingPlan itemCompletedPlan = trainingPlanService.completeItem(
                 planId,
-                pendingPlan.version()
+                startedPlan.version(),
+                itemId,
+                List.of("test-report:mysql-training-plan-smoke")
         );
+        TrainingPlan completedPlan = trainingPlanService.complete(planId, itemCompletedPlan.version());
 
-        assertThat(activePlan.status())
-                .isEqualTo(TrainingPlan.PlanStatus.ACTIVE);
+        assertThat(completedPlan.status()).isEqualTo(TrainingPlan.PlanStatus.COMPLETED);
+        assertThat(completedPlan.generationContext()).isEqualTo(pendingPlan.generationContext());
+        assertThat(completedPlan.items().getFirst().status())
+                .isEqualTo(TrainingPlanItem.ItemStatus.COMPLETED);
+        assertThat(completedPlan.items().getFirst().completionEvidenceRefs())
+                .containsExactly("test-report:mysql-training-plan-smoke");
 
-        try (ConfigurableApplicationContext restartedContext =
-                     startFreshApplicationContext()) {
+        String persistedModelRequestId = jdbcTemplate.queryForObject(
+                """
+                SELECT JSON_UNQUOTE(
+                    JSON_EXTRACT(generation_context_json, '$.modelRequestId')
+                )
+                FROM training_plan
+                WHERE plan_id = ?
+                """,
+                String.class,
+                planId.toString()
+        );
+        assertThat(persistedModelRequestId).isEqualTo("mysql-smoke-model-request");
+        try (ConfigurableApplicationContext restartedContext = startFreshApplicationContext()) {
             CareerPlanningRepository restartedRepository =
-                    restartedContext.getBean(
-                            CareerPlanningRepository.class
-                    );
+                    restartedContext.getBean(CareerPlanningRepository.class);
+            TrainingPlan restartedPlan = restartedRepository.findTrainingPlan(
+                    SMOKE_ACTOR,
+                    planId
+            ).orElseThrow();
 
-            TrainingPlan restartedPlan =
-                    restartedRepository.findTrainingPlan(
-                            SMOKE_ACTOR,
-                            planId
-                    ).orElseThrow();
-
-            assertThat(restartedPlan.status())
-                    .isEqualTo(TrainingPlan.PlanStatus.ACTIVE);
-
-            assertThat(restartedPlan.version())
-                    .isEqualTo(activePlan.version());
-
-            assertThat(restartedPlan.items())
-                    .containsExactlyElementsOf(activePlan.items());
+            assertThat(restartedPlan.status()).isEqualTo(TrainingPlan.PlanStatus.COMPLETED);
+            assertThat(restartedPlan.version()).isEqualTo(completedPlan.version());
+            assertThat(restartedPlan.generationContext()).isEqualTo(completedPlan.generationContext());
+            assertThat(restartedPlan.items()).containsExactlyElementsOf(completedPlan.items());
+            assertThat(restartedPlan.items().getFirst().completionEvidenceRefs())
+                    .containsExactly("test-report:mysql-training-plan-smoke");
         }
     }
-
     @Test
     void shouldRollbackPlanInsertWhenPlanItemPrimaryKeyConflicts() {
         UUID targetRoleId = UUID.randomUUID();
@@ -448,17 +438,16 @@ class MySqlCareerPlanningPersistenceSmoke {
                         CREATED_AT.plusSeconds(2)
                 );
 
-        return TrainingPlan.createDraft(
+        return TrainingPlan.createGeneratedDraft(
                 planId,
                 SMOKE_ACTOR,
                 planVersion,
                 snapshotId,
+                generationContext(),
                 "AI Agent开发能力训练计划",
                 List.of(item),
                 CREATED_AT.plusSeconds(2)
-        ).submitForConfirmation(
-                CREATED_AT.plusSeconds(3)
-        );
+        ).submitForConfirmation(CREATED_AT.plusSeconds(3));
     }
 
     private JobRequirements requirements() {
@@ -563,6 +552,33 @@ class MySqlCareerPlanningPersistenceSmoke {
 
         memoryDecisionRepository.insert(decision);
         return confirmed;
+    }
+
+    private TrainingPlan.GenerationContext generationContext() {
+        return new TrainingPlan.GenerationContext(
+                "training-plan-generation-v1",
+                "training-plan-input-v1",
+                600,
+                List.of(new TrainingPlan.MemoryInputRef(
+                        UUID.fromString("70000000-0000-0000-0000-000000000001"),
+                        1,
+                        MemoryType.TIME_CONSTRAINT,
+                        "weekly_hours",
+                        "c".repeat(64)
+                )),
+                List.of(new TrainingPlan.ResourceInputRef(
+                        TrainingPlanItem.ResourceType.KNOWLEDGE_DOCUMENT,
+                        "ai-job-jd-summary",
+                        "d".repeat(64)
+                )),
+                "training-plan-generator-v1",
+                "training-plan-prompt-v1",
+                "mysql-smoke-model-request",
+                800,
+                200,
+                1_000,
+                1_500
+        );
     }
 
     /**

@@ -160,7 +160,7 @@ class CareerPlanningDomainTest {
         TrainingPlan started = active.startItem(PLAN_ITEM_ID, NOW.plusSeconds(3));
         TrainingPlan itemCompleted = started.completeItem(
                 PLAN_ITEM_ID,
-                List.of("project-evidence-1"),
+                List.of("github:commit/project-evidence-1"),
                 NOW.plusSeconds(4)
         );
         TrainingPlan completed = itemCompleted.complete(NOW.plusSeconds(5));
@@ -169,6 +169,12 @@ class CareerPlanningDomainTest {
         assertThat(itemCompleted.items().getFirst().status()).isEqualTo(ItemStatus.COMPLETED);
         assertThat(completed.status()).isEqualTo(PlanStatus.COMPLETED);
         assertThat(completed.version()).isEqualTo(5);
+        assertThat(completed.status()).isEqualTo(PlanStatus.COMPLETED);
+        assertThat(completed.version()).isEqualTo(5);
+
+        assertThatThrownBy(() -> completed.cancel(NOW.plusSeconds(6)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("当前状态不允许取消训练计划");
     }
 
     @Test
@@ -181,6 +187,60 @@ class CareerPlanningDomainTest {
 
         assertThat(repeated).isSameAs(active);
         assertThat(repeated.version()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldRejectCompletingNotStartedItem() {
+        TrainingPlanItem item = TrainingPlanItem.createDraft(
+                PLAN_ITEM_ID,
+                1,
+                "实现Memory确认流",
+                "实现候选确认、拒绝和撤销状态转换",
+                180,
+                "状态机与owner隔离测试全部通过",
+                "提交测试报告或代码提交引用",
+                List.of(GAP_ITEM_ID),
+                null,
+                List.of(new ResourceRef(ResourceType.KNOWLEDGE_DOCUMENT, "memory-guide")),
+                NOW
+        );
+
+        assertThatThrownBy(() -> item.complete(List.of("github:commit/abc123"), NOW.plusSeconds(1)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("只有IN_PROGRESS计划项可以完成");
+
+        assertThat(item.status()).isEqualTo(ItemStatus.NOT_STARTED);
+        assertThat(item.version()).isZero();
+        assertThat(item.completionEvidenceRefs()).isEmpty();
+    }
+
+    @Test
+    void shouldRejectUncontrolledCompletionEvidenceRef() {
+        TrainingPlanItem started = draftPlan().items().getFirst().start(NOW.plusSeconds(1));
+
+        assertThatThrownBy(() ->
+                started.complete(List.of("开始第一次item测试"), NOW.plusSeconds(2))
+        )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("完成证据引用格式不受支持");
+
+        assertThat(started.status()).isEqualTo(ItemStatus.IN_PROGRESS);
+        assertThat(started.version()).isEqualTo(1);
+        assertThat(started.completionEvidenceRefs()).isEmpty();
+    }
+
+    @Test
+    void shouldCancelPendingPlanIdempotentlyWithoutChangingItems() {
+        TrainingPlan pending = draftPlan().submitForConfirmation(NOW.plusSeconds(1));
+
+        TrainingPlan cancelled = pending.cancel(NOW.plusSeconds(2));
+        TrainingPlan repeated = cancelled.cancel(NOW.plusSeconds(3));
+
+        assertThat(cancelled.status()).isEqualTo(PlanStatus.CANCELLED);
+        assertThat(cancelled.version()).isEqualTo(2);
+        assertThat(cancelled.cancelledAt()).isEqualTo(NOW.plusSeconds(2));
+        assertThat(cancelled.items()).containsExactlyElementsOf(pending.items());
+        assertThat(repeated).isSameAs(cancelled);
     }
 
     private TrainingPlan draftPlan() {

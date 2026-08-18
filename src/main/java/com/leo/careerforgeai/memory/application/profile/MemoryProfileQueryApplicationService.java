@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -88,5 +89,24 @@ public class MemoryProfileQueryApplicationService {
             throw new IllegalStateException("技能画像读取期间发生变化，请重试");
         }
         return new ConfirmedSkillProfile(actorId, versionAfter, skillEvidence);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MemoryItem> findConfirmedPlanningMemories() {
+        ActorId actorId = Objects.requireNonNull(
+                currentActorProvider.currentActor(),
+                "currentActor不能为空"
+        );
+        return requireOwnedStatus(
+                memoryRepository.findConfirmedByOwner(actorId),
+                actorId,
+                MemoryStatus.CONFIRMED
+        ).stream()
+                .filter(item -> item.type() == MemoryType.TIME_CONSTRAINT
+                        || item.type() == MemoryType.LEARNING_PREFERENCE)
+                .sorted(Comparator.comparing((MemoryItem item) -> item.type().name())
+                        .thenComparing(item -> item.normalizedKey().value())
+                        .thenComparing(MemoryItem::memoryId))
+                .toList();
     }
 }

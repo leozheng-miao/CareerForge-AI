@@ -34,6 +34,10 @@ public class TrainingPlanEntity {
     @TableField("gap_snapshot_id")
     private String gapSnapshotId;
 
+    /** 生成期固定输入、资源版本和模型调用审计JSON。 */
+    @TableField("generation_context_json")
+    private String generationContextJson;
+
     @TableField("title")
     private String title;
 

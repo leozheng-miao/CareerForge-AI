@@ -8,6 +8,7 @@ import com.leo.careerforgeai.career.domain.TrainingPlanItem;
 import com.leo.careerforgeai.career.infrastructure.persistence.converter.CareerPlanningPersistenceConverter;
 import com.leo.careerforgeai.career.infrastructure.persistence.entity.TrainingPlanEntity;
 import com.leo.careerforgeai.career.infrastructure.persistence.entity.TrainingPlanItemEntity;
+import com.leo.careerforgeai.memory.domain.profile.MemoryType;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -149,11 +150,12 @@ class CareerPlanningPersistenceConverterTest {
                         NOW
                 );
 
-        return TrainingPlan.createDraft(
+        return TrainingPlan.createGeneratedDraft(
                 PLAN_ID,
                 ACTOR,
                 1,
                 SNAPSHOT_ID,
+                generationContext(),
                 "AI Agent开发能力训练计划",
                 List.of(item),
                 NOW
@@ -175,6 +177,39 @@ class CareerPlanningPersistenceConverterTest {
                 List.of(),
                 List.of("开发AI Agent应用"),
                 List.of("Memory状态机")
+        );
+    }
+
+    private TrainingPlan.GenerationContext generationContext() {
+        return new TrainingPlan.GenerationContext(
+                "training-plan-generation-v1",
+                "training-plan-input-v1",
+                600,
+                List.of(
+                        new TrainingPlan.MemoryInputRef(
+                                UUID.fromString(
+                                        "70000000-0000-0000-0000-000000000001"
+                                ),
+                                1,
+                                MemoryType.TIME_CONSTRAINT,
+                                "weekly_hours",
+                                "c".repeat(64)
+                        )
+                ),
+                List.of(
+                        new TrainingPlan.ResourceInputRef(
+                                TrainingPlanItem.ResourceType.KNOWLEDGE_DOCUMENT,
+                                "ai-job-jd-summary",
+                                "d".repeat(64)
+                        )
+                ),
+                "training-plan-generator-v1",
+                "training-plan-prompt-v1",
+                "model-request-1",
+                800,
+                200,
+                1_000,
+                1_500
         );
     }
 }

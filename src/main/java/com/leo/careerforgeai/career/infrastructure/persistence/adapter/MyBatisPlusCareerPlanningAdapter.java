@@ -426,7 +426,10 @@ public class MyBatisPlusCareerPlanningAdapter implements CareerPlanningRepositor
                         || currentPlan.planVersion() != updatedPlan.planVersion()
                         || !currentPlan.gapSnapshotId().equals(updatedPlan.gapSnapshotId())
                         || !currentPlan.title().equals(updatedPlan.title())
-                        || !currentPlan.createdAt().equals(updatedPlan.createdAt());
+                        || !currentPlan.createdAt().equals(updatedPlan.createdAt())
+                        || !Objects.equals(
+                        currentPlan.generationContext(),
+                        updatedPlan.generationContext());
 
         if (immutableFieldsChanged) {
             throw new IllegalArgumentException("TrainingPlan不可变字段不能修改");

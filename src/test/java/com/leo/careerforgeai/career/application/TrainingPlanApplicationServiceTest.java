@@ -2,6 +2,7 @@ package com.leo.careerforgeai.career.application;
 
 import com.leo.careerforgeai.career.application.port.CareerPlanningRepository;
 import com.leo.careerforgeai.career.application.training.TrainingPlanApplicationService;
+import com.leo.careerforgeai.career.application.training.TrainingPlanVersionConflictException;
 import com.leo.careerforgeai.career.domain.TrainingPlan;
 import com.leo.careerforgeai.career.domain.TrainingPlanItem;
 import com.leo.careerforgeai.shared.actor.ActorId;
@@ -109,7 +110,7 @@ class TrainingPlanApplicationServiceTest {
                 PLAN_ID,
                 3,
                 ITEM_ID,
-                List.of("project-evidence-1")
+                List.of("github:commit/abc123")
         );
         TrainingPlan completed = service.complete(PLAN_ID, 4);
 
@@ -166,6 +167,80 @@ class TrainingPlanApplicationServiceTest {
         assertThat(storedPlan.get()).isEqualTo(active);
         assertThat(storedPlan.get().items().getFirst().status())
                 .isEqualTo(TrainingPlanItem.ItemStatus.NOT_STARTED);
+        assertThat(updateCount).hasValue(1);
+    }
+
+    @Test
+    void shouldRejectStaleVersionWhenConfirmingPendingPlan() {
+        TrainingPlan original = pendingPlan(ACTOR_A);
+        storedPlan.set(original);
+
+        assertThatThrownBy(() -> service.activate(PLAN_ID, 0))
+                .isInstanceOf(TrainingPlanVersionConflictException.class)
+                .hasMessage("训练计划版本已经过期");
+
+        assertThat(storedPlan.get()).isSameAs(original);
+        assertThat(storedPlan.get().status())
+                .isEqualTo(TrainingPlan.PlanStatus.PENDING_CONFIRMATION);
+        assertThat(updateCount).hasValue(0);
+    }
+
+    @Test
+    void shouldRejectCompletingItemBeforeStart() {
+        storedPlan.set(pendingPlan(ACTOR_A));
+        TrainingPlan active = service.activate(PLAN_ID, 1);
+
+        assertThatThrownBy(() ->
+                service.completeItem(
+                        PLAN_ID,
+                        2,
+                        ITEM_ID,
+                        List.of("github:commit/abc123")
+                )
+        )
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("只有IN_PROGRESS计划项可以完成");
+
+        assertThat(storedPlan.get()).isSameAs(active);
+        assertThat(updateCount).hasValue(1);
+    }
+
+    @Test
+    void shouldRejectUncontrolledEvidenceWithoutUpdatingPlan() {
+        storedPlan.set(pendingPlan(ACTOR_A));
+        service.activate(PLAN_ID, 1);
+        TrainingPlan started = service.startItem(PLAN_ID, 2, ITEM_ID);
+
+        assertThatThrownBy(() ->
+                service.completeItem(
+                        PLAN_ID,
+                        3,
+                        ITEM_ID,
+                        List.of("开始第一次item测试")
+                )
+        )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("完成证据引用格式不受支持");
+
+        assertThat(storedPlan.get()).isSameAs(started);
+        assertThat(storedPlan.get().version()).isEqualTo(3);
+        assertThat(storedPlan.get().items().getFirst().status())
+                .isEqualTo(TrainingPlanItem.ItemStatus.IN_PROGRESS);
+        assertThat(updateCount).hasValue(2);
+    }
+
+    @Test
+    void shouldCancelOwnedPlanIdempotentlyWithoutSecondUpdate() {
+        storedPlan.set(pendingPlan(ACTOR_A));
+
+        TrainingPlan cancelled = service.cancel(PLAN_ID, 1);
+        TrainingPlan repeated = service.cancel(PLAN_ID, 1);
+
+        assertThat(cancelled.status()).isEqualTo(TrainingPlan.PlanStatus.CANCELLED);
+        assertThat(cancelled.version()).isEqualTo(2);
+        assertThat(cancelled.cancelledAt()).isEqualTo(NOW);
+        assertThat(repeated).isSameAs(cancelled);
+        assertThat(storedPlan.get()).isSameAs(cancelled);
         assertThat(updateCount).hasValue(1);
     }
 

@@ -127,6 +127,14 @@ public class CareerPlanningPersistenceConverter {
         entity.setOwnerId(plan.ownerId().value());
         entity.setPlanVersion(plan.planVersion());
         entity.setGapSnapshotId(plan.gapSnapshotId().toString());
+        entity.setGenerationContextJson(
+                plan.generationContext() == null
+                        ? null
+                        : serialize(
+                        plan.generationContext(),
+                        "generationContext"
+                )
+        );
         entity.setTitle(plan.title());
         entity.setPlanStatus(plan.status().name());
         entity.setVersion(plan.version());
@@ -265,6 +273,11 @@ public class CareerPlanningPersistenceConverter {
                 new ActorId(planEntity.getOwnerId()),
                 requireLong(planEntity.getPlanVersion(), "planVersion"),
                 UUID.fromString(planEntity.getGapSnapshotId()),
+                deserializeNullable(
+                        planEntity.getGenerationContextJson(),
+                        TrainingPlan.GenerationContext.class,
+                        "generationContextJson"
+                ),
                 planEntity.getTitle(),
                 TrainingPlan.PlanStatus.valueOf(planEntity.getPlanStatus()),
                 items,
@@ -354,5 +367,16 @@ public class CareerPlanningPersistenceConverter {
         }
 
         return value;
+    }
+
+    private <T> T deserializeNullable(
+            String json,
+            Class<T> type,
+            String fieldName
+    ) {
+        if (json == null) {
+            return null;
+        }
+        return deserialize(json, type, fieldName);
     }
 }

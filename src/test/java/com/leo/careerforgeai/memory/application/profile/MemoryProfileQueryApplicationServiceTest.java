@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.memory.application.profile;
 
 import com.leo.careerforgeai.memory.application.port.profile.MemoryRepository;
+import com.leo.careerforgeai.memory.domain.profile.LearningPreferenceKey;
 import com.leo.careerforgeai.memory.domain.profile.MemoryDecision;
 import com.leo.careerforgeai.memory.domain.profile.MemoryDecisionType;
 import com.leo.careerforgeai.memory.domain.profile.MemoryItem;
@@ -175,6 +176,42 @@ class MemoryProfileQueryApplicationServiceTest {
                 .hasMessage("profileVersion小于当前技能证据数量");
     }
 
+    @Test
+    void shouldReturnConfirmedPlanningMemoriesInStableOrder() {
+        MemoryItem learningPreference = confirmedPlanningMemory(
+                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                MemoryType.LEARNING_PREFERENCE,
+                MemoryNormalizedKey.learningPreference(
+                        LearningPreferenceKey.CONTENT_FORMAT
+                ),
+                "我更喜欢项目驱动的学习材料"
+        );
+        MemoryItem timeConstraint = confirmedPlanningMemory(
+                UUID.fromString("00000000-0000-0000-0000-000000000002"),
+                MemoryType.TIME_CONSTRAINT,
+                MemoryNormalizedKey.timeConstraint(
+                        TimeConstraintKey.WEEKLY_HOURS
+                ),
+                "我每周可以学习10小时"
+        );
+        MemoryItem skillEvidence = confirmedSkillMemory(
+                UUID.fromString("00000000-0000-0000-0000-000000000003"),
+                ACTOR_A,
+                "Spring Boot"
+        );
+        when(memoryRepository.findConfirmedByOwner(ACTOR_A))
+                .thenReturn(List.of(timeConstraint, skillEvidence, learningPreference));
+
+        List<MemoryItem> result =
+                service.findConfirmedPlanningMemories();
+
+        assertThat(result).containsExactly(
+                learningPreference,
+                timeConstraint
+        );
+        verify(memoryRepository).findConfirmedByOwner(ACTOR_A);
+    }
+
     private MemoryItem confirmedSkillMemory(UUID memoryId, ActorId ownerId, String skillName) {
         MemoryItem candidate = MemoryItem.createPending(
                 memoryId,
@@ -213,6 +250,39 @@ class MemoryProfileQueryApplicationServiceTest {
                 NOW.plusSeconds(1)
         );
         return candidate.applyDecision(decision);
+    }
+
+    private MemoryItem confirmedPlanningMemory(
+            UUID memoryId,
+            MemoryType type,
+            MemoryNormalizedKey normalizedKey,
+            String content
+    ) {
+        MemoryItem candidate = MemoryItem.createPending(
+                memoryId,
+                ACTOR_A,
+                type,
+                normalizedKey,
+                content,
+                new MemorySource(
+                        MemorySourceType.CONVERSATION_TURN,
+                        "turn-" + memoryId,
+                        "c".repeat(64)
+                ),
+                List.of("turn-" + memoryId),
+                NOW
+        );
+        return candidate.applyDecision(
+                MemoryDecision.create(
+                        UUID.randomUUID(),
+                        candidate,
+                        ACTOR_A,
+                        MemoryDecisionType.CONFIRM,
+                        null,
+                        "用户确认计划约束",
+                        NOW.plusSeconds(1)
+                )
+        );
     }
 
     private MemoryItem pendingMemory(UUID memoryId, ActorId ownerId, String content) {

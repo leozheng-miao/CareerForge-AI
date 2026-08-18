@@ -10,6 +10,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import com.leo.careerforgeai.memory.domain.profile.MemoryType;
 
 /**
  * @program: CareerForge-AI
@@ -20,6 +21,7 @@ import java.util.UUID;
  * @param ownerId 训练计划所属用户
  * @param planVersion 当前用户的训练计划业务版本
  * @param gapSnapshotId 生成计划时使用的能力差距快照ID
+ * @param generationContext 生成计划时冻结的Memory、资源和模型调用上下文，历史骨架计划允许为空
  * @param title 训练计划标题
  * @param status 当前计划状态
  * @param items 训练任务列表
@@ -35,6 +37,7 @@ public record TrainingPlan(
         ActorId ownerId,
         long planVersion,
         UUID gapSnapshotId,
+        GenerationContext generationContext,
         String title,
         PlanStatus status,
         List<TrainingPlanItem> items,
@@ -91,6 +94,41 @@ public record TrainingPlan(
                 ownerId,
                 planVersion,
                 gapSnapshotId,
+                null,
+                title,
+                PlanStatus.DRAFT,
+                items,
+                0,
+                now,
+                now,
+                null,
+                null,
+                null
+        );
+    }
+
+    /**
+     * 使用已经完成Java校验的固定输入和模型结果创建生成期草案。
+     * 该对象仍是内存中的DRAFT，持久化前必须提交为PENDING_CONFIRMATION。
+     */
+    public static TrainingPlan createGeneratedDraft(
+            UUID planId,
+            ActorId ownerId,
+            long planVersion,
+            UUID gapSnapshotId,
+            GenerationContext generationContext,
+            String title,
+            List<TrainingPlanItem> items,
+            Instant now
+    ) {
+        Objects.requireNonNull(generationContext, "generationContext 不能为空");
+
+        return new TrainingPlan(
+                planId,
+                ownerId,
+                planVersion,
+                gapSnapshotId,
+                generationContext,
                 title,
                 PlanStatus.DRAFT,
                 items,
@@ -269,6 +307,7 @@ public record TrainingPlan(
                 ownerId,
                 planVersion,
                 gapSnapshotId,
+                generationContext,
                 title,
                 targetStatus,
                 targetItems,
@@ -413,6 +452,171 @@ public record TrainingPlan(
             throw new IllegalArgumentException("title 不能包含控制字符");
         }
 
+        return normalized;
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 冻结训练计划生成时使用的Memory、资源版本和模型调用审计
+     * @author: Miao Zheng
+     * @date: 2026-08-17
+     * @param schemaVersion 生成上下文JSON协议版本
+     * @param inputPolicyVersion 固定输入读取与校验策略版本
+     * @param weeklyAvailableMinutes Java从已确认时间约束解析出的每周可用分钟数
+     * @param memoryRefs 本次使用的已确认时间约束和学习偏好引用
+     * @param allowedResources 本次允许模型引用的受控资源及来源版本
+     * @param generatorVersion 训练计划生成器版本
+     * @param promptVersion 训练计划Prompt版本
+     * @param modelRequestId 模型供应商返回的请求ID
+     * @param inputTokens 模型输入Token
+     * @param outputTokens 模型输出Token
+     * @param totalTokens 模型总Token
+     * @param modelDurationMs 模型调用耗时
+     */
+    public record GenerationContext(
+            String schemaVersion,
+            String inputPolicyVersion,
+            int weeklyAvailableMinutes,
+            List<MemoryInputRef> memoryRefs,
+            List<ResourceInputRef> allowedResources,
+            String generatorVersion,
+            String promptVersion,
+            String modelRequestId,
+            long inputTokens,
+            long outputTokens,
+            long totalTokens,
+            long modelDurationMs
+    ) {
+        public GenerationContext {
+            schemaVersion = normalizeAuditText(schemaVersion, "schemaVersion", 64);
+            inputPolicyVersion = normalizeAuditText(inputPolicyVersion, "inputPolicyVersion", 64);
+            generatorVersion = normalizeAuditText(generatorVersion, "generatorVersion", 64);
+            promptVersion = normalizeAuditText(promptVersion, "promptVersion", 64);
+            modelRequestId = normalizeAuditText(modelRequestId, "modelRequestId", 128);
+
+            if (weeklyAvailableMinutes < 1
+                    || weeklyAvailableMinutes > TrainingPlanItem.MAX_ESTIMATED_MINUTES) {
+                throw new IllegalArgumentException("weeklyAvailableMinutes超出允许范围");
+            }
+            if (memoryRefs == null || memoryRefs.isEmpty()) {
+                throw new IllegalArgumentException("memoryRefs必须包含已确认时间约束");
+            }
+            if (memoryRefs.stream().anyMatch(Objects::isNull)) {
+                throw new IllegalArgumentException("memoryRefs不能包含空值");
+            }
+            if (allowedResources == null) {
+                throw new IllegalArgumentException("allowedResources不能为空");
+            }
+            if (allowedResources.stream().anyMatch(Objects::isNull)) {
+                throw new IllegalArgumentException("allowedResources不能包含空值");
+            }
+
+            memoryRefs = List.copyOf(memoryRefs);
+            allowedResources = List.copyOf(allowedResources);
+
+            Set<UUID> memoryIds = new HashSet<>();
+            for (MemoryInputRef memoryRef : memoryRefs) {
+                if (!memoryIds.add(memoryRef.memoryId())) {
+                    throw new IllegalArgumentException("memoryRefs不能包含重复Memory ID");
+                }
+            }
+            if (new HashSet<>(allowedResources).size() != allowedResources.size()) {
+                throw new IllegalArgumentException("allowedResources不能重复");
+            }
+            if (inputTokens < 0 || outputTokens < 0 || totalTokens < 0) {
+                throw new IllegalArgumentException("模型Token不能小于0");
+            }
+            if (modelDurationMs < 0) {
+                throw new IllegalArgumentException("modelDurationMs不能小于0");
+            }
+        }
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 冻结计划生成时使用的一条已确认Memory身份和内容版本
+     * @author: Miao Zheng
+     * @date: 2026-08-17
+     * @param memoryId 已确认Memory ID
+     * @param version 参与生成时的Memory版本
+     * @param memoryType Memory业务类型
+     * @param normalizedKey Memory固定槽位
+     * @param contentHash Memory不可变正文Hash
+     */
+    public record MemoryInputRef(
+            UUID memoryId,
+            long version,
+            MemoryType memoryType,
+            String normalizedKey,
+            String contentHash
+    ) {
+        public MemoryInputRef {
+            Objects.requireNonNull(memoryId, "memoryId不能为空");
+            Objects.requireNonNull(memoryType, "memoryType不能为空");
+
+            if (version < 1) {
+                throw new IllegalArgumentException("已确认Memory版本必须从1开始");
+            }
+
+            normalizedKey = normalizeAuditText(
+                    normalizedKey,
+                    "normalizedKey",
+                    128
+            );
+            contentHash = normalizeSha256(contentHash, "contentHash");
+        }
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 冻结计划生成时允许模型引用的资源身份和来源版本
+     * @author: Miao Zheng
+     * @date: 2026-08-17
+     * @param resourceType 受控资源类型
+     * @param resourceId 受控资源ID
+     * @param sourceHash 资源内容版本Hash
+     */
+    public record ResourceInputRef(
+            TrainingPlanItem.ResourceType resourceType,
+            String resourceId,
+            String sourceHash
+    ) {
+        public ResourceInputRef {
+            Objects.requireNonNull(resourceType, "resourceType不能为空");
+            resourceId = normalizeAuditText(resourceId, "resourceId", 200);
+            sourceHash = normalizeSha256(sourceHash, "sourceHash");
+        }
+    }
+
+    private static String normalizeAuditText(
+            String value,
+            String fieldName,
+            int maxLength
+    ) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + "不能为空");
+        }
+
+        String normalized = value.strip();
+
+        if (normalized.length() > maxLength) {
+            throw new IllegalArgumentException(fieldName + "超过长度限制");
+        }
+        if (normalized.chars().anyMatch(Character::isISOControl)) {
+            throw new IllegalArgumentException(fieldName + "不能包含控制字符");
+        }
+        return normalized;
+    }
+
+    private static String normalizeSha256(
+            String value,
+            String fieldName
+    ) {
+        String normalized = normalizeAuditText(value, fieldName, 64);
+
+        if (!normalized.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException(fieldName + "必须是小写SHA-256");
+        }
         return normalized;
     }
 

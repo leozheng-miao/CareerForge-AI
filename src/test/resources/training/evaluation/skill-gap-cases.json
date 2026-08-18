@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "skill-gap-evaluation-v1",
+  "evaluationSetVersion": "careerforge-skill-gap-eval-v1",
+  "cases": [
+    {
+      "caseId": "skill-gap-eval-001",
+      "scenario": "EMPTY_PROFILE",
+      "profileVersion": 0,
+      "programmingLanguages": ["Java"],
+      "backendRequirements": ["Spring Boot"],
+      "evidence": [],
+      "expectedMatched": 0,
+      "expectedUnverified": 0,
+      "expectedMissing": 2,
+      "expectedPartial": 0,
+      "labelReason": "没有技能证据时所有岗位要求必须标记为MISSING"
+    },
+    {
+      "caseId": "skill-gap-eval-002",
+      "scenario": "SELF_REPORT_ONLY",
+      "profileVersion": 3,
+      "programmingLanguages": ["Java"],
+      "backendRequirements": [],
+      "evidence": [
+        {
+          "skill": "Java",
+          "sourceType": "CONVERSATION_TURN"
+        }
+      ],
+      "expectedMatched": 0,
+      "expectedUnverified": 1,
+      "expectedMissing": 0,
+      "expectedPartial": 0,
+      "labelReason": "只有用户自述时不能直接标记为MATCHED"
+    },
+    {
+      "caseId": "skill-gap-eval-003",
+      "scenario": "PROJECT_EVIDENCE_MATCHED",
+      "profileVersion": 5,
+      "programmingLanguages": ["Java"],
+      "backendRequirements": [],
+      "evidence": [
+        {
+          "skill": "Java",
+          "sourceType": "PROJECT_EVIDENCE"
+        }
+      ],
+      "expectedMatched": 1,
+      "expectedUnverified": 0,
+      "expectedMissing": 0,
+      "expectedPartial": 0,
+      "labelReason": "项目证据与技能标准键精确匹配时标记为MATCHED"
+    },
+    {
+      "caseId": "skill-gap-eval-004",
+      "scenario": "PARTIAL_NOT_INFERRED",
+      "profileVersion": 6,
+      "programmingLanguages": [],
+      "backendRequirements": ["熟练掌握Spring Boot并完成高并发系统开发"],
+      "evidence": [
+        {
+          "skill": "Spring Boot",
+          "sourceType": "PROJECT_EVIDENCE"
+        }
+      ],
+      "expectedMatched": 0,
+      "expectedUnverified": 0,
+      "expectedMissing": 1,
+      "expectedPartial": 0,
+      "labelReason": "当前算法不根据包含关系主观推断PARTIAL"
+    },
+    {
+      "caseId": "skill-gap-eval-005",
+      "scenario": "MIXED_PROFILE",
+      "profileVersion": 8,
+      "programmingLanguages": ["Java"],
+      "backendRequirements": ["Spring Boot", "MySQL"],
+      "evidence": [
+        {
+          "skill": "Java",
+          "sourceType": "PROJECT_EVIDENCE"
+        },
+        {
+          "skill": "Spring Boot",
+          "sourceType": "CONVERSATION_TURN"
+        }
+      ],
+      "expectedMatched": 1,
+      "expectedUnverified": 1,
+      "expectedMissing": 1,
+      "expectedPartial": 0,
+      "labelReason": "混合画像必须稳定生成MATCHED、UNVERIFIED和MISSING"
+    }
+  ]
+}

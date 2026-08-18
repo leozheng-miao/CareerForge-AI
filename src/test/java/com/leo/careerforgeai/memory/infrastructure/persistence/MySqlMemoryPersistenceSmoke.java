@@ -110,8 +110,7 @@ class MySqlMemoryPersistenceSmoke {
     @Test
     void shouldMigratePersistFilterByOwnerAndReadAfterContextRestart() {
         assertThat(flyway.info().current()).isNotNull();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("6");
-
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
         Integer tableCount = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
@@ -495,6 +494,20 @@ class MySqlMemoryPersistenceSmoke {
     }
 
     private MemoryItem pendingMemory(UUID memoryId, String content) {
+        UUID sessionId = UUID.randomUUID();
+        UUID turnId = UUID.randomUUID();
+        CoachingSession session = CoachingSession.create(sessionId, SMOKE_ACTOR, "Memory确认Smoke来源", NOW);
+        ConversationTurn sourceTurn = ConversationTurn.completedUser(
+                turnId,
+                sessionId,
+                UUID.randomUUID(),
+                SMOKE_ACTOR,
+                1,
+                content,
+                NOW
+        );
+        conversationRepository.insertSession(session);
+        conversationRepository.insertTurn(sourceTurn);
         return MemoryItem.createPending(
                 memoryId,
                 SMOKE_ACTOR,
@@ -503,14 +516,13 @@ class MySqlMemoryPersistenceSmoke {
                 content,
                 new MemorySource(
                         MemorySourceType.CONVERSATION_TURN,
-                        "mysql-smoke-turn-" + memoryId,
-                        "a".repeat(64)
+                        turnId.toString(),
+                        sourceTurn.contentHash()
                 ),
-                List.of("mysql-smoke-turn-" + memoryId),
+                List.of(turnId.toString()),
                 NOW
         );
     }
-
     private ConfigurableApplicationContext startFreshApplicationContext() {
         return new SpringApplicationBuilder(CareerForgeAiApplication.class)
                 .web(WebApplicationType.NONE)

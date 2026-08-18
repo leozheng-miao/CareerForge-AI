@@ -17,6 +17,10 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.json.JsonMapper;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -91,6 +95,43 @@ class TrainingPlanGeneratorTest {
                 .containsExactly(ModelRole.SYSTEM, ModelRole.USER);
     }
 
+    @Test
+    void shouldNotLogUntrustedModelOutputContent() {
+        String untrustedOutput = "not-json api-key=secret-value 用户隐私正文";
+        when(modelGateway.chat(any())).thenReturn(response(untrustedOutput));
+
+        Logger logger = (Logger) LoggerFactory.getLogger(TrainingPlanGenerator.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+
+        try {
+            assertThatThrownBy(() -> generator.generate(input))
+                    .isInstanceOfSatisfying(TrainingPlanGenerationException.class, exception ->
+                            assertThat(exception.getErrorType()).isEqualTo(MODEL_OUTPUT_INVALID))
+                    .hasMessage("训练计划结构化输出不是合法JSON");
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+
+        assertThat(appender.list).hasSize(1);
+        String message = appender.list.getFirst().getFormattedMessage();
+        assertThat(message)
+                .contains(
+                        "modelRequestId=training-model-request-1",
+                        "reason=训练计划结构化输出不是合法JSON",
+                        "outputChars=",
+                        "outputSha256="
+                )
+                .doesNotContain(
+                        "api-key",
+                        "secret-value",
+                        "用户隐私正文",
+                        untrustedOutput
+                );
+    }
+
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("invalidOutputs")
     void shouldRejectUntrustedModelOutput(String expectedMessage, String output) {
@@ -105,6 +146,23 @@ class TrainingPlanGeneratorTest {
     }
 
     private static Stream<Arguments> invalidOutputs() {
+
+        String forgedPlanState = validOutput().replace(
+                "\"durationWeeks\": 1,",
+                """
+                "durationWeeks": 1,
+                  "ownerId": "actor-b",
+                  "status": "ACTIVE",
+                """
+        );
+        String forgedItemState = validOutput().replace(
+                "\"foundationGoal\": null,",
+                """
+                "foundationGoal": null,
+                      "status": "COMPLETED",
+                      "completionEvidenceRefs": ["github:commit/forged"],
+                """
+        );
         String validItem = itemJson(1, "完成Java并发训练", "实现并验证线程安全任务处理器",
                 120, GAP_ITEM_ID, "document-1");
         return Stream.of(
@@ -120,6 +178,8 @@ class TrainingPlanGeneratorTest {
                                 601, GAP_ITEM_ID, "document-1"))),
                 arguments("训练计划包含重复任务", planJson(1, validItem, validItem)),
                 arguments("计划周期内每周必须至少包含一个任务", planJson(2, validItem)),
+                arguments("训练计划结构化输出不是合法JSON", forgedPlanState),
+                arguments("训练计划结构化输出不是合法JSON", forgedItemState),
                 arguments("训练计划包含未经输入支持的用户事实陈述",
                         planJson(1, itemJson(1, "Java训练任务", "你已经掌握Java并发编程",
                                 120, GAP_ITEM_ID, "document-1")))

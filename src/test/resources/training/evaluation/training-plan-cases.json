@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "training-plan-evaluation-v1",
+  "evaluationSetVersion": "careerforge-training-plan-eval-v1",
+  "cases": [
+    {
+      "caseId": "training-plan-eval-001",
+      "scenario": "TARGET_NOT_CONFIRMED",
+      "estimatedMinutes": 0,
+      "resourceId": "",
+      "expectedOutcome": "REJECTED",
+      "expectedErrorType": "TARGET_NOT_CONFIRMED",
+      "persist": false,
+      "latestPlanVersion": 0,
+      "expectedPlanVersion": 0,
+      "labelReason": "没有已确认TargetRole时不能生成Gap或训练计划"
+    },
+    {
+      "caseId": "training-plan-eval-002",
+      "scenario": "VALID_PLAN",
+      "estimatedMinutes": 120,
+      "resourceId": "document-1",
+      "expectedOutcome": "ACCEPTED",
+      "expectedErrorType": "",
+      "persist": false,
+      "latestPlanVersion": 0,
+      "expectedPlanVersion": 0,
+      "labelReason": "合法Gap、资源、时间和验收证据应通过Java校验"
+    },
+    {
+      "caseId": "training-plan-eval-003",
+      "scenario": "WEEKLY_TIME_EXCEEDED",
+      "estimatedMinutes": 601,
+      "resourceId": "document-1",
+      "expectedOutcome": "REJECTED",
+      "expectedErrorType": "MODEL_OUTPUT_INVALID",
+      "persist": false,
+      "latestPlanVersion": 0,
+      "expectedPlanVersion": 0,
+      "labelReason": "模型计划超过已确认每周时间时必须失败关闭"
+    },
+    {
+      "caseId": "training-plan-eval-004",
+      "scenario": "UNKNOWN_RESOURCE",
+      "estimatedMinutes": 120,
+      "resourceId": "unknown-document",
+      "expectedOutcome": "REJECTED",
+      "expectedErrorType": "MODEL_OUTPUT_INVALID",
+      "persist": false,
+      "latestPlanVersion": 0,
+      "expectedPlanVersion": 0,
+      "labelReason": "模型引用输入白名单外资源时必须失败关闭"
+    },
+    {
+      "caseId": "training-plan-eval-005",
+      "scenario": "PENDING_PLAN_NOT_ACTIVE",
+      "estimatedMinutes": 120,
+      "resourceId": "document-1",
+      "expectedOutcome": "ACCEPTED",
+      "expectedErrorType": "",
+      "persist": true,
+      "latestPlanVersion": 0,
+      "expectedPlanVersion": 1,
+      "labelReason": "生成并保存后的计划必须等待用户确认"
+    },
+    {
+      "caseId": "training-plan-eval-006",
+      "scenario": "TARGET_VERSION_CHANGED_NEW_PLAN",
+      "estimatedMinutes": 120,
+      "resourceId": "document-1",
+      "expectedOutcome": "ACCEPTED",
+      "expectedErrorType": "",
+      "persist": true,
+      "latestPlanVersion": 1,
+      "expectedPlanVersion": 2,
+      "labelReason": "目标和内容变化后创建新计划版本并保留历史计划"
+    }
+  ]
+}

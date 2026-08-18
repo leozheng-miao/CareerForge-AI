@@ -5,6 +5,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 import java.util.UUID;
+import com.leo.careerforgeai.career.application.port.CareerPlanningRepository;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 
 /**
  * @program: CareerForge-AI
@@ -13,6 +15,7 @@ import java.util.UUID;
  * @date: 2026-08-18
  */
 @Service
+@ConditionalOnBean(CareerPlanningRepository.class)
 public class TrainingPlanGenerationApplicationService {
 
     private final TrainingPlanGenerationInputReader inputReader;

@@ -168,9 +168,7 @@ class TargetRoleDraftApplicationServiceTest {
 
         assertThatThrownBy(() -> service.getDraft(DRAFT_ID))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage(
-                        "目标岗位草案查询结果违反owner或状态边界"
-                );
+                .hasMessage("目标岗位草案查询结果违反owner边界");
     }
 
     private TargetRoleDraft draft(ActorId ownerId) {

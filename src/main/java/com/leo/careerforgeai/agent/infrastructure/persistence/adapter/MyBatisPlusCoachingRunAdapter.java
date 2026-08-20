@@ -3,6 +3,7 @@ package com.leo.careerforgeai.agent.infrastructure.persistence.adapter;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.leo.careerforgeai.agent.application.port.run.CoachingRunRepository;
 import com.leo.careerforgeai.agent.domain.run.CoachingRun;
+import com.leo.careerforgeai.agent.domain.run.CoachingRunStatus;
 import com.leo.careerforgeai.agent.infrastructure.persistence.converter.CoachingRunPersistenceConverter;
 import com.leo.careerforgeai.agent.infrastructure.persistence.entity.CoachingRunEntity;
 import com.leo.careerforgeai.agent.infrastructure.persistence.mapper.CoachingRunMapper;
@@ -10,6 +11,8 @@ import com.leo.careerforgeai.shared.actor.ActorId;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -95,6 +98,32 @@ public class MyBatisPlusCoachingRunAdapter
 
         return Optional.ofNullable(mapper.selectOne(query))
                 .map(converter::toDomain);
+    }
+
+    @Override
+    public List<CoachingRun> findNonTerminalUpdatedBefore(
+            Instant updatedBefore,
+            int limit
+    ) {
+        Objects.requireNonNull(updatedBefore, "updatedBefore不能为空");
+        if (limit < 1 || limit > 1000) {
+            throw new IllegalArgumentException("limit必须在1到1000之间");
+        }
+
+        LambdaQueryWrapper<CoachingRunEntity> query = new LambdaQueryWrapper<>();
+        query.in(
+                        CoachingRunEntity::getRunStatus,
+                        CoachingRunStatus.RECEIVED.name(),
+                        CoachingRunStatus.ACCEPTED.name(),
+                        CoachingRunStatus.RUNNING.name()
+                )
+                .lt(CoachingRunEntity::getUpdatedAt, updatedBefore)
+                .orderByAsc(CoachingRunEntity::getUpdatedAt)
+                .last("LIMIT " + limit);
+
+        return mapper.selectList(query).stream()
+                .map(converter::toDomain)
+                .toList();
     }
 
     @Override

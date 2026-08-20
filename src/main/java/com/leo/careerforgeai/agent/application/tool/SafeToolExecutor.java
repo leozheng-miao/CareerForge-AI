@@ -1,5 +1,6 @@
 package com.leo.careerforgeai.agent.application.tool;
 
+import com.leo.careerforgeai.agent.application.run.execution.RunMdcContext;
 import com.leo.careerforgeai.agent.domain.tool.AgentToolOutput;
 import com.leo.careerforgeai.agent.domain.tool.ToolContract;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionContext;
@@ -136,7 +137,13 @@ public final class SafeToolExecutor {
             // 放入线程池，对最大工作线程数做限制，防止当前请求线程一直阻塞（执行隔离 + 有界资源 + 超时等待）
             // tool.execute() 从刚才的白名单结果中执行工具
             // future 本质上用于 等待结果/检查是否完成/取得结果/捕获任务异常/请求取消任务/限制等待时间
-            future = executorService.submit(() -> tool.execute(input, context));
+            // RunMdcContext 保证 mdc在父子线程都存在不丢失
+            RunMdcContext mdcContext = RunMdcContext.capture();
+            future = executorService.submit(
+                    mdcContext.wrapSupplier(
+                            () -> tool.execute(input, context)
+                    )
+            );
         } catch (RuntimeException exception) {
             return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "工具执行任务无法提交");
         }

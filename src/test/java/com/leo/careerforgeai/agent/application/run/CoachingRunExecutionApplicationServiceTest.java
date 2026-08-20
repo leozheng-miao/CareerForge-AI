@@ -5,6 +5,7 @@ import com.leo.careerforgeai.agent.application.coach.CareerCoachResult;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachService;
 import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerErrorType;
 import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerException;
+import com.leo.careerforgeai.agent.application.run.execution.RunExecutionContext;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswer;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopResult;
@@ -39,7 +40,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * @program: CareerForge-AI
- * @description: 验证Run同步执行、幂等重放、成功终结、超时和回答校验失败
+ * @description: 验证Run执行、幂等重放、成功终结、超时、回答校验失败和显式owner传递
  * @author: Miao Zheng
  * @date: 2026-08-20
  **/
@@ -124,30 +125,39 @@ class CoachingRunExecutionApplicationServiceTest {
     void shouldExecuteCoachAndSucceedRun() {
         CoachingRun running = runningRun();
         CoachingRun succeeded = running.succeed(ASSISTANT_TURN_ID, NOW);
-        CareerCoachResult coachResult = completedCoachResult();
 
         prepareRunningExecution(running);
-        when(careerCoachService.coachWithContext(context)).thenReturn(coachResult);
-        when(lifecycleService.succeed(RUN_ID, "可信回答", "agent-run-success"))
-                .thenReturn(succeeded);
+        when(careerCoachService.coachWithContext(context)).thenReturn(completedCoachResult());
+        when(lifecycleService.succeedForActor(
+                OWNER,
+                RUN_ID,
+                "可信回答",
+                "agent-run-success"
+        )).thenReturn(succeeded);
 
         CoachingRun result = service.execute(RUN_ID);
 
         assertThat(result).isSameAs(succeeded);
-        verify(lifecycleService).succeed(RUN_ID, "可信回答", "agent-run-success");
+        verify(lifecycleService).succeedForActor(
+                OWNER,
+                RUN_ID,
+                "可信回答",
+                "agent-run-success"
+        );
     }
 
     @Test
     void shouldReplayExistingRunWithoutCallingModel() {
         CoachingRun running = runningRun();
-        when(lifecycleService.start(RUN_ID))
+
+        when(currentActorProvider.currentActor()).thenReturn(OWNER);
+        when(lifecycleService.startForActor(OWNER, RUN_ID))
                 .thenReturn(new CoachingRunStartResult(running, false));
 
         CoachingRun result = service.execute(RUN_ID);
 
         assertThat(result).isSameAs(running);
         verifyNoInteractions(
-                currentActorProvider,
                 conversationRepository,
                 sessionApplicationService,
                 memoryRepository,
@@ -166,7 +176,8 @@ class CoachingRunExecutionApplicationServiceTest {
 
         assertThatThrownBy(() -> service.execute(RUN_ID)).isSameAs(failure);
 
-        verify(lifecycleService).timeOut(
+        verify(lifecycleService).timeOutForActor(
+                OWNER,
                 RUN_ID,
                 "agent-run-timeout",
                 "MODEL_TIMEOUT"
@@ -181,31 +192,62 @@ class CoachingRunExecutionApplicationServiceTest {
                 AgentRunStatus.COMPLETED,
                 AgentTerminationReason.FINAL_ANSWER
         );
-        CareerCoachFinalAnswerException failure =
-                new CareerCoachFinalAnswerException(
-                        CareerCoachFinalAnswerErrorType.CITATION_NOT_ALLOWED,
-                        "最终回答包含未授权引用"
-                ).withTrace(trace);
+        CareerCoachFinalAnswerException failure = new CareerCoachFinalAnswerException(
+                CareerCoachFinalAnswerErrorType.CITATION_NOT_ALLOWED,
+                "最终回答包含未授权引用"
+        ).withTrace(trace);
 
         prepareRunningExecution(running);
         when(careerCoachService.coachWithContext(context)).thenThrow(failure);
 
         assertThatThrownBy(() -> service.execute(RUN_ID)).isSameAs(failure);
 
-        verify(lifecycleService).fail(
+        verify(lifecycleService).failForActor(
+                OWNER,
                 RUN_ID,
                 "agent-run-invalid",
                 "CITATION_NOT_ALLOWED"
         );
     }
 
+    @Test
+    void shouldUseExplicitOwnerFromRunExecutionContext() {
+        CoachingRun running = runningRun();
+        CoachingRun succeeded = running.succeed(ASSISTANT_TURN_ID, NOW);
+        RunExecutionContext executionContext = new RunExecutionContext(
+                OWNER,
+                RUN_ID,
+                "trace-explicit-owner",
+                NOW.minusSeconds(30),
+                NOW.plusSeconds(30)
+        );
+
+        prepareExplicitOwnerExecution(running);
+        when(careerCoachService.coachWithContext(context)).thenReturn(completedCoachResult());
+        when(lifecycleService.succeedForActor(
+                OWNER,
+                RUN_ID,
+                "可信回答",
+                "agent-run-success"
+        )).thenReturn(succeeded);
+
+        CoachingRun result = service.execute(executionContext);
+
+        assertThat(result).isSameAs(succeeded);
+        verifyNoInteractions(currentActorProvider);
+    }
+
     private void prepareRunningExecution(CoachingRun running) {
-        when(lifecycleService.start(RUN_ID))
-                .thenReturn(new CoachingRunStartResult(running, true));
         when(currentActorProvider.currentActor()).thenReturn(OWNER);
+        prepareExplicitOwnerExecution(running);
+    }
+
+    private void prepareExplicitOwnerExecution(CoachingRun running) {
+        when(lifecycleService.startForActor(OWNER, RUN_ID))
+                .thenReturn(new CoachingRunStartResult(running, true));
         when(conversationRepository.findTurn(OWNER, USER_TURN_ID))
                 .thenReturn(Optional.of(userTurn));
-        when(sessionApplicationService.getRecentTurns(SESSION_ID))
+        when(sessionApplicationService.getRecentTurnsForActor(OWNER, SESSION_ID))
                 .thenReturn(List.of(userTurn));
         when(memoryRepository.findConfirmedByOwner(OWNER)).thenReturn(List.of());
         when(contextAssembler.assemble(userTurn, List.of(userTurn), List.of()))
@@ -254,9 +296,7 @@ class CoachingRunExecutionApplicationServiceTest {
         ).accept(
                 USER_TURN_ID,
                 NOW.minusSeconds(20)
-        ).start(
-                NOW.minusSeconds(10)
-        );
+        ).start(NOW.minusSeconds(10));
     }
 
     private AgentRunTrace trace(

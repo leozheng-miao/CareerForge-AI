@@ -22,14 +22,16 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
  * @program: CareerForge-AI
- * @description: 验证Run启动、成功、失败、超时、终态重放和CAS冲突
+ * @description: 验证Run启动、成功、失败、超时、终态重放、CAS冲突和显式owner执行
  * @author: Miao Zheng
  * @date: 2026-08-20
  **/
@@ -65,15 +67,13 @@ class CoachingRunLifecycleApplicationServiceTest {
                 sessionApplicationService,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
-        when(currentActorProvider.currentActor()).thenReturn(OWNER);
     }
 
     @Test
     void shouldStartAcceptedRunWithCas() {
-        CoachingRun accepted = acceptedRun();
-        when(repository.findByRunId(OWNER, RUN_ID)).thenReturn(Optional.of(accepted));
-        when(repository.updateIfVersionMatches(eq(OWNER), any(CoachingRun.class), eq(1L)))
-                .thenReturn(true);
+        when(currentActorProvider.currentActor()).thenReturn(OWNER);
+        when(repository.findByRunId(OWNER, RUN_ID)).thenReturn(Optional.of(acceptedRun()));
+        when(repository.updateIfVersionMatches(eq(OWNER), any(CoachingRun.class), eq(1L))).thenReturn(true);
 
         CoachingRunStartResult result = service.start(RUN_ID);
 
@@ -86,35 +86,34 @@ class CoachingRunLifecycleApplicationServiceTest {
     @Test
     void shouldReplayRunningRunWithoutAnotherCas() {
         CoachingRun running = runningRun();
+        when(currentActorProvider.currentActor()).thenReturn(OWNER);
         when(repository.findByRunId(OWNER, RUN_ID)).thenReturn(Optional.of(running));
 
         CoachingRunStartResult result = service.start(RUN_ID);
 
         assertThat(result.started()).isFalse();
         assertThat(result.run()).isSameAs(running);
-        verify(repository, never()).updateIfVersionMatches(any(), any(), org.mockito.ArgumentMatchers.anyLong());    }
+        verify(repository, never()).updateIfVersionMatches(any(), any(), anyLong());
+    }
 
     @Test
     void shouldSaveValidatedAssistantAndSucceedRun() {
         CoachingRun running = runningRun();
         ConversationTurn assistantTurn = completedAssistantTurn();
 
+        when(currentActorProvider.currentActor()).thenReturn(OWNER);
         when(repository.findByRunId(OWNER, RUN_ID)).thenReturn(Optional.of(running));
-        when(sessionApplicationService.recordValidatedAssistantTurn(
+        when(sessionApplicationService.recordValidatedAssistantTurnForActor(
+                OWNER,
                 SESSION_ID,
                 5L,
                 USER_TURN_ID,
                 "可信回答",
                 "agent-run-success"
         )).thenReturn(assistantTurn);
-        when(repository.updateIfVersionMatches(eq(OWNER), any(CoachingRun.class), eq(2L)))
-                .thenReturn(true);
+        when(repository.updateIfVersionMatches(eq(OWNER), any(CoachingRun.class), eq(2L))).thenReturn(true);
 
-        CoachingRun succeeded = service.succeed(
-                RUN_ID,
-                "可信回答",
-                "agent-run-success"
-        );
+        CoachingRun succeeded = service.succeed(RUN_ID, "可信回答", "agent-run-success");
 
         assertThat(succeeded.status()).isEqualTo(CoachingRunStatus.SUCCEEDED);
         assertThat(succeeded.assistantTurnId()).isEqualTo(ASSISTANT_TURN_ID);
@@ -126,22 +125,19 @@ class CoachingRunLifecycleApplicationServiceTest {
     void shouldSaveFailedAssistantAndFailRun() {
         CoachingRun running = runningRun();
 
+        when(currentActorProvider.currentActor()).thenReturn(OWNER);
         when(repository.findByRunId(OWNER, RUN_ID)).thenReturn(Optional.of(running));
-        when(sessionApplicationService.recordFailedAssistantTurn(
+        when(sessionApplicationService.recordFailedAssistantTurnForActor(
+                OWNER,
                 SESSION_ID,
                 5L,
                 USER_TURN_ID,
                 "agent-run-failed",
                 "MODEL_ERROR"
         )).thenReturn(failedAssistantTurn("agent-run-failed", "MODEL_ERROR"));
-        when(repository.updateIfVersionMatches(eq(OWNER), any(CoachingRun.class), eq(2L)))
-                .thenReturn(true);
+        when(repository.updateIfVersionMatches(eq(OWNER), any(CoachingRun.class), eq(2L))).thenReturn(true);
 
-        CoachingRun failed = service.fail(
-                RUN_ID,
-                "agent-run-failed",
-                "MODEL_ERROR"
-        );
+        CoachingRun failed = service.fail(RUN_ID, "agent-run-failed", "MODEL_ERROR");
 
         assertThat(failed.status()).isEqualTo(CoachingRunStatus.FAILED);
         assertThat(failed.failureCode()).isEqualTo("MODEL_ERROR");
@@ -152,37 +148,46 @@ class CoachingRunLifecycleApplicationServiceTest {
     void shouldSaveFailedAssistantAndTimeOutRun() {
         CoachingRun running = runningRun();
 
+        when(currentActorProvider.currentActor()).thenReturn(OWNER);
         when(repository.findByRunId(OWNER, RUN_ID)).thenReturn(Optional.of(running));
-        when(sessionApplicationService.recordFailedAssistantTurn(
+        when(sessionApplicationService.recordFailedAssistantTurnForActor(
+                OWNER,
                 SESSION_ID,
                 5L,
                 USER_TURN_ID,
                 "agent-run-timeout",
                 "MODEL_TIMEOUT"
         )).thenReturn(failedAssistantTurn("agent-run-timeout", "MODEL_TIMEOUT"));
-        when(repository.updateIfVersionMatches(eq(OWNER), any(CoachingRun.class), eq(2L)))
-                .thenReturn(true);
+        when(repository.updateIfVersionMatches(eq(OWNER), any(CoachingRun.class), eq(2L))).thenReturn(true);
 
-        CoachingRun timedOut = service.timeOut(
-                RUN_ID,
-                "agent-run-timeout",
-                "MODEL_TIMEOUT"
-        );
+        CoachingRun timedOut = service.timeOut(RUN_ID, "agent-run-timeout", "MODEL_TIMEOUT");
 
         assertThat(timedOut.status()).isEqualTo(CoachingRunStatus.TIMED_OUT);
         assertThat(timedOut.failureCode()).isEqualTo("MODEL_TIMEOUT");
+        assertThat(timedOut.assistantTurnId()).isEqualTo(ASSISTANT_TURN_ID);
     }
 
     @Test
     void shouldThrowVersionConflictWhenStartCasFails() {
-        CoachingRun accepted = acceptedRun();
-        when(repository.findByRunId(OWNER, RUN_ID)).thenReturn(Optional.of(accepted));
-        when(repository.updateIfVersionMatches(eq(OWNER), any(CoachingRun.class), eq(1L)))
-                .thenReturn(false);
+        when(currentActorProvider.currentActor()).thenReturn(OWNER);
+        when(repository.findByRunId(OWNER, RUN_ID)).thenReturn(Optional.of(acceptedRun()));
+        when(repository.updateIfVersionMatches(eq(OWNER), any(CoachingRun.class), eq(1L))).thenReturn(false);
 
         assertThatThrownBy(() -> service.start(RUN_ID))
                 .isInstanceOf(CoachingRunVersionConflictException.class)
                 .hasMessage("Run版本已经发生变化");
+    }
+
+    @Test
+    void shouldStartWithExplicitOwnerWithoutCurrentActorProvider() {
+        when(repository.findByRunId(OWNER, RUN_ID)).thenReturn(Optional.of(acceptedRun()));
+        when(repository.updateIfVersionMatches(eq(OWNER), any(CoachingRun.class), eq(1L))).thenReturn(true);
+
+        CoachingRunStartResult result = service.startForActor(OWNER, RUN_ID);
+
+        assertThat(result.started()).isTrue();
+        assertThat(result.run().status()).isEqualTo(CoachingRunStatus.RUNNING);
+        verifyNoInteractions(currentActorProvider);
     }
 
     private CoachingRun acceptedRun() {

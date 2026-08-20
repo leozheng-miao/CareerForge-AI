@@ -10,7 +10,7 @@ import java.util.UUID;
 
 /**
  * @program: CareerForge-AI
- * @description: 定义同步提交Coaching Run所需的幂等身份、Session版本和消息
+ * @description: 定义异步提交Coaching Run所需的幂等身份、Session版本和消息
  * @author: Miao Zheng
  * @date: 2026-08-20
  * @param sessionId 当前用户拥有的Coaching Session

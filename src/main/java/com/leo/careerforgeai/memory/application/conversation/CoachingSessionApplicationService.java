@@ -119,12 +119,38 @@ public class CoachingSessionApplicationService {
             String validatedContent,
             String agentRunId
     ) {
-        ActorId actorId = currentActorProvider.currentActor();
-        CoachingSession session = requireOwnedSession(actorId, sessionId);
+        return recordValidatedAssistantTurnForActor(
+                currentActorProvider.currentActor(),
+                sessionId,
+                expectedSessionVersion,
+                userTurnId,
+                validatedContent,
+                agentRunId
+        );
+    }
 
+    /**
+     * 使用已经由RunExecutionContext确认的owner保存可信助手消息。
+     * 该方法只允许应用层内部调用，actorId不能来自客户端。
+     */
+    @Transactional
+    public ConversationTurn recordValidatedAssistantTurnForActor(
+            ActorId actorId,
+            UUID sessionId,
+            long expectedSessionVersion,
+            UUID userTurnId,
+            String validatedContent,
+            String agentRunId
+    ) {
+        Objects.requireNonNull(actorId, "actorId不能为空");
+        CoachingSession session = requireOwnedSession(actorId, sessionId);
         requireExpectedVersion(session, expectedSessionVersion);
 
-        ConversationTurn userTurn = requireCompletedUserTurn(actorId, sessionId, userTurnId);
+        ConversationTurn userTurn = requireCompletedUserTurn(
+                actorId,
+                sessionId,
+                userTurnId
+        );
         Instant now = clock.instant();
 
         ConversationTurn assistantTurn = ConversationTurn.completedAssistant(
@@ -138,10 +164,15 @@ public class CoachingSessionApplicationService {
                 now
         );
 
-        CoachingSession advancedSession = session.advanceTurnSequence(now);
-        updateSessionOrThrow(actorId, advancedSession, expectedSessionVersion);
-        conversationRepository.insertTurn(assistantTurn);
+        CoachingSession advancedSession =
+                session.advanceTurnSequence(now);
 
+        updateSessionOrThrow(
+                actorId,
+                advancedSession,
+                expectedSessionVersion
+        );
+        conversationRepository.insertTurn(assistantTurn);
         return assistantTurn;
     }
 
@@ -157,12 +188,38 @@ public class CoachingSessionApplicationService {
             String agentRunId,
             String failureCode
     ) {
-        ActorId actorId = currentActorProvider.currentActor();
-        CoachingSession session = requireOwnedSession(actorId, sessionId);
+        return recordFailedAssistantTurnForActor(
+                currentActorProvider.currentActor(),
+                sessionId,
+                expectedSessionVersion,
+                userTurnId,
+                agentRunId,
+                failureCode
+        );
+    }
 
+    /**
+     * 使用已经由RunExecutionContext确认的owner保存受控失败消息。
+     * 该方法不能保存模型原始失败正文。
+     */
+    @Transactional
+    public ConversationTurn recordFailedAssistantTurnForActor(
+            ActorId actorId,
+            UUID sessionId,
+            long expectedSessionVersion,
+            UUID userTurnId,
+            String agentRunId,
+            String failureCode
+    ) {
+        Objects.requireNonNull(actorId, "actorId不能为空");
+        CoachingSession session = requireOwnedSession(actorId, sessionId);
         requireExpectedVersion(session, expectedSessionVersion);
 
-        ConversationTurn userTurn = requireCompletedUserTurn(actorId, sessionId, userTurnId);
+        ConversationTurn userTurn = requireCompletedUserTurn(
+                actorId,
+                sessionId,
+                userTurnId
+        );
         Instant now = clock.instant();
 
         ConversationTurn failedTurn = ConversationTurn.failedAssistant(
@@ -177,9 +234,13 @@ public class CoachingSessionApplicationService {
         );
 
         CoachingSession advancedSession = session.advanceTurnSequence(now);
-        updateSessionOrThrow(actorId, advancedSession, expectedSessionVersion);
-        conversationRepository.insertTurn(failedTurn);
 
+        updateSessionOrThrow(
+                actorId,
+                advancedSession,
+                expectedSessionVersion
+        );
+        conversationRepository.insertTurn(failedTurn);
         return failedTurn;
     }
 
@@ -189,10 +250,29 @@ public class CoachingSessionApplicationService {
      */
     @Transactional(readOnly = true)
     public List<ConversationTurn> getRecentTurns(UUID sessionId) {
-        ActorId actorId = currentActorProvider.currentActor();
+        return getRecentTurnsForActor(
+                currentActorProvider.currentActor(),
+                sessionId
+        );
+    }
+
+    /**
+     * 使用RunExecutionContext中的可信owner读取最近Turn。
+     * actorId不能从HTTP请求体或模型参数取得。
+     */
+    @Transactional(readOnly = true)
+    public List<ConversationTurn> getRecentTurnsForActor(
+            ActorId actorId,
+            UUID sessionId
+    ) {
+        Objects.requireNonNull(actorId, "actorId不能为空");
         requireOwnedSession(actorId, sessionId);
 
-        return conversationRepository.findRecentTurns(actorId, sessionId, DEFAULT_RECENT_TURN_LIMIT);
+        return conversationRepository.findRecentTurns(
+                actorId,
+                sessionId,
+                DEFAULT_RECENT_TURN_LIMIT
+        );
     }
 
     private CoachingSession requireOwnedSession(ActorId actorId, UUID sessionId) {
@@ -227,7 +307,7 @@ public class CoachingSessionApplicationService {
             throw new IllegalArgumentException("expectedVersion不能小于0");
         }
         if (session.version() != expectedVersion) {
-            throw new IllegalStateException("Session版本已经过期");
+            throw new CoachingSessionVersionConflictException("Session版本已经过期");
         }
     }
 
@@ -243,7 +323,7 @@ public class CoachingSessionApplicationService {
         );
 
         if (!updated) {
-            throw new IllegalStateException("Session并发更新冲突");
+            throw new CoachingSessionVersionConflictException("Session并发更新冲突");
         }
     }
 }

@@ -44,10 +44,21 @@ public class CoachingRunLifecycleApplicationService {
 
     @Transactional
     public CoachingRunStartResult start(UUID runId) {
-        ActorId ownerId = currentActorProvider.currentActor();
+        return startForActor(
+                currentActorProvider.currentActor(),
+                runId
+        );
+    }
+
+    @Transactional
+    public CoachingRunStartResult startForActor(
+            ActorId ownerId,
+            UUID runId
+    ) {
         CoachingRun current = requireOwnedRun(ownerId, runId);
 
-        if (current.status() == CoachingRunStatus.RUNNING || current.isTerminal()) {
+        if (current.status() == CoachingRunStatus.RUNNING
+                || current.isTerminal()) {
             return new CoachingRunStartResult(current, false);
         }
         if (current.status() != CoachingRunStatus.ACCEPTED) {
@@ -60,70 +71,178 @@ public class CoachingRunLifecycleApplicationService {
     }
 
     @Transactional
-    public CoachingRun succeed(UUID runId, String validatedAnswer, String agentRunId) {
-        ActorId ownerId = currentActorProvider.currentActor();
+    public CoachingRun succeed(
+            UUID runId,
+            String validatedAnswer,
+            String agentRunId
+    ) {
+        return succeedForActor(
+                currentActorProvider.currentActor(),
+                runId,
+                validatedAnswer,
+                agentRunId
+        );
+    }
+
+    @Transactional
+    public CoachingRun succeedForActor(
+            ActorId ownerId,
+            UUID runId,
+            String validatedAnswer,
+            String agentRunId
+    ) {
         CoachingRun current = requireOwnedRun(ownerId, runId);
 
         if (current.isTerminal()) return current;
         requireRunning(current);
 
-        ConversationTurn assistantTurn = sessionApplicationService.recordValidatedAssistantTurn(
-                current.sessionId(),
-                nextSessionVersion(current.expectedSessionVersion()),
-                requireUserTurnId(current),
-                validatedAnswer,
-                agentRunId
-        );
-        requireAssistantTurnIdentity(ownerId, current, assistantTurn);
+        ConversationTurn assistantTurn =
+                sessionApplicationService
+                        .recordValidatedAssistantTurnForActor(
+                                ownerId,
+                                current.sessionId(),
+                                nextSessionVersion(
+                                        current.expectedSessionVersion()
+                                ),
+                                requireUserTurnId(current),
+                                validatedAnswer,
+                                agentRunId
+                        );
 
-        CoachingRun succeeded = current.succeed(assistantTurn.turnId(), clock.instant());
+        requireAssistantTurnIdentity(
+                ownerId,
+                current,
+                assistantTurn
+        );
+
+        CoachingRun succeeded = current.succeed(
+                assistantTurn.turnId(),
+                clock.instant()
+        );
         updateOrThrow(ownerId, succeeded, current.version());
         return succeeded;
     }
 
     @Transactional
-    public CoachingRun fail(UUID runId, String agentRunId, String failureCode) {
-        return finishFailure(runId, agentRunId, failureCode, false);
+    public CoachingRun fail(
+            UUID runId,
+            String agentRunId,
+            String failureCode
+    ) {
+        return failForActor(
+                currentActorProvider.currentActor(),
+                runId,
+                agentRunId,
+                failureCode
+        );
     }
 
     @Transactional
-    public CoachingRun timeOut(UUID runId, String agentRunId, String failureCode) {
-        return finishFailure(runId, agentRunId, failureCode, true);
+    public CoachingRun failForActor(
+            ActorId ownerId,
+            UUID runId,
+            String agentRunId,
+            String failureCode
+    ) {
+        return finishFailure(
+                ownerId,
+                runId,
+                agentRunId,
+                failureCode,
+                false
+        );
+    }
+
+    @Transactional
+    public CoachingRun timeOut(
+            UUID runId,
+            String agentRunId,
+            String failureCode
+    ) {
+        return timeOutForActor(
+                currentActorProvider.currentActor(),
+                runId,
+                agentRunId,
+                failureCode
+        );
+    }
+
+    @Transactional
+    public CoachingRun timeOutForActor(
+            ActorId ownerId,
+            UUID runId,
+            String agentRunId,
+            String failureCode
+    ) {
+        return finishFailure(
+                ownerId,
+                runId,
+                agentRunId,
+                failureCode,
+                true
+        );
     }
 
     private CoachingRun finishFailure(
+            ActorId ownerId,
             UUID runId,
             String agentRunId,
             String failureCode,
             boolean timedOut
     ) {
-        ActorId ownerId = currentActorProvider.currentActor();
         CoachingRun current = requireOwnedRun(ownerId, runId);
 
         if (current.isTerminal()) return current;
         requireRunning(current);
 
-        ConversationTurn assistantTurn = sessionApplicationService.recordFailedAssistantTurn(
-                current.sessionId(),
-                nextSessionVersion(current.expectedSessionVersion()),
-                requireUserTurnId(current),
-                agentRunId,
-                failureCode
+        ConversationTurn assistantTurn =
+                sessionApplicationService
+                        .recordFailedAssistantTurnForActor(
+                                ownerId,
+                                current.sessionId(),
+                                nextSessionVersion(
+                                        current.expectedSessionVersion()
+                                ),
+                                requireUserTurnId(current),
+                                agentRunId,
+                                failureCode
+                        );
+
+        requireAssistantTurnIdentity(
+                ownerId,
+                current,
+                assistantTurn
         );
-        requireAssistantTurnIdentity(ownerId, current, assistantTurn);
 
         CoachingRun finished = timedOut
-                ? current.timeOut(assistantTurn.turnId(), failureCode, clock.instant())
-                : current.fail(assistantTurn.turnId(), failureCode, clock.instant());
+                ? current.timeOut(
+                assistantTurn.turnId(),
+                failureCode,
+                clock.instant()
+        )
+                : current.fail(
+                assistantTurn.turnId(),
+                failureCode,
+                clock.instant()
+        );
 
         updateOrThrow(ownerId, finished, current.version());
         return finished;
     }
 
-    private CoachingRun requireOwnedRun(ActorId ownerId, UUID runId) {
+    private CoachingRun requireOwnedRun(
+            ActorId ownerId,
+            UUID runId
+    ) {
+        Objects.requireNonNull(ownerId, "ownerId不能为空");
         Objects.requireNonNull(runId, "runId不能为空");
+
         return repository.findByRunId(ownerId, runId)
-                .orElseThrow(() -> new IllegalArgumentException("Run不存在或不属于当前用户"));
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Run不存在或不属于当前用户"
+                        )
+                );
     }
 
     private static void requireRunning(CoachingRun run) {
@@ -133,7 +252,10 @@ public class CoachingRunLifecycleApplicationService {
     }
 
     private static UUID requireUserTurnId(CoachingRun run) {
-        return Objects.requireNonNull(run.userTurnId(), "RUNNING Run缺少userTurnId");
+        return Objects.requireNonNull(
+                run.userTurnId(),
+                "RUNNING Run缺少userTurnId"
+        );
     }
 
     private static long nextSessionVersion(long version) {
@@ -149,14 +271,26 @@ public class CoachingRunLifecycleApplicationService {
             CoachingRun run,
             ConversationTurn assistantTurn
     ) {
-        if (!ownerId.equals(assistantTurn.ownerId()) || !run.sessionId().equals(assistantTurn.sessionId())) {
+        if (!ownerId.equals(assistantTurn.ownerId())
+                || !run.sessionId().equals(assistantTurn.sessionId())) {
             throw new IllegalStateException("保存的ASSISTANT Turn与Run身份不一致");
         }
     }
 
-    private void updateOrThrow(ActorId ownerId, CoachingRun updated, long expectedVersion) {
-        if (!repository.updateIfVersionMatches(ownerId, updated, expectedVersion)) {
-            throw new CoachingRunVersionConflictException(updated.runId(), expectedVersion);
+    private void updateOrThrow(
+            ActorId ownerId,
+            CoachingRun updated,
+            long expectedVersion
+    ) {
+        if (!repository.updateIfVersionMatches(
+                ownerId,
+                updated,
+                expectedVersion
+        )) {
+            throw new CoachingRunVersionConflictException(
+                    updated.runId(),
+                    expectedVersion
+            );
         }
     }
 }

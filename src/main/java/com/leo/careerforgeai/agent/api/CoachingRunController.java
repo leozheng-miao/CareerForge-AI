@@ -3,13 +3,18 @@ package com.leo.careerforgeai.agent.api;
 import com.leo.careerforgeai.agent.api.dto.CoachingRunResponse;
 import com.leo.careerforgeai.agent.api.dto.CreateCoachingRunRequest;
 import com.leo.careerforgeai.agent.application.run.CoachingRunApplicationService;
+import com.leo.careerforgeai.agent.application.run.CoachingRunAsyncSubmissionApplicationService;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +26,7 @@ import java.util.UUID;
 
 /**
  * @program: CareerForge-AI
- * @description: 提供Coaching Run同步提交和owner隔离查询API
+ * @description: 提供Coaching Run异步提交和owner隔离查询API
  * @author: Miao Zheng
  * @date: 2026-08-20
  **/
@@ -32,27 +37,37 @@ import java.util.UUID;
 @ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
 public class CoachingRunController {
 
+    private final CoachingRunAsyncSubmissionApplicationService submissionService;
     private final CoachingRunApplicationService applicationService;
 
     @PostMapping
-    @Operation(summary = "同步提交Coaching Run")
-    public BaseResponse<CoachingRunResponse> submit(
+    @Operation(summary = "异步提交Coaching Run")
+    @ApiResponses({
+            @ApiResponse(responseCode = "202", description = "Run已经接受并提交异步执行"),
+            @ApiResponse(responseCode = "409", description = "requestId冲突或Run版本冲突"),
+            @ApiResponse(responseCode = "429", description = "Run执行容量已满")
+    })
+    public ResponseEntity<BaseResponse<CoachingRunResponse>> submit(
             @Valid @RequestBody CreateCoachingRunRequest request
     ) {
-        return ResultUtils.success(
-                CoachingRunResponse.from(
-                        applicationService.submit(
-                                request.sessionId(),
-                                request.requestId(),
-                                request.expectedSessionVersion(),
-                                request.message()
-                        )
+        CoachingRunResponse response = CoachingRunResponse.from(
+                submissionService.submit(
+                        request.sessionId(),
+                        request.requestId(),
+                        request.expectedSessionVersion(),
+                        request.message()
                 )
         );
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(ResultUtils.success(response));
     }
 
     @GetMapping("/{runId}")
     @Operation(summary = "查询当前用户的Coaching Run")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "返回Run当前事实"),
+            @ApiResponse(responseCode = "404", description = "Run不存在或不属于当前用户")
+    })
     public BaseResponse<CoachingRunResponse> get(@PathVariable UUID runId) {
         return ResultUtils.success(CoachingRunResponse.from(applicationService.get(runId)));
     }

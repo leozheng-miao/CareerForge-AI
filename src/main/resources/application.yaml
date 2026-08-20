@@ -104,6 +104,11 @@ careerforge:
       model-call-timeout: ${AGENT_MODEL_CALL_TIMEOUT:30s}
       tool-executor-threads: ${AGENT_TOOL_EXECUTOR_THREADS:8}
       tool-executor-queue-capacity: ${AGENT_TOOL_EXECUTOR_QUEUE_CAPACITY:32}
+    run:
+      max-concurrent-runs: ${COACHING_RUN_MAX_CONCURRENT:8}
+      max-concurrent-runs-per-owner: ${COACHING_RUN_MAX_CONCURRENT_PER_OWNER:2}
+      shutdown-grace-period: ${COACHING_RUN_SHUTDOWN_GRACE_PERIOD:20s}
+      execution-timeout: ${COACHING_RUN_EXECUTION_TIMEOUT:90s}
     spring-ai:
       enabled: ${SPRING_AI_CAREER_COACH_ENABLED:false}
 server:

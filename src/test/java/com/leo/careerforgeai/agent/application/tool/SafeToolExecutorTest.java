@@ -1,5 +1,6 @@
 package com.leo.careerforgeai.agent.application.tool;
 
+import com.leo.careerforgeai.agent.application.run.execution.RunMdcContext;
 import com.leo.careerforgeai.agent.domain.tool.AgentToolOutput;
 import com.leo.careerforgeai.agent.domain.tool.ToolContract;
 import com.leo.careerforgeai.agent.domain.tool.ToolExecutionContext;
@@ -31,12 +32,21 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.leo.careerforgeai.agent.application.run.execution.RunMdcContext;
+import org.slf4j.MDC;
+
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * @program: CareerForge-AI
@@ -293,6 +303,55 @@ class ToolSafetyTest {
         assertThat(result.errorType()).isEqualTo(ToolExecutionErrorType.EXECUTION_FAILED);
         assertThat(result.modelUsage()).isEqualTo(new ModelUsage(80, 20, 100));
         assertThat(result.modelDurationMs()).isEqualTo(45L);
+    }
+
+    @Test
+    @DisplayName("Run MDC显式传播到工具线程并在执行后清理")
+    void shouldPropagateRunMdcToToolThreadAndCleanAfterExecution()
+            throws Exception {
+        AtomicReference<String> capturedRunId = new AtomicReference<>();
+        AtomicReference<String> capturedTraceId = new AtomicReference<>();
+
+        TestTool tool = tool(
+                defaultContract("search_tool"),
+                input -> {
+                    capturedRunId.set(MDC.get(RunMdcContext.RUN_ID));
+                    capturedTraceId.set(MDC.get(RunMdcContext.TRACE_ID));
+                    return output("ok");
+                }
+        );
+
+        SafeToolExecutor executor = executor(tool);
+
+        MDC.put(RunMdcContext.OWNER_ID, "actor-a");
+        MDC.put(RunMdcContext.RUN_ID, "coaching-run-1");
+        MDC.put(RunMdcContext.TRACE_ID, "trace-run-1");
+
+        try {
+            ToolExecutionResult result = executor.execute(
+                    new ToolCall(
+                            "call-mdc",
+                            "search_tool",
+                            "{\"query\":\"Java并发\"}"
+                    ),
+                    context
+            );
+
+            assertThat(result.status())
+                    .isEqualTo(ToolExecutionStatus.SUCCESS);
+            assertThat(capturedRunId)
+                    .hasValue("coaching-run-1");
+            assertThat(capturedTraceId)
+                    .hasValue("trace-run-1");
+        } finally {
+            MDC.clear();
+        }
+
+        Future<String> afterTask = executorService.submit(
+                () -> MDC.get(RunMdcContext.RUN_ID)
+        );
+
+        assertThat(afterTask.get(2, TimeUnit.SECONDS)).isNull();
     }
 
     private SafeToolExecutor executor(AgentTool<?, ?>... tools) {

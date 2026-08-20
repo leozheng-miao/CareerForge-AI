@@ -8,6 +8,7 @@ import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinal
 import com.leo.careerforgeai.agent.application.run.CoachingRunNotFoundException;
 import com.leo.careerforgeai.agent.application.run.CoachingRunRequestConflictException;
 import com.leo.careerforgeai.agent.application.run.CoachingRunVersionConflictException;
+import com.leo.careerforgeai.agent.application.run.execution.CoachingRunCapacityRejectedException;
 import com.leo.careerforgeai.shared.exception.ErrorCode;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
@@ -58,6 +59,15 @@ public class CareerCoachApiExceptionHandler {
         log.warn("Coaching Run版本冲突，runId={}, expectedVersion={}", exception.runId(), exception.expectedVersion());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ResultUtils.error(ErrorCode.CONFLICT_ERROR, "Run状态已经变化，请重新查询"));
+    }
+
+    @ExceptionHandler(CoachingRunCapacityRejectedException.class)
+    public ResponseEntity<BaseResponse<?>> handleCapacityRejected(
+            CoachingRunCapacityRejectedException exception
+    ) {
+        log.warn("Coaching Run执行容量已满，ownerId={}", exception.ownerId().value());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ResultUtils.error(ErrorCode.TOO_MANY_REQUEST, "当前Run执行容量已满，请稍后重试"));
     }
 
     @ExceptionHandler(CoachingRunNotFoundException.class)

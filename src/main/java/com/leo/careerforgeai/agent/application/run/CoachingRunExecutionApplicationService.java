@@ -4,6 +4,7 @@ import com.leo.careerforgeai.agent.application.coach.CareerCoachExecutionExcepti
 import com.leo.careerforgeai.agent.application.coach.CareerCoachResult;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachService;
 import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerException;
+import com.leo.careerforgeai.agent.application.run.execution.RunExecutionContext;
 import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
 import com.leo.careerforgeai.agent.domain.run.CoachingRun;
 import com.leo.careerforgeai.memory.application.context.ConversationContext;
@@ -25,7 +26,7 @@ import java.util.UUID;
 
 /**
  * @program: CareerForge-AI
- * @description: 在事务外组装Context并同步执行现有Career Coach调用链
+ * @description: 使用显式owner在事务外组装Context并执行现有Career Coach调用链
  * @author: Miao Zheng
  * @date: 2026-08-20
  **/
@@ -61,41 +62,96 @@ public class CoachingRunExecutionApplicationService {
     }
 
     public CoachingRun execute(UUID runId) {
-        // 启动 lifecycle
-        CoachingRunStartResult startResult = lifecycleService.start(runId);
+        return execute(
+                currentActorProvider.currentActor(),
+                runId
+        );
+    }
+
+    public CoachingRun execute(RunExecutionContext executionContext) {
+        Objects.requireNonNull(executionContext, "executionContext不能为空");
+        return execute(
+                executionContext.ownerId(),
+                executionContext.runId()
+        );
+    }
+
+    private CoachingRun execute(
+            ActorId ownerId,
+            UUID runId
+    ) {
+        CoachingRunStartResult startResult =
+                lifecycleService.startForActor(
+                        ownerId,
+                        runId
+                );
+
         if (!startResult.started()) return startResult.run();
 
         CoachingRun running = startResult.run();
-        ActorId ownerId = currentActorProvider.currentActor();
-        //检验 是否存在绑定的 userTurn
-        ConversationTurn userTurn = requireUserTurn(ownerId, running);
+        ConversationTurn userTurn =
+                requireUserTurn(ownerId, running);
 
-        List<ConversationTurn> recentTurns = sessionApplicationService.getRecentTurns(running.sessionId());
-        List<MemoryItem> confirmedMemories = memoryRepository.findConfirmedByOwner(ownerId);
-        // 用拿到的 最近 Turn + 已确定Memory，组装 context
-        ConversationContext context = contextAssembler.assemble(userTurn, recentTurns, confirmedMemories);
+        List<ConversationTurn> recentTurns =
+                sessionApplicationService
+                        .getRecentTurnsForActor(
+                                ownerId,
+                                running.sessionId()
+                        );
+
+        List<MemoryItem> confirmedMemories =
+                memoryRepository.findConfirmedByOwner(ownerId);
+
+        ConversationContext context = contextAssembler.assemble(
+                userTurn,
+                recentTurns,
+                confirmedMemories
+        );
 
         try {
-            // 调用 careerCoach Agent
-            CareerCoachResult result = careerCoachService.coachWithContext(context);
-            return lifecycleService.succeed(
+            CareerCoachResult result =
+                    careerCoachService.coachWithContext(context);
+
+            return lifecycleService.succeedForActor(
+                    ownerId,
                     running.runId(),
                     result.answer().answer(),
                     result.trace().runId()
             );
         } catch (CareerCoachExecutionException exception) {
-            finishExecutionFailureWithoutMasking(running.runId(), exception);
+            finishExecutionFailureWithoutMasking(
+                    ownerId,
+                    running.runId(),
+                    exception
+            );
             throw exception;
         } catch (CareerCoachFinalAnswerException exception) {
-            finishValidationFailureWithoutMasking(running.runId(), exception);
+            finishValidationFailureWithoutMasking(
+                    ownerId,
+                    running.runId(),
+                    exception
+            );
             throw exception;
         }
     }
 
-    private ConversationTurn requireUserTurn(ActorId ownerId, CoachingRun run) {
-        UUID userTurnId = Objects.requireNonNull(run.userTurnId(), "RUNNING Run缺少userTurnId");
-        ConversationTurn userTurn = conversationRepository.findTurn(ownerId, userTurnId)
-                .orElseThrow(() -> new IllegalStateException("Run关联的USER Turn不存在"));
+    private ConversationTurn requireUserTurn(
+            ActorId ownerId,
+            CoachingRun run
+    ) {
+        UUID userTurnId = Objects.requireNonNull(
+                run.userTurnId(),
+                "RUNNING Run缺少userTurnId"
+        );
+
+        ConversationTurn userTurn =
+                conversationRepository
+                        .findTurn(ownerId, userTurnId)
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Run关联的USER Turn不存在"
+                                )
+                        );
 
         if (!run.sessionId().equals(userTurn.sessionId())) {
             throw new IllegalStateException("Run关联的USER Turn不属于当前Session");
@@ -104,18 +160,21 @@ public class CoachingRunExecutionApplicationService {
     }
 
     private void finishExecutionFailureWithoutMasking(
+            ActorId ownerId,
             UUID runId,
             CareerCoachExecutionException original
     ) {
         try {
             if (original.getRunStatus() == AgentRunStatus.TIMED_OUT) {
-                lifecycleService.timeOut(
+                lifecycleService.timeOutForActor(
+                        ownerId,
                         runId,
                         original.getTrace().runId(),
                         original.getTerminationReason().name()
                 );
             } else {
-                lifecycleService.fail(
+                lifecycleService.failForActor(
+                        ownerId,
                         runId,
                         original.getTrace().runId(),
                         original.getTerminationReason().name()
@@ -123,11 +182,16 @@ public class CoachingRunExecutionApplicationService {
             }
         } catch (RuntimeException persistenceException) {
             original.addSuppressed(persistenceException);
-            log.warn("Run失败终态保存失败，runId={}, persistenceError={}", runId, persistenceException.getClass().getSimpleName());
+            log.warn(
+                    "Run失败终态保存失败，runId={}, persistenceError={}",
+                    runId,
+                    persistenceException.getClass().getSimpleName()
+            );
         }
     }
 
     private void finishValidationFailureWithoutMasking(
+            ActorId ownerId,
             UUID runId,
             CareerCoachFinalAnswerException original
     ) {
@@ -137,14 +201,19 @@ public class CoachingRunExecutionApplicationService {
         }
 
         try {
-            lifecycleService.fail(
+            lifecycleService.failForActor(
+                    ownerId,
                     runId,
                     original.getTrace().runId(),
                     original.getErrorType().name()
             );
         } catch (RuntimeException persistenceException) {
             original.addSuppressed(persistenceException);
-            log.warn("Run校验失败终态保存失败，runId={}, persistenceError={}", runId, persistenceException.getClass().getSimpleName());
+            log.warn(
+                    "Run校验失败终态保存失败，runId={}, persistenceError={}",
+                    runId,
+                    persistenceException.getClass().getSimpleName()
+            );
         }
     }
 }

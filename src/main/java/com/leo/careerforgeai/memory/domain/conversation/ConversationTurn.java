@@ -182,7 +182,8 @@ public record ConversationTurn(
         return status == ConversationTurnStatus.COMPLETED;
     }
 
-    private static String normalizeContent(String content) {
+    /** 统一规范化会话消息，确保请求指纹与最终持久化内容使用相同口径。 */
+    public static String normalizeContent(String content) {
         if (content == null || content.isBlank()) {
             throw new IllegalArgumentException("content 不能为空");
         }

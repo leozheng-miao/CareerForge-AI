@@ -18,6 +18,7 @@
         <spring-ai.version>2.0.0</spring-ai.version>
         <springdoc-openapi.version>3.0.3</springdoc-openapi.version>
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
+        <resilience4j.version>2.4.0</resilience4j.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -100,6 +101,21 @@
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!--   resilience4j    -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-retry</artifactId>
+            <version>${resilience4j.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-circuitbreaker</artifactId>
+            <version>${resilience4j.version}</version>
+            <scope>test</scope>
         </dependency>
 
     </dependencies>

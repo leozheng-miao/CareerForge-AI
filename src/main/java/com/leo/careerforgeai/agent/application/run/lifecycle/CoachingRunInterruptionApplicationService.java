@@ -1,6 +1,7 @@
-package com.leo.careerforgeai.agent.application.run;
+package com.leo.careerforgeai.agent.application.run.lifecycle;
 
 import com.leo.careerforgeai.agent.application.port.run.CoachingRunRepository;
+import com.leo.careerforgeai.agent.application.run.CoachingRunNotFoundException;
 import com.leo.careerforgeai.agent.domain.run.CoachingRun;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

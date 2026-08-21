@@ -3,7 +3,7 @@ package com.leo.careerforgeai.agent.api;
 import com.leo.careerforgeai.agent.api.dto.CoachingRunResponse;
 import com.leo.careerforgeai.agent.api.dto.CreateCoachingRunRequest;
 import com.leo.careerforgeai.agent.application.run.CoachingRunApplicationService;
-import com.leo.careerforgeai.agent.application.run.CoachingRunAsyncSubmissionApplicationService;
+import com.leo.careerforgeai.agent.application.run.submission.CoachingRunAsyncSubmissionApplicationService;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
 import io.swagger.v3.oas.annotations.Operation;

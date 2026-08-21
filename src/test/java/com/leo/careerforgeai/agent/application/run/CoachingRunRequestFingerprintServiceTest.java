@@ -1,5 +1,6 @@
 package com.leo.careerforgeai.agent.application.run;
 
+import com.leo.careerforgeai.agent.application.run.submission.CoachingRunRequestFingerprintService;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;

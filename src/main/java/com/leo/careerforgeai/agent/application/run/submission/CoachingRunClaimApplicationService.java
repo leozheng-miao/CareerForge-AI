@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.agent.application.run;
+package com.leo.careerforgeai.agent.application.run.submission;
 
 import com.leo.careerforgeai.agent.application.port.run.CoachingRunRepository;
 import com.leo.careerforgeai.agent.domain.run.CoachingRun;

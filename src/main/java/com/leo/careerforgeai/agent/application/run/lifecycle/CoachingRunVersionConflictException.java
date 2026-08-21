@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.agent.application.run;
+package com.leo.careerforgeai.agent.application.run.lifecycle;
 
 import java.util.Objects;
 import java.util.UUID;

@@ -2,9 +2,9 @@ package com.leo.careerforgeai.agent.api;
 
 import com.leo.careerforgeai.agent.api.advice.CareerCoachApiExceptionHandler;
 import com.leo.careerforgeai.agent.application.run.CoachingRunApplicationService;
-import com.leo.careerforgeai.agent.application.run.CoachingRunAsyncSubmissionApplicationService;
+import com.leo.careerforgeai.agent.application.run.submission.CoachingRunAsyncSubmissionApplicationService;
 import com.leo.careerforgeai.agent.application.run.CoachingRunNotFoundException;
-import com.leo.careerforgeai.agent.application.run.CoachingRunRequestConflictException;
+import com.leo.careerforgeai.agent.application.run.submission.CoachingRunRequestConflictException;
 import com.leo.careerforgeai.agent.application.run.execution.CoachingRunCapacityRejectedException;
 import com.leo.careerforgeai.agent.domain.run.CoachingRun;
 import com.leo.careerforgeai.shared.actor.ActorId;

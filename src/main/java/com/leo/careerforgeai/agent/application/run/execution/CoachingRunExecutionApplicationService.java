@@ -1,10 +1,11 @@
-package com.leo.careerforgeai.agent.application.run;
+package com.leo.careerforgeai.agent.application.run.execution;
 
 import com.leo.careerforgeai.agent.application.coach.CareerCoachExecutionException;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachResult;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachService;
 import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerException;
-import com.leo.careerforgeai.agent.application.run.execution.RunExecutionContext;
+import com.leo.careerforgeai.agent.application.run.lifecycle.CoachingRunLifecycleApplicationService;
+import com.leo.careerforgeai.agent.application.run.lifecycle.CoachingRunStartResult;
 import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
 import com.leo.careerforgeai.agent.domain.run.CoachingRun;
 import com.leo.careerforgeai.memory.application.context.ConversationContext;

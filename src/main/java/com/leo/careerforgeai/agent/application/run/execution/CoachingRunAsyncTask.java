@@ -1,7 +1,6 @@
 package com.leo.careerforgeai.agent.application.run.execution;
 
-import com.leo.careerforgeai.agent.application.run.CoachingRunExecutionApplicationService;
-import com.leo.careerforgeai.agent.application.run.CoachingRunInterruptionApplicationService;
+import com.leo.careerforgeai.agent.application.run.lifecycle.CoachingRunInterruptionApplicationService;
 import com.leo.careerforgeai.memory.application.conversation.CoachingSessionVersionConflictException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

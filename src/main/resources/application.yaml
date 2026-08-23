@@ -48,6 +48,14 @@ spring:
         tool-change-notification: false
   elasticsearch:
     uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+      database: ${REDIS_DATABASE:0}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:1s}
+      timeout: ${REDIS_READ_TIMEOUT:1s}
+      repositories:
+        enabled: false
   jackson:
     deserialization:
       fail-on-unknown-properties: true
@@ -91,6 +99,11 @@ careerforge:
       final-top-k: ${RAG_FINAL_TOP_K:5}
       rerank-enabled: ${RAG_RERANK_ENABLED:false}
       max-content-chars: ${RAG_MAX_CONTENT_CHARS:3000}
+  redis:
+    namespace: ${CAREERFORGE_REDIS_NAMESPACE:careerforge}
+    environment: ${CAREERFORGE_REDIS_ENVIRONMENT:local}
+    event-ttl: ${CAREERFORGE_REDIS_EVENT_TTL:30m}
+    event-stream-max-length: ${CAREERFORGE_REDIS_EVENT_STREAM_MAX_LENGTH:500}
   agent:
     loop:
       max-model-iterations: ${AGENT_MAX_MODEL_ITERATIONS:6}

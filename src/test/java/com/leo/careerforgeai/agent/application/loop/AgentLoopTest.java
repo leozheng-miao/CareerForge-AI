@@ -389,6 +389,106 @@ class AgentLoopTest {
         assertThat(result.trace().durationMs()).isEqualTo(31_000);
     }
 
+    @Test
+    @DisplayName("只为白名单工具按执行顺序发送开始和完成观察事件")
+    void shouldNotifyObserverForRegisteredToolInExecutionOrder() {
+        TestTool searchTool = tool("search_tool", input -> "evidence-" + input.query());
+        ToolCall toolCall = new ToolCall(
+                "call-1",
+                "search_tool",
+                "{\"query\":\"Java并发\"}"
+        );
+        ToolCallingGateway gateway = mock(ToolCallingGateway.class);
+        when(gateway.call(any(ToolCallingRequest.class))).thenReturn(
+                new ToolCallsResult(
+                        "request-1",
+                        "deepseek-v4-flash",
+                        List.of(toolCall),
+                        new ModelUsage(50, 10, 60)
+                ),
+                finalAnswer("request-2", "基于工具证据的回答")
+        );
+
+        List<String> observedEvents = new ArrayList<>();
+        AgentLoopObserver observer = new AgentLoopObserver() {
+            @Override
+            public void toolStarted(String toolName, Instant occurredAt) {
+                observedEvents.add("STARTED:" + toolName);
+            }
+
+            @Override
+            public void toolCompleted(
+                    String toolName,
+                    ToolExecutionStatus status,
+                    Instant occurredAt
+            ) {
+                observedEvents.add("COMPLETED:" + toolName + ":" + status);
+            }
+        };
+
+        AgentLoopResult result = loop(
+                gateway,
+                List.of(searchTool)
+        ).run(request(), observer);
+
+        assertThat(result.status()).isEqualTo(AgentRunStatus.COMPLETED);
+        assertThat(observedEvents).containsExactly(
+                "STARTED:search_tool",
+                "COMPLETED:search_tool:SUCCESS"
+        );
+    }
+
+    @Test
+    @DisplayName("未知工具不会发送观察事件但仍返回受控工具失败结果")
+    void shouldNotExposeUnknownToolThroughObserver() {
+        TestTool allowedTool = tool("search_tool", input -> "unused");
+        ToolCall unknownCall = new ToolCall(
+                "call-unknown",
+                "unknown_tool",
+                "{\"query\":\"Java并发\"}"
+        );
+        ToolCallingGateway gateway = mock(ToolCallingGateway.class);
+        when(gateway.call(any(ToolCallingRequest.class))).thenReturn(
+                new ToolCallsResult(
+                        "request-1",
+                        "deepseek-v4-flash",
+                        List.of(unknownCall),
+                        new ModelUsage(50, 10, 60)
+                ),
+                finalAnswer("request-2", "无法使用未知工具")
+        );
+
+        List<String> observedEvents = new ArrayList<>();
+        AgentLoopObserver observer = new AgentLoopObserver() {
+            @Override
+            public void toolStarted(String toolName, Instant occurredAt) {
+                observedEvents.add("STARTED:" + toolName);
+            }
+
+            @Override
+            public void toolCompleted(
+                    String toolName,
+                    ToolExecutionStatus status,
+                    Instant occurredAt
+            ) {
+                observedEvents.add("COMPLETED:" + toolName);
+            }
+        };
+
+        AgentLoopResult result = loop(
+                gateway,
+                List.of(allowedTool)
+        ).run(request(), observer);
+
+        assertThat(result.status()).isEqualTo(AgentRunStatus.COMPLETED);
+        assertThat(observedEvents).isEmpty();
+        assertThat(result.trace().toolCalls()).hasSize(1);
+        assertThat(result.trace().toolCalls().getFirst().status())
+                .isEqualTo(ToolExecutionStatus.FAILURE);
+        assertThat(result.trace().toolCalls().getFirst().errorType())
+                .isEqualTo(ToolExecutionErrorType.UNKNOWN_TOOL);
+    }
+
     /** 创建包含默认策略和真实安全工具执行器的被测 Agent Loop。 */
     private AgentLoop loop(ToolCallingGateway gateway, List<AgentTool<?, ?>> tools) {
         return loop(gateway, tools, policy(), new HeuristicAgentTokenEstimator(), clock);

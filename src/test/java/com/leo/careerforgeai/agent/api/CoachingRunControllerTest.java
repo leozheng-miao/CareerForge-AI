@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.agent.api;
 
 import com.leo.careerforgeai.agent.api.advice.CareerCoachApiExceptionHandler;
+import com.leo.careerforgeai.agent.api.sse.CoachingRunSseService;
 import com.leo.careerforgeai.agent.application.run.CoachingRunApplicationService;
 import com.leo.careerforgeai.agent.application.run.submission.CoachingRunAsyncSubmissionApplicationService;
 import com.leo.careerforgeai.agent.application.run.CoachingRunNotFoundException;
@@ -63,6 +64,9 @@ class CoachingRunControllerTest {
     @Mock
     private CoachingRunApplicationService applicationService;
 
+    @Mock
+    private CoachingRunSseService coachingRunSseService;
+
     private final ValidatorFactory validatorFactory =
             Validation.buildDefaultValidatorFactory();
 
@@ -77,7 +81,8 @@ class CoachingRunControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new CoachingRunController(
                                 submissionService,
-                                applicationService
+                                applicationService,
+                                coachingRunSseService
                         )
                 )
                 .setControllerAdvice(

@@ -4,6 +4,8 @@ import com.leo.careerforgeai.agent.application.coach.CareerCoachExecutionExcepti
 import com.leo.careerforgeai.agent.application.coach.CareerCoachResult;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachService;
 import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerException;
+import com.leo.careerforgeai.agent.application.loop.AgentLoopObserver;
+import com.leo.careerforgeai.agent.application.run.event.CoachingRunProgressEventPublisher;
 import com.leo.careerforgeai.agent.application.run.lifecycle.CoachingRunLifecycleApplicationService;
 import com.leo.careerforgeai.agent.application.run.lifecycle.CoachingRunStartResult;
 import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
@@ -43,6 +45,7 @@ public class CoachingRunExecutionApplicationService {
     private final ConversationContextAssembler contextAssembler;
     private final CareerCoachService careerCoachService;
     private final CoachingRunLifecycleApplicationService lifecycleService;
+    private final CoachingRunProgressEventPublisher progressEventPublisher;
 
     public CoachingRunExecutionApplicationService(
             CurrentActorProvider currentActorProvider,
@@ -51,7 +54,8 @@ public class CoachingRunExecutionApplicationService {
             MemoryRepository memoryRepository,
             ConversationContextAssembler contextAssembler,
             CareerCoachService careerCoachService,
-            CoachingRunLifecycleApplicationService lifecycleService
+            CoachingRunLifecycleApplicationService lifecycleService,
+            CoachingRunProgressEventPublisher progressEventPublisher
     ) {
         this.currentActorProvider = Objects.requireNonNull(currentActorProvider, "currentActorProvider不能为空");
         this.conversationRepository = Objects.requireNonNull(conversationRepository, "conversationRepository不能为空");
@@ -60,6 +64,7 @@ public class CoachingRunExecutionApplicationService {
         this.contextAssembler = Objects.requireNonNull(contextAssembler, "contextAssembler不能为空");
         this.careerCoachService = Objects.requireNonNull(careerCoachService, "careerCoachService不能为空");
         this.lifecycleService = Objects.requireNonNull(lifecycleService, "lifecycleService不能为空");
+        this.progressEventPublisher = Objects.requireNonNull(progressEventPublisher, "progressEventPublisher不能为空");
     }
 
     public CoachingRun execute(UUID runId) {
@@ -109,9 +114,14 @@ public class CoachingRunExecutionApplicationService {
                 confirmedMemories
         );
 
+        AgentLoopObserver observer = progressEventPublisher.observerFor(
+                ownerId,
+                running.runId()
+        );
+
         try {
             CareerCoachResult result =
-                    careerCoachService.coachWithContext(context);
+                    careerCoachService.coachWithContext(context, observer);
 
             return lifecycleService.succeedForActor(
                     ownerId,

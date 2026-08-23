@@ -5,6 +5,8 @@ import com.leo.careerforgeai.agent.application.coach.CareerCoachResult;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachService;
 import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerErrorType;
 import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerException;
+import com.leo.careerforgeai.agent.application.loop.AgentLoopObserver;
+import com.leo.careerforgeai.agent.application.run.event.CoachingRunProgressEventPublisher;
 import com.leo.careerforgeai.agent.application.run.execution.CoachingRunExecutionApplicationService;
 import com.leo.careerforgeai.agent.application.run.execution.RunExecutionContext;
 import com.leo.careerforgeai.agent.application.run.lifecycle.CoachingRunLifecycleApplicationService;
@@ -81,6 +83,12 @@ class CoachingRunExecutionApplicationServiceTest {
     @Mock
     private CoachingRunLifecycleApplicationService lifecycleService;
 
+    @Mock
+    private CoachingRunProgressEventPublisher progressEventPublisher;
+
+    @Mock
+    private AgentLoopObserver agentLoopObserver;
+
     private CoachingRunExecutionApplicationService service;
     private ConversationTurn userTurn;
     private ConversationContext context;
@@ -94,7 +102,8 @@ class CoachingRunExecutionApplicationServiceTest {
                 memoryRepository,
                 contextAssembler,
                 careerCoachService,
-                lifecycleService
+                lifecycleService,
+                progressEventPublisher
         );
 
         userTurn = ConversationTurn.completedUser(
@@ -130,7 +139,7 @@ class CoachingRunExecutionApplicationServiceTest {
         CoachingRun succeeded = running.succeed(ASSISTANT_TURN_ID, NOW);
 
         prepareRunningExecution(running);
-        when(careerCoachService.coachWithContext(context)).thenReturn(completedCoachResult());
+        when(careerCoachService.coachWithContext(context, agentLoopObserver)).thenReturn(completedCoachResult());
         when(lifecycleService.succeedForActor(
                 OWNER,
                 RUN_ID,
@@ -165,7 +174,8 @@ class CoachingRunExecutionApplicationServiceTest {
                 sessionApplicationService,
                 memoryRepository,
                 contextAssembler,
-                careerCoachService
+                careerCoachService,
+                progressEventPublisher
         );
     }
 
@@ -175,7 +185,7 @@ class CoachingRunExecutionApplicationServiceTest {
         CareerCoachExecutionException failure = timeoutException();
 
         prepareRunningExecution(running);
-        when(careerCoachService.coachWithContext(context)).thenThrow(failure);
+        when(careerCoachService.coachWithContext(context, agentLoopObserver)).thenThrow(failure);
 
         assertThatThrownBy(() -> service.execute(RUN_ID)).isSameAs(failure);
 
@@ -201,7 +211,7 @@ class CoachingRunExecutionApplicationServiceTest {
         ).withTrace(trace);
 
         prepareRunningExecution(running);
-        when(careerCoachService.coachWithContext(context)).thenThrow(failure);
+        when(careerCoachService.coachWithContext(context, agentLoopObserver)).thenThrow(failure);
 
         assertThatThrownBy(() -> service.execute(RUN_ID)).isSameAs(failure);
 
@@ -226,7 +236,7 @@ class CoachingRunExecutionApplicationServiceTest {
         );
 
         prepareExplicitOwnerExecution(running);
-        when(careerCoachService.coachWithContext(context)).thenReturn(completedCoachResult());
+        when(careerCoachService.coachWithContext(context, agentLoopObserver)).thenReturn(completedCoachResult());
         when(lifecycleService.succeedForActor(
                 OWNER,
                 RUN_ID,
@@ -255,6 +265,8 @@ class CoachingRunExecutionApplicationServiceTest {
         when(memoryRepository.findConfirmedByOwner(OWNER)).thenReturn(List.of());
         when(contextAssembler.assemble(userTurn, List.of(userTurn), List.of()))
                 .thenReturn(context);
+        when(progressEventPublisher.observerFor(OWNER, RUN_ID))
+                .thenReturn(agentLoopObserver);
     }
 
     private CareerCoachResult completedCoachResult() {

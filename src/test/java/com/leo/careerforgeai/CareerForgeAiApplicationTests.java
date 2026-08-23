@@ -24,6 +24,8 @@ import org.apache.ibatis.session.SqlSessionFactory;
 import org.flywaydb.core.Flyway;
 
 import javax.sql.DataSource;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 /**
  * @program: CareerForge-AI
@@ -59,6 +61,9 @@ class CareerForgeAiApplicationTests {
 
     @Autowired
     private JsonMapper jsonMapper;
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     @Test
     void contextLoadsWithExplicitAgentToolWhitelist() {
@@ -115,5 +120,18 @@ class CareerForgeAiApplicationTests {
         assertThat(applicationContext.getBeansOfType(DataSource.class)).isEmpty();
         assertThat(applicationContext.getBeansOfType(SqlSessionFactory.class)).isEmpty();
         assertThat(applicationContext.getBeansOfType(Flyway.class)).isEmpty();
+    }
+
+    @Test
+    void redisInfrastructureShouldUseOnlyStringSerialization() {
+        assertThat(stringRedisTemplate.isEnableDefaultSerializer()).isFalse();
+        assertThat(stringRedisTemplate.getKeySerializer())
+                .isInstanceOf(StringRedisSerializer.class);
+        assertThat(stringRedisTemplate.getValueSerializer())
+                .isInstanceOf(StringRedisSerializer.class);
+        assertThat(stringRedisTemplate.getHashKeySerializer())
+                .isInstanceOf(StringRedisSerializer.class);
+        assertThat(stringRedisTemplate.getHashValueSerializer())
+                .isInstanceOf(StringRedisSerializer.class);
     }
 }

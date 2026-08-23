@@ -3,6 +3,7 @@ package com.leo.careerforgeai.agent.application.run.execution;
 import com.leo.careerforgeai.agent.application.run.lifecycle.CoachingRunInterruptionApplicationService;
 import com.leo.careerforgeai.memory.application.conversation.CoachingSessionVersionConflictException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -15,6 +16,7 @@ import java.util.Objects;
  * @date: 2026-08-20
  **/
 @Component
+@ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
 @Slf4j
 public class CoachingRunAsyncTask {
 

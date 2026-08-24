@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import java.util.Objects;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * @program: CareerForge-AI
@@ -47,12 +48,19 @@ public class CoachingRunAsyncDispatcher {
             RunAdmissionLease lease,
             Consumer<RunExecutionContext> task
     ) {
+        Objects.requireNonNull(context, "context不能为空");
         Objects.requireNonNull(lease, "lease不能为空");
+        Objects.requireNonNull(task, "task不能为空");
 
         try {
-            Objects.requireNonNull(context, "context不能为空");
-            Objects.requireNonNull(task, "task不能为空");
             return taskExecutor.submit(context, lease, task);
+        } catch (RejectedExecutionException exception) {
+            lease.close();
+            throw new CoachingRunDispatchRejectedException(
+                    context.ownerId(),
+                    context.runId(),
+                    exception
+            );
         } catch (RuntimeException | Error exception) {
             lease.close();
             throw exception;

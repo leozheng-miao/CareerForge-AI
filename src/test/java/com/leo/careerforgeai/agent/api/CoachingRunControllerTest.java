@@ -3,11 +3,14 @@ package com.leo.careerforgeai.agent.api;
 import com.leo.careerforgeai.agent.api.advice.CareerCoachApiExceptionHandler;
 import com.leo.careerforgeai.agent.api.sse.CoachingRunSseService;
 import com.leo.careerforgeai.agent.application.run.CoachingRunApplicationService;
+import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitExceededException;
+import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitUnavailableException;
 import com.leo.careerforgeai.agent.application.run.submission.CoachingRunAsyncSubmissionApplicationService;
 import com.leo.careerforgeai.agent.application.run.CoachingRunNotFoundException;
 import com.leo.careerforgeai.agent.application.run.submission.CoachingRunRequestConflictException;
 import com.leo.careerforgeai.agent.application.run.execution.CoachingRunCapacityRejectedException;
 import com.leo.careerforgeai.agent.domain.run.CoachingRun;
+import com.leo.careerforgeai.agent.infrastructure.redis.RedisInfrastructureErrorType;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.web.GlobalExceptionHandler;
 import jakarta.validation.Validation;
@@ -38,6 +41,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitExceededException;
+import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitUnavailableException;
+import com.leo.careerforgeai.agent.infrastructure.redis.RedisInfrastructureErrorType;
+
+import java.time.Duration;
+
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
 /**
  * @program: CareerForge-AI
@@ -192,6 +202,51 @@ class CoachingRunControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(40400))
                 .andExpect(jsonPath("$.message").value("Run不存在或不属于当前用户"));
+    }
+
+    @Test
+    void shouldReturnRetryAfterWhenRateLimitIsExceeded() throws Exception {
+        when(submissionService.submit(
+                SESSION_ID,
+                REQUEST_ID,
+                4L,
+                MESSAGE
+        )).thenThrow(new CoachingRunRateLimitExceededException(
+                OWNER,
+                RUN_ID,
+                Duration.ofMillis(12_001)
+        ));
+
+        mockMvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRequest()))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "13"))
+                .andExpect(jsonPath("$.code").value(42900))
+                .andExpect(jsonPath("$.message")
+                        .value("请求过于频繁，请稍后使用新的requestId重试"));
+    }
+
+    @Test
+    void shouldReturnHttp503WhenRateLimitInfrastructureIsUnavailable() throws Exception {
+        when(submissionService.submit(
+                SESSION_ID,
+                REQUEST_ID,
+                4L,
+                MESSAGE
+        )).thenThrow(new CoachingRunRateLimitUnavailableException(
+                OWNER,
+                RUN_ID,
+                RedisInfrastructureErrorType.UNAVAILABLE
+        ));
+
+        mockMvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRequest()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value(50300))
+                .andExpect(jsonPath("$.message")
+                        .value("Run提交服务暂时不可用，请稍后重试"));
     }
 
     private String validRequest() {

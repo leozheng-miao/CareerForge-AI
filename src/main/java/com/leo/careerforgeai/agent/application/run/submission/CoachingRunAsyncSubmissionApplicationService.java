@@ -1,12 +1,19 @@
 package com.leo.careerforgeai.agent.application.run.submission;
 
+import com.leo.careerforgeai.agent.application.port.run.CoachingRunRateLimiter;
 import com.leo.careerforgeai.agent.application.run.execution.CoachingRunAsyncDispatcher;
 import com.leo.careerforgeai.agent.application.run.execution.CoachingRunAsyncTask;
+import com.leo.careerforgeai.agent.application.run.execution.CoachingRunCapacityRejectedException;
 import com.leo.careerforgeai.agent.application.run.execution.RunAdmissionLease;
 import com.leo.careerforgeai.agent.application.run.execution.RunExecutionContext;
+import com.leo.careerforgeai.agent.application.run.lifecycle.CoachingRunLifecycleApplicationService;
+import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitDecision;
+import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitExceededException;
+import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitUnavailableException;
 import com.leo.careerforgeai.agent.config.CoachingRunExecutionProperties;
 import com.leo.careerforgeai.agent.domain.run.CoachingRun;
 import com.leo.careerforgeai.agent.domain.run.CoachingRunStatus;
+import com.leo.careerforgeai.agent.infrastructure.redis.RedisInfrastructureException;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -16,20 +23,28 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import com.leo.careerforgeai.agent.application.run.execution.CoachingRunDispatchRejectedException;
 
 /**
  * @program: CareerForge-AI
- * @description: 编排Run幂等认领、容量准入、接受和异步虚拟线程执行
+ * @description: 编排Run幂等认领、原子限流、容量准入、接受和异步虚拟线程执行
  * @author: Miao Zheng
- * @date: 2026-08-20
- **/
+ * @date: 2026-08-24
+ */
 @Service
 @ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
 public class CoachingRunAsyncSubmissionApplicationService {
 
+    private static final String RATE_LIMITED_FAILURE = "RATE_LIMITED";
+    private static final String RATE_LIMIT_UNAVAILABLE_FAILURE = "RATE_LIMIT_UNAVAILABLE";
+    private static final String LOCAL_CAPACITY_REJECTED_FAILURE = "LOCAL_CAPACITY_REJECTED";
+    private static final String EXECUTOR_NOT_ACCEPTING_FAILURE = "EXECUTOR_NOT_ACCEPTING";
+
     private final CurrentActorProvider currentActorProvider;
     private final CoachingRunClaimApplicationService claimService;
     private final CoachingRunAcceptanceApplicationService acceptanceService;
+    private final CoachingRunLifecycleApplicationService lifecycleService;
+    private final CoachingRunRateLimiter rateLimiter;
     private final CoachingRunAsyncTask asyncTask;
     private final CoachingRunAsyncDispatcher dispatcher;
     private final CoachingRunExecutionProperties properties;
@@ -39,6 +54,8 @@ public class CoachingRunAsyncSubmissionApplicationService {
             CurrentActorProvider currentActorProvider,
             CoachingRunClaimApplicationService claimService,
             CoachingRunAcceptanceApplicationService acceptanceService,
+            CoachingRunLifecycleApplicationService lifecycleService,
+            CoachingRunRateLimiter rateLimiter,
             CoachingRunAsyncTask asyncTask,
             CoachingRunAsyncDispatcher dispatcher,
             CoachingRunExecutionProperties properties,
@@ -47,6 +64,8 @@ public class CoachingRunAsyncSubmissionApplicationService {
         this.currentActorProvider = Objects.requireNonNull(currentActorProvider, "currentActorProvider不能为空");
         this.claimService = Objects.requireNonNull(claimService, "claimService不能为空");
         this.acceptanceService = Objects.requireNonNull(acceptanceService, "acceptanceService不能为空");
+        this.lifecycleService = Objects.requireNonNull(lifecycleService, "lifecycleService不能为空");
+        this.rateLimiter = Objects.requireNonNull(rateLimiter, "rateLimiter不能为空");
         this.asyncTask = Objects.requireNonNull(asyncTask, "asyncTask不能为空");
         this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher不能为空");
         this.properties = Objects.requireNonNull(properties, "properties不能为空");
@@ -60,7 +79,6 @@ public class CoachingRunAsyncSubmissionApplicationService {
             String message
     ) {
         ActorId ownerId = currentActorProvider.currentActor();
-        // claim 认领 Run
         CoachingRunClaimResult claimResult = claimService.claim(
                 sessionId,
                 requestId,
@@ -71,17 +89,14 @@ public class CoachingRunAsyncSubmissionApplicationService {
 
         requireOwner(ownerId, claimed);
         if (claimResult.replayed() && claimed.status() != CoachingRunStatus.RECEIVED) return claimed;
+        if (!claimResult.replayed()) enforceRateLimit(ownerId, claimed.runId());
 
-        // 衔接 Run 容量准入，申请 Semaphore
-        // 保护下游模型和工具，防止容量已满
-        RunAdmissionLease lease = dispatcher.acquire(ownerId);
+        RunAdmissionLease lease = acquireLocalCapacity(ownerId, claimed.runId());
         boolean handedOff = false;
 
         try {
-            // acceptance 接受 run
             CoachingRun accepted = acceptanceService.accept(claimed.runId(), message);
             requireOwner(ownerId, accepted);
-
             if (accepted.status() != CoachingRunStatus.ACCEPTED) return accepted;
 
             Instant submittedAt = clock.instant();
@@ -93,12 +108,44 @@ public class CoachingRunAsyncSubmissionApplicationService {
                     submittedAt.plus(properties.executionTimeout())
             );
 
-            // 提交虚拟线程
-            dispatcher.dispatch(context, lease, asyncTask::execute);
-            handedOff = true;
-            return accepted;
+            try {
+                dispatcher.dispatch(context, lease, asyncTask::execute);
+                handedOff = true;
+                return accepted;
+            } catch (CoachingRunDispatchRejectedException exception) {
+                lifecycleService.rejectForActor(
+                        ownerId,
+                        accepted.runId(),
+                        EXECUTOR_NOT_ACCEPTING_FAILURE
+                );
+                throw exception;
+            }
         } finally {
             if (!handedOff) lease.close();
+        }
+    }
+
+    private void enforceRateLimit(ActorId ownerId, UUID runId) {
+        CoachingRunRateLimitDecision decision;
+        try {
+            decision = rateLimiter.acquire(ownerId);
+        } catch (RedisInfrastructureException exception) {
+            lifecycleService.rejectForActor(ownerId, runId, RATE_LIMIT_UNAVAILABLE_FAILURE);
+            throw new CoachingRunRateLimitUnavailableException(ownerId, runId, exception.errorType());
+        }
+
+        if (decision.allowed()) return;
+
+        lifecycleService.rejectForActor(ownerId, runId, RATE_LIMITED_FAILURE);
+        throw new CoachingRunRateLimitExceededException(ownerId, runId, decision.resetAfter());
+    }
+
+    private RunAdmissionLease acquireLocalCapacity(ActorId ownerId, UUID runId) {
+        try {
+            return dispatcher.acquire(ownerId);
+        } catch (CoachingRunCapacityRejectedException exception) {
+            lifecycleService.rejectForActor(ownerId, runId, LOCAL_CAPACITY_REJECTED_FAILURE);
+            throw exception;
         }
     }
 

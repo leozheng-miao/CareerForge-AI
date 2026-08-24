@@ -24,7 +24,8 @@ public enum ErrorCode {
     PASSWORD_ERROR(40012, "用户名或密码错误"),
     JWT_INVALID(40110, "JWT 无效或已过期"),
     SYSTEM_ERROR(50000, "系统内部异常"),
-    OPERATION_ERROR(50001, "操作失败");
+    OPERATION_ERROR(50001, "操作失败"),
+    SERVICE_UNAVAILABLE_ERROR(50300, "服务暂时不可用");
 
     /**
      * 状态码

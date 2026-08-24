@@ -6,6 +6,7 @@ import com.leo.careerforgeai.agent.api.CoachingSessionController;
 import com.leo.careerforgeai.agent.application.coach.CareerCoachExecutionException;
 import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerException;
 import com.leo.careerforgeai.agent.application.run.CoachingRunNotFoundException;
+import com.leo.careerforgeai.agent.application.run.execution.CoachingRunDispatchRejectedException;
 import com.leo.careerforgeai.agent.application.run.submission.CoachingRunRequestConflictException;
 import com.leo.careerforgeai.agent.application.run.lifecycle.CoachingRunVersionConflictException;
 import com.leo.careerforgeai.agent.application.run.execution.CoachingRunCapacityRejectedException;
@@ -21,6 +22,9 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitExceededException;
+import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitUnavailableException;
+import org.springframework.http.HttpHeaders;
 
 /**
  * @program: CareerForge-AI
@@ -120,5 +124,51 @@ public class CareerCoachApiExceptionHandler {
     public BaseResponse<?> handleInvalidState(IllegalStateException exception) {
         log.warn("Career Coach状态冲突，error={}", exception.getMessage());
         return ResultUtils.error(ErrorCode.OPERATION_ERROR, "会话或Run状态已经变化，请刷新后重试");
+    }
+
+    @ExceptionHandler(CoachingRunRateLimitExceededException.class)
+    public ResponseEntity<BaseResponse<?>> handleRateLimitExceeded(
+            CoachingRunRateLimitExceededException exception
+    ) {
+        long retryAfterSeconds = Math.max(1L, Math.ceilDiv(exception.retryAfter().toMillis(), 1000L));
+        log.warn(
+                "Coaching Run请求超过owner限流，ownerId={}, runId={}, retryAfterSeconds={}",
+                exception.ownerId().value(),
+                exception.runId(),
+                retryAfterSeconds
+        );
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds))
+                .body(ResultUtils.error(ErrorCode.TOO_MANY_REQUEST, "请求过于频繁，请稍后使用新的requestId重试"));
+    }
+
+    @ExceptionHandler(CoachingRunRateLimitUnavailableException.class)
+    public ResponseEntity<BaseResponse<?>> handleRateLimitUnavailable(
+            CoachingRunRateLimitUnavailableException exception
+    ) {
+        log.error(
+                "Coaching Run限流基础设施不可用，ownerId={}, runId={}, errorType={}",
+                exception.ownerId().value(),
+                exception.runId(),
+                exception.errorType()
+        );
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ResultUtils.error(ErrorCode.SERVICE_UNAVAILABLE_ERROR, "Run提交服务暂时不可用，请稍后重试"));
+    }
+
+    @ExceptionHandler(CoachingRunDispatchRejectedException.class)
+    public ResponseEntity<BaseResponse<?>> handleDispatchRejected(
+            CoachingRunDispatchRejectedException exception
+    ) {
+        log.warn(
+                "Coaching Run执行器关闭期拒绝提交，ownerId={}, runId={}",
+                exception.ownerId().value(),
+                exception.runId()
+        );
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ResultUtils.error(
+                        ErrorCode.SERVICE_UNAVAILABLE_ERROR,
+                        "Run执行服务正在关闭，请使用新的requestId稍后重试"
+                ));
     }
 }

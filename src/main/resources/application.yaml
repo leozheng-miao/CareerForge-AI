@@ -68,6 +68,8 @@ careerforge:
     base-url: ${AI_MODEL_BASE_URL}
     api-key: ${AI_MODEL_API_KEY}
     name: ${AI_MODEL_NAME}
+  model-call-bulkhead:
+    max-concurrent-calls: ${MODEL_MAX_CONCURRENT_CALLS:4}
   embedding:
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
@@ -124,6 +126,9 @@ careerforge:
       execution-timeout: ${COACHING_RUN_EXECUTION_TIMEOUT:90s}
     spring-ai:
       enabled: ${SPRING_AI_CAREER_COACH_ENABLED:false}
+    run-rate-limit:
+      max-requests: ${COACHING_RUN_RATE_LIMIT_MAX_REQUESTS:10}
+      window: ${COACHING_RUN_RATE_LIMIT_WINDOW:1m}
 server:
   port: 8080
 # springdoc-openapi 项目配置

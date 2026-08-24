@@ -116,6 +116,21 @@ class CoachingRunAsyncDispatcherTest {
         occupied.close();
     }
 
+    @Test
+    void shouldMapExecutorShutdownAndReleaseCapacity() {
+        taskExecutor.close();
+
+        assertThatThrownBy(() -> dispatcher.dispatch(
+                context(),
+                ignored -> {
+                }
+        )).isInstanceOf(CoachingRunDispatchRejectedException.class)
+                .hasMessage("Coaching Run执行器已经停止接收任务");
+
+        RunAdmissionLease reacquired = admissionGate.tryAcquire(OWNER).orElseThrow();
+        reacquired.close();
+    }
+
     private RunExecutionContext context() {
         return new RunExecutionContext(
                 OWNER,

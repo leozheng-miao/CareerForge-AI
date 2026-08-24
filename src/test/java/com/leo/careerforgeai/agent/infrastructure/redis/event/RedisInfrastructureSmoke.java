@@ -20,6 +20,15 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.leo.careerforgeai.agent.application.port.run.CoachingRunRateLimiter;
+import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitDecision;
+import com.leo.careerforgeai.agent.config.CoachingRunRateLimitProperties;
+
+import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * @program: CareerForge-AI
@@ -36,29 +45,38 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.ai.mcp.server.enabled=false",
         "careerforge.redis.environment=smoke",
         "careerforge.redis.event-ttl=30s",
-        "careerforge.redis.event-stream-max-length=5"
+        "careerforge.redis.event-stream-max-length=5",
+        "careerforge.agent.run-rate-limit.max-requests=3",
+        "careerforge.agent.run-rate-limit.window=10s"
 })
 class RedisInfrastructureSmoke {
 
     private static final ActorId OWNER_ID = new ActorId("redis-smoke-owner");
     private static final Instant BASE_TIME = Instant.parse("2026-08-21T00:00:00Z");
+    private static final String RATE_LIMIT_OPERATION = "coaching-run-submit";
 
     private final RedisAvailabilityProbe availabilityProbe;
     private final CoachingRunEventStore eventStore;
     private final CareerForgeRedisKeyFactory keyFactory;
     private final StringRedisTemplate redisTemplate;
     private final JdbcTemplate jdbcTemplate;
+    private final CoachingRunRateLimiter rateLimiter;
+    private final CoachingRunRateLimitProperties rateLimitProperties;
 
     @Autowired
     RedisInfrastructureSmoke(
             RedisAvailabilityProbe availabilityProbe,
             CoachingRunEventStore eventStore,
+            CoachingRunRateLimiter rateLimiter,
+            CoachingRunRateLimitProperties rateLimitProperties,
             CareerForgeRedisKeyFactory keyFactory,
             StringRedisTemplate redisTemplate,
             JdbcTemplate jdbcTemplate
     ) {
         this.availabilityProbe = availabilityProbe;
         this.eventStore = eventStore;
+        this.rateLimiter = rateLimiter;
+        this.rateLimitProperties = rateLimitProperties;
         this.keyFactory = keyFactory;
         this.redisTemplate = redisTemplate;
         this.jdbcTemplate = jdbcTemplate;
@@ -109,6 +127,89 @@ class RedisInfrastructureSmoke {
             assertThat(readMysqlFacts()).isEqualTo(mysqlFactsBefore);
         } finally {
             redisTemplate.delete(streamKey);
+        }
+    }
+
+    @Test
+    void shouldAtomicallyLimitConcurrentRequestsAndKeepTtl() throws Exception {
+        ActorId ownerId = new ActorId("redis-rate-smoke-" + UUID.randomUUID());
+        String rateLimitKey = keyFactory.ownerRateLimitKey(
+                ownerId,
+                RATE_LIMIT_OPERATION
+        );
+        int concurrentRequests = 20;
+        CountDownLatch start = new CountDownLatch(1);
+
+        redisTemplate.delete(rateLimitKey);
+
+        try {
+            availabilityProbe.verifyAvailable();
+            List<Future<CoachingRunRateLimitDecision>> futures =
+                    new ArrayList<>(concurrentRequests);
+
+            try (ExecutorService executor =
+                         Executors.newVirtualThreadPerTaskExecutor()) {
+                for (int index = 0; index < concurrentRequests; index++) {
+                    futures.add(executor.submit(() -> {
+                        try {
+                            start.await();
+                            return rateLimiter.acquire(ownerId);
+                        } catch (InterruptedException exception) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException(
+                                    "Redis限流Smoke被中断",
+                                    exception
+                            );
+                        }
+                    }));
+                }
+
+                start.countDown();
+
+                List<CoachingRunRateLimitDecision> decisions =
+                        new ArrayList<>(concurrentRequests);
+                for (Future<CoachingRunRateLimitDecision> future : futures) {
+                    decisions.add(future.get(5, TimeUnit.SECONDS));
+                }
+
+                List<CoachingRunRateLimitDecision> allowed = decisions.stream()
+                        .filter(CoachingRunRateLimitDecision::allowed)
+                        .toList();
+                List<CoachingRunRateLimitDecision> rejected = decisions.stream()
+                        .filter(decision -> !decision.allowed())
+                        .toList();
+
+                assertThat(allowed)
+                        .hasSize(rateLimitProperties.maxRequests());
+                assertThat(allowed)
+                        .extracting(CoachingRunRateLimitDecision::remaining)
+                        .containsExactlyInAnyOrder(0L, 1L, 2L);
+                assertThat(rejected)
+                        .hasSize(
+                                concurrentRequests
+                                        - rateLimitProperties.maxRequests()
+                        );
+                assertThat(rejected)
+                        .allSatisfy(decision -> {
+                            assertThat(decision.remaining()).isZero();
+                            assertThat(decision.resetAfter()).isPositive();
+                        });
+            }
+
+            assertThat(redisTemplate.opsForValue().get(rateLimitKey))
+                    .isEqualTo(
+                            Integer.toString(
+                                    rateLimitProperties.maxRequests()
+                            )
+                    );
+
+            Long ttlSeconds = redisTemplate.getExpire(
+                    rateLimitKey,
+                    TimeUnit.SECONDS
+            );
+            assertThat(ttlSeconds).isBetween(1L, 10L);
+        } finally {
+            redisTemplate.delete(rateLimitKey);
         }
     }
 

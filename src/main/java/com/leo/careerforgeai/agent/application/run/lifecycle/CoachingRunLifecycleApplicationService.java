@@ -183,6 +183,20 @@ public class CoachingRunLifecycleApplicationService {
         );
     }
 
+    @Transactional
+    public CoachingRun rejectForActor(ActorId ownerId, UUID runId, String failureCode) {
+        CoachingRun current = requireOwnedRun(ownerId, runId);
+        if (current.isTerminal()) return current;
+        if (current.status() != CoachingRunStatus.RECEIVED
+                && current.status() != CoachingRunStatus.ACCEPTED) {
+            throw new IllegalStateException("只有RECEIVED或ACCEPTED Run可以被拒绝");
+        }
+
+        CoachingRun rejected = current.reject(failureCode, clock.instant());
+        updateOrThrow(ownerId, rejected, current.version());
+        return rejected;
+    }
+
     private CoachingRun finishFailure(
             ActorId ownerId,
             UUID runId,

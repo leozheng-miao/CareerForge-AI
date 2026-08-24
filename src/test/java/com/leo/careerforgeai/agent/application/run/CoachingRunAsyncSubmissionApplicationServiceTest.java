@@ -4,6 +4,7 @@ import com.leo.careerforgeai.agent.application.run.execution.CoachingRunAdmissio
 import com.leo.careerforgeai.agent.application.run.execution.CoachingRunAsyncDispatcher;
 import com.leo.careerforgeai.agent.application.run.execution.CoachingRunAsyncTask;
 import com.leo.careerforgeai.agent.application.run.execution.CoachingRunCapacityRejectedException;
+import com.leo.careerforgeai.agent.application.run.execution.CoachingRunDispatchRejectedException;
 import com.leo.careerforgeai.agent.application.run.execution.RunAdmissionLease;
 import com.leo.careerforgeai.agent.application.run.execution.RunExecutionContext;
 import com.leo.careerforgeai.agent.application.run.submission.CoachingRunAcceptanceApplicationService;
@@ -27,6 +28,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.RejectedExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -35,6 +37,14 @@ import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import com.leo.careerforgeai.agent.application.port.run.CoachingRunRateLimiter;
+import com.leo.careerforgeai.agent.application.run.lifecycle.CoachingRunLifecycleApplicationService;
+import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitDecision;
+import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitExceededException;
+import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitUnavailableException;
+import com.leo.careerforgeai.agent.infrastructure.redis.RedisInfrastructureErrorType;
+import com.leo.careerforgeai.agent.infrastructure.redis.RedisInfrastructureException;
+import static org.mockito.Mockito.never;
 
 /**
  * @program: CareerForge-AI
@@ -68,6 +78,12 @@ class CoachingRunAsyncSubmissionApplicationServiceTest {
     @Mock
     private CoachingRunAsyncDispatcher dispatcher;
 
+    @Mock
+    private CoachingRunLifecycleApplicationService lifecycleService;
+
+    @Mock
+    private CoachingRunRateLimiter rateLimiter;
+
     private CoachingRunExecutionProperties properties;
     private CoachingRunAsyncSubmissionApplicationService service;
 
@@ -79,10 +95,19 @@ class CoachingRunAsyncSubmissionApplicationServiceTest {
                 Duration.ofSeconds(90),
                 Duration.ofSeconds(1)
         );
+        org.mockito.Mockito.lenient()
+                .when(rateLimiter.acquire(OWNER))
+                .thenReturn(new CoachingRunRateLimitDecision(
+                        true,
+                        9,
+                        Duration.ofMinutes(1)
+                ));
         service = new CoachingRunAsyncSubmissionApplicationService(
                 currentActorProvider,
                 claimService,
                 acceptanceService,
+                lifecycleService,
+                rateLimiter,
                 asyncTask,
                 dispatcher,
                 properties,
@@ -176,6 +201,11 @@ class CoachingRunAsyncSubmissionApplicationServiceTest {
                 .hasMessage("Coaching Run执行容量已满");
 
         verifyNoInteractions(acceptanceService, asyncTask);
+        verify(lifecycleService).rejectForActor(
+                OWNER,
+                RUN_ID,
+                "LOCAL_CAPACITY_REJECTED"
+        );
     }
 
     @Test
@@ -196,6 +226,124 @@ class CoachingRunAsyncSubmissionApplicationServiceTest {
 
         assertThat(lease.isReleased()).isTrue();
         verifyNoInteractions(asyncTask);
+    }
+
+    @Test
+    void shouldRejectAcceptedRunWhenExecutorStopsAccepting() {
+        CoachingRun received = receivedRun();
+        CoachingRun accepted = acceptedRun();
+        RunAdmissionLease lease = lease();
+        CoachingRunDispatchRejectedException rejection =
+                new CoachingRunDispatchRejectedException(
+                        OWNER,
+                        RUN_ID,
+                        new RejectedExecutionException("executor closed")
+                );
+
+        when(currentActorProvider.currentActor()).thenReturn(OWNER);
+        when(claimService.claim(SESSION_ID, REQUEST_ID, 4L, MESSAGE))
+                .thenReturn(new CoachingRunClaimResult(received, false));
+        when(dispatcher.acquire(OWNER)).thenReturn(lease);
+        when(acceptanceService.accept(RUN_ID, MESSAGE)).thenReturn(accepted);
+        when(dispatcher.dispatch(any(RunExecutionContext.class), same(lease), any()))
+                .thenThrow(rejection);
+
+        assertThatThrownBy(() -> service.submit(
+                SESSION_ID,
+                REQUEST_ID,
+                4L,
+                MESSAGE
+        )).isSameAs(rejection);
+
+        verify(lifecycleService).rejectForActor(
+                OWNER,
+                RUN_ID,
+                "EXECUTOR_NOT_ACCEPTING"
+        );
+        assertThat(lease.isReleased()).isTrue();
+        verifyNoInteractions(asyncTask);
+    }
+
+    @Test
+    void shouldNotChargeRateLimitForReplayedReceivedRun() {
+        CoachingRun received = receivedRun();
+        CoachingRun accepted = acceptedRun();
+        RunAdmissionLease lease = lease();
+
+        when(currentActorProvider.currentActor()).thenReturn(OWNER);
+        when(claimService.claim(SESSION_ID, REQUEST_ID, 4L, MESSAGE))
+                .thenReturn(new CoachingRunClaimResult(received, true));
+        when(dispatcher.acquire(OWNER)).thenReturn(lease);
+        when(acceptanceService.accept(RUN_ID, MESSAGE)).thenReturn(accepted);
+        when(dispatcher.dispatch(any(RunExecutionContext.class), same(lease), any()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
+        CoachingRun result = service.submit(SESSION_ID, REQUEST_ID, 4L, MESSAGE);
+
+        assertThat(result).isSameAs(accepted);
+        verify(rateLimiter, never()).acquire(OWNER);
+        lease.close();
+    }
+
+    @Test
+    void shouldRejectNewRunWhenRateLimitIsExceeded() {
+        CoachingRun received = receivedRun();
+        when(currentActorProvider.currentActor()).thenReturn(OWNER);
+        when(claimService.claim(SESSION_ID, REQUEST_ID, 4L, MESSAGE))
+                .thenReturn(new CoachingRunClaimResult(received, false));
+        when(rateLimiter.acquire(OWNER))
+                .thenReturn(new CoachingRunRateLimitDecision(
+                        false,
+                        0,
+                        Duration.ofSeconds(13)
+                ));
+
+        assertThatThrownBy(() -> service.submit(
+                SESSION_ID,
+                REQUEST_ID,
+                4L,
+                MESSAGE
+        )).isInstanceOfSatisfying(
+                CoachingRunRateLimitExceededException.class,
+                exception -> {
+                    assertThat(exception.runId()).isEqualTo(RUN_ID);
+                    assertThat(exception.retryAfter()).isEqualTo(Duration.ofSeconds(13));
+                }
+        );
+
+        verify(lifecycleService).rejectForActor(OWNER, RUN_ID, "RATE_LIMITED");
+        verifyNoInteractions(dispatcher, acceptanceService, asyncTask);
+    }
+
+    @Test
+    void shouldFailClosedWhenRedisRateLimitIsUnavailable() {
+        CoachingRun received = receivedRun();
+        when(currentActorProvider.currentActor()).thenReturn(OWNER);
+        when(claimService.claim(SESSION_ID, REQUEST_ID, 4L, MESSAGE))
+                .thenReturn(new CoachingRunClaimResult(received, false));
+        when(rateLimiter.acquire(OWNER))
+                .thenThrow(new RedisInfrastructureException(
+                        RedisInfrastructureErrorType.UNAVAILABLE,
+                        "Redis不可用"
+                ));
+
+        assertThatThrownBy(() -> service.submit(
+                SESSION_ID,
+                REQUEST_ID,
+                4L,
+                MESSAGE
+        )).isInstanceOfSatisfying(
+                CoachingRunRateLimitUnavailableException.class,
+                exception -> assertThat(exception.errorType())
+                        .isEqualTo(RedisInfrastructureErrorType.UNAVAILABLE)
+        );
+
+        verify(lifecycleService).rejectForActor(
+                OWNER,
+                RUN_ID,
+                "RATE_LIMIT_UNAVAILABLE"
+        );
+        verifyNoInteractions(dispatcher, acceptanceService, asyncTask);
     }
 
     private RunAdmissionLease lease() {

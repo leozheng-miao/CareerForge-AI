@@ -70,6 +70,17 @@ careerforge:
     name: ${AI_MODEL_NAME}
   model-call-bulkhead:
     max-concurrent-calls: ${MODEL_MAX_CONCURRENT_CALLS:4}
+  model-reliability:
+    max-attempts: ${MODEL_RETRY_MAX_ATTEMPTS:3}
+    initial-backoff: ${MODEL_RETRY_INITIAL_BACKOFF:200ms}
+    max-backoff: ${MODEL_RETRY_MAX_BACKOFF:2s}
+    backoff-multiplier: ${MODEL_RETRY_BACKOFF_MULTIPLIER:2.0}
+    max-retry-after: ${MODEL_MAX_RETRY_AFTER:10s}
+    circuit-window-size: ${MODEL_CIRCUIT_WINDOW_SIZE:10}
+    circuit-minimum-calls: ${MODEL_CIRCUIT_MINIMUM_CALLS:5}
+    circuit-failure-rate-threshold: ${MODEL_CIRCUIT_FAILURE_RATE_THRESHOLD:50}
+    circuit-open-duration: ${MODEL_CIRCUIT_OPEN_DURATION:15s}
+    circuit-half-open-permitted-calls: ${MODEL_CIRCUIT_HALF_OPEN_CALLS:2}
   embedding:
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}

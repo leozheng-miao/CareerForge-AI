@@ -1,7 +1,6 @@
 package com.leo.careerforgeai.model.application.reliability;
 
 import com.leo.careerforgeai.model.application.ToolCallingGateway;
-import com.leo.careerforgeai.model.application.reliability.ModelCallBulkhead;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolCallingModelResult;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolCallingRequest;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -12,27 +11,31 @@ import java.util.Objects;
 
 /**
  * @program: CareerForge-AI
- * @description: 在真实DeepSeek Tool Calling边界应用模型调用并发舱壁
+ * @description: 在有限重试层外统计一次完整Tool Calling逻辑调用并应用共享熔断器
  * @author: Miao Zheng
  * @date: 2026-08-24
  */
 @Component
-public class BulkheadToolCallingGateway implements ToolCallingGateway {
+@Primary
+public class CircuitBreakingToolCallingGateway implements ToolCallingGateway {
 
     private final ToolCallingGateway delegate;
-    private final ModelCallBulkhead bulkhead;
+    private final ModelCircuitBreaker circuitBreaker;
 
-    public BulkheadToolCallingGateway(
-            @Qualifier("deepSeekToolCallingClient") ToolCallingGateway delegate,
-            ModelCallBulkhead bulkhead
+    public CircuitBreakingToolCallingGateway(
+            @Qualifier("retryingToolCallingGateway") ToolCallingGateway delegate,
+            ModelCircuitBreaker circuitBreaker
     ) {
         this.delegate = Objects.requireNonNull(delegate, "delegate不能为空");
-        this.bulkhead = Objects.requireNonNull(bulkhead, "bulkhead不能为空");
+        this.circuitBreaker = Objects.requireNonNull(
+                circuitBreaker,
+                "circuitBreaker不能为空"
+        );
     }
 
     @Override
     public ToolCallingModelResult call(ToolCallingRequest request) {
         Objects.requireNonNull(request, "request不能为空");
-        return bulkhead.execute(() -> delegate.call(request));
+        return circuitBreaker.execute(() -> delegate.call(request));
     }
 }

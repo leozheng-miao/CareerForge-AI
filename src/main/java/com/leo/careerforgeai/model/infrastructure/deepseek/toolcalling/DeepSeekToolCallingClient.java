@@ -37,6 +37,10 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.time.Clock;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.ZonedDateTime;
 
 /**
  * 负责公共 Tool Calling 协议与 DeepSeek HTTP 协议之间的双向转换，并拒绝结构异常或无法安全归类的响应。
@@ -51,12 +55,15 @@ public class DeepSeekToolCallingClient implements ToolCallingGateway {
     private final ModelProperties properties;
     private final JsonMapper jsonMapper;
     private final HttpClient httpClient;
+    private final Clock clock;
 
-    public DeepSeekToolCallingClient(ModelProperties properties, JsonMapper jsonMapper, HttpClient httpClient) {
+    public DeepSeekToolCallingClient(ModelProperties properties, JsonMapper jsonMapper, HttpClient httpClient, Clock clock) {
         this.properties = properties;
         this.jsonMapper = jsonMapper;
         this.httpClient = httpClient;
+        this.clock = clock;
     }
+
 
     @Override
     public ToolCallingModelResult call(ToolCallingRequest request) {
@@ -177,7 +184,7 @@ public class DeepSeekToolCallingClient implements ToolCallingGateway {
         );
 
         if (response.statusCode() < 200 || response.statusCode() > 299) {
-            throw mapHttpError(response.statusCode());
+            throw mapHttpError(response);
         }
 
         try {
@@ -322,21 +329,47 @@ public class DeepSeekToolCallingClient implements ToolCallingGateway {
         }
     }
 
-    private ModelException mapHttpError(int statusCode) {
+    private ModelException mapHttpError(HttpResponse<?> response) {
+        int statusCode = response.statusCode();
         return switch (statusCode) {
             case 401 -> new ModelException(ModelErrorType.AUTHENTICATION_ERROR, "模型供应商鉴权失败");
             case 403 -> new ModelException(ModelErrorType.PERMISSION_ERROR, "模型供应商拒绝访问");
             case 404 -> new ModelException(ModelErrorType.MODEL_NOT_FOUND, "指定模型或模型接口不存在");
             case 408, 504 -> new ModelException(ModelErrorType.TIMEOUT, "模型供应商响应超时");
-            case 429 -> new ModelException(ModelErrorType.RATE_LIMITED, "模型供应商请求频率受限");
+            case 429 -> new ModelException(
+                    ModelErrorType.RATE_LIMITED,
+                    "模型供应商请求频率受限",
+                    parseRetryAfter(response)
+            );
             default -> {
                 if (statusCode >= 500) {
-                    yield new ModelException(ModelErrorType.PROVIDER_ERROR,
-                            "模型供应商服务异常，statusCode=" + statusCode);
+                    yield new ModelException(ModelErrorType.PROVIDER_ERROR, "模型供应商服务异常，statusCode=" + statusCode);
                 }
-                yield new ModelException(ModelErrorType.PROVIDER_ERROR,
-                        "模型供应商拒绝请求，statusCode=" + statusCode);
-            }
+                yield new ModelException(
+                        ModelErrorType.PROVIDER_REQUEST_REJECTED,
+                        "模型供应商拒绝请求，statusCode=" + statusCode
+                );            }
         };
+    }
+
+    private Duration parseRetryAfter(HttpResponse<?> response) {
+        String header = response.headers().firstValue("Retry-After").orElse(null);
+        if (header == null || header.isBlank()) return null;
+
+        String value = header.trim();
+        try {
+            long seconds = Long.parseLong(value);
+            if (seconds >= 0) return Duration.ofSeconds(seconds);
+        } catch (NumberFormatException ignored) {
+        }
+
+        try {
+            var retryAt = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();
+            Duration retryAfter = Duration.between(clock.instant(), retryAt);
+            return retryAfter.isNegative() ? Duration.ZERO : retryAfter;
+        } catch (DateTimeParseException | ArithmeticException exception) {
+            log.warn("模型供应商Retry-After响应头非法，已回退本地退避策略");
+            return null;
+        }
     }
 }

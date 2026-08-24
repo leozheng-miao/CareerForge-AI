@@ -44,6 +44,11 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import java.net.http.HttpHeaders;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Map;
 
 /**
  * @program: CareerForge-AI
@@ -85,6 +90,7 @@ class DeepSeekToolCallingClientTest {
     private final HttpClient httpClient = mock(HttpClient.class);
     private final JsonMapper jsonMapper = spy(JsonMapper.builder().build());
     private final DeepSeekToolCallingClient client = createClient(jsonMapper);
+    private static final Instant NOW = Instant.parse("2026-08-24T00:00:00Z");
 
     @Test
     @DisplayName("发送JSON初始请求并将tool_calls响应映射为ToolCallsResult")
@@ -228,6 +234,7 @@ class DeepSeekToolCallingClientTest {
 
     @ParameterizedTest
     @CsvSource({
+            "400, PROVIDER_REQUEST_REJECTED",
             "401, AUTHENTICATION_ERROR",
             "403, PERMISSION_ERROR",
             "404, MODEL_NOT_FOUND",
@@ -291,6 +298,24 @@ class DeepSeekToolCallingClientTest {
                 () -> client.call(initialRequest(VALID_SCHEMA)),
                 ModelErrorType.INVALID_RESPONSE
         );
+    }
+
+    @Test
+    @DisplayName("解析429响应中的Retry-After秒数、HTTP日期并忽略非法值")
+    void shouldParseRetryAfterHeader() throws Exception {
+        assertRetryAfter("7", Duration.ofSeconds(7));
+        assertRetryAfter("Mon, 24 Aug 2026 00:00:09 GMT", Duration.ofSeconds(9));
+        assertRetryAfter("invalid", null);
+    }
+
+    private void assertRetryAfter(String header, Duration expectedRetryAfter) throws Exception {
+        stubResponse(429, "", Map.of("Retry-After", List.of(header)));
+
+        assertThatThrownBy(() -> client.call(initialRequest(VALID_SCHEMA)))
+                .isInstanceOfSatisfying(ModelException.class, exception -> {
+                    assertThat(exception.getErrorType()).isEqualTo(ModelErrorType.RATE_LIMITED);
+                    assertThat(exception.getRetryAfter()).isEqualTo(expectedRetryAfter);
+                });
     }
 
     private static Stream<Object[]> transportFailures() {
@@ -436,22 +461,30 @@ class DeepSeekToolCallingClientTest {
                 "test-api-key",
                 "deepseek-v4-flash"
         );
-        return new DeepSeekToolCallingClient(properties, mapper, httpClient);
+        return new DeepSeekToolCallingClient(
+                properties,
+                mapper,
+                httpClient,
+                Clock.fixed(NOW, ZoneOffset.UTC)
+        );
     }
-
     /** Stub指定HTTP状态和响应正文。 */
     private void stubResponse(int statusCode, String body) throws Exception {
+        stubResponse(statusCode, body, Map.of());
+    }
+
+    private void stubResponse(int statusCode, String body, Map<String, List<String>> headers) throws Exception {
         @SuppressWarnings("unchecked")
         HttpResponse<String> response = mock(HttpResponse.class);
 
         when(response.statusCode()).thenReturn(statusCode);
         when(response.body()).thenReturn(body);
+        when(response.headers()).thenReturn(HttpHeaders.of(headers, (name, value) -> true));
         when(httpClient.send(
                 any(HttpRequest.class),
                 org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()
         )).thenReturn(response);
     }
-
     /** Stub模型传输层异常。 */
     private void stubSendFailure(IOException failure) throws Exception {
         when(httpClient.send(

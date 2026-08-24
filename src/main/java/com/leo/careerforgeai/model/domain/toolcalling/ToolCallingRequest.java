@@ -54,6 +54,17 @@ public record ToolCallingRequest(
         this(messages, tools, toolChoiceMode, outputFormat, maxOutputTokens, DEFAULT_TIMEOUT);
     }
 
+    public ToolCallingRequest withTimeout(Duration timeout) {
+        return new ToolCallingRequest(
+                messages,
+                tools,
+                toolChoiceMode,
+                outputFormat,
+                maxOutputTokens,
+                timeout
+        );
+    }
+
     private static void validateUniqueToolNames(List<ToolDefinition> tools) {
         Set<String> names = new HashSet<>();
         for (ToolDefinition tool : tools) {

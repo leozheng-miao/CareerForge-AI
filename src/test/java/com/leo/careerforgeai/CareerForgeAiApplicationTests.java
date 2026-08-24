@@ -26,6 +26,8 @@ import org.flywaydb.core.Flyway;
 import javax.sql.DataSource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import com.leo.careerforgeai.model.application.ToolCallingGateway;
+import com.leo.careerforgeai.model.application.reliability.CircuitBreakingToolCallingGateway;
 
 /**
  * @program: CareerForge-AI
@@ -64,6 +66,9 @@ class CareerForgeAiApplicationTests {
 
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+
+    @Autowired
+    private ToolCallingGateway toolCallingGateway;
 
     @Test
     void contextLoadsWithExplicitAgentToolWhitelist() {
@@ -133,5 +138,26 @@ class CareerForgeAiApplicationTests {
                 .isInstanceOf(StringRedisSerializer.class);
         assertThat(stringRedisTemplate.getHashValueSerializer())
                 .isInstanceOf(StringRedisSerializer.class);
+    }
+
+    @Test
+    void shouldAssembleModelReliabilityGatewayChainWithSinglePrimaryEntry() {
+        assertThat(toolCallingGateway)
+                .isInstanceOf(CircuitBreakingToolCallingGateway.class);
+
+        assertThat(toolCallingGateway).isSameAs(
+                applicationContext.getBean(
+                        "circuitBreakingToolCallingGateway",
+                        ToolCallingGateway.class
+                )
+        );
+
+        assertThat(applicationContext.getBeansOfType(ToolCallingGateway.class))
+                .containsOnlyKeys(
+                        "deepSeekToolCallingClient",
+                        "bulkheadToolCallingGateway",
+                        "retryingToolCallingGateway",
+                        "circuitBreakingToolCallingGateway"
+                );
     }
 }

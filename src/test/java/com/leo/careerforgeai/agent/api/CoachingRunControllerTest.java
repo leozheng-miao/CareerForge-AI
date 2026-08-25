@@ -48,6 +48,7 @@ import com.leo.careerforgeai.agent.infrastructure.redis.RedisInfrastructureError
 import java.time.Duration;
 
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * @program: CareerForge-AI
@@ -247,6 +248,19 @@ class CoachingRunControllerTest {
                 .andExpect(jsonPath("$.code").value(50300))
                 .andExpect(jsonPath("$.message")
                         .value("Run提交服务暂时不可用，请稍后重试"));
+    }
+
+    @Test
+    void shouldReturnHttp400ForMalformedJsonWithoutSubmittingRun() throws Exception {
+        mockMvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sessionId\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(40000))
+                .andExpect(jsonPath("$.message").value("请求JSON格式或字段不合法"))
+                .andExpect(content().string(not(containsString("JsonEOFException"))));
+
+        verifyNoInteractions(submissionService);
     }
 
     private String validRequest() {

@@ -49,6 +49,12 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Map;
+import com.sun.net.httpserver.HttpServer;
+
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @program: CareerForge-AI
@@ -135,7 +141,7 @@ class DeepSeekToolCallingClientTest {
         });
 
         ArgumentCaptor<HttpRequest> httpRequestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
-        verify(httpClient).send(
+        verify(httpClient).sendAsync(
                 httpRequestCaptor.capture(),
                 org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()
         );
@@ -270,12 +276,15 @@ class DeepSeekToolCallingClientTest {
     }
 
     @Test
-    @DisplayName("中断调用时恢复线程中断标记")
-    void shouldRestoreInterruptedFlag() throws Exception {
-        when(httpClient.send(
+    @DisplayName("中断调用时取消HTTP Future并恢复线程中断标记")
+    void shouldRestoreInterruptedFlag() {
+        CompletableFuture<HttpResponse<String>> pendingResponse = new CompletableFuture<>();
+        when(httpClient.sendAsync(
                 any(HttpRequest.class),
                 org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()
-        )).thenThrow(new InterruptedException("interrupted"));
+        )).thenReturn(pendingResponse);
+
+        Thread.currentThread().interrupt();
 
         try {
             assertThatThrownBy(() -> client.call(initialRequest(VALID_SCHEMA)))
@@ -283,6 +292,7 @@ class DeepSeekToolCallingClientTest {
                             assertThat(exception.getErrorType()).isEqualTo(ModelErrorType.NETWORK_ERROR));
 
             assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            assertThat(pendingResponse).isCancelled();
         } finally {
             Thread.interrupted();
         }
@@ -298,6 +308,60 @@ class DeepSeekToolCallingClientTest {
                 () -> client.call(initialRequest(VALID_SCHEMA)),
                 ModelErrorType.INVALID_RESPONSE
         );
+    }
+
+    @Test
+    @DisplayName("响应头已经到达但响应体超过Deadline时仍然终止调用")
+    void shouldTimeoutWhileReadingResponseBody() throws Exception {
+        byte[] responseBody = response(
+                "\"最终回答\"",
+                "null",
+                "stop",
+                VALID_USAGE
+        ).getBytes(StandardCharsets.UTF_8);
+
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/chat/completions", exchange -> {
+            try {
+                exchange.getRequestBody().readAllBytes();
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, responseBody.length);
+
+                try {
+                    Thread.sleep(1_000);
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                }
+
+                try (OutputStream output = exchange.getResponseBody()) {
+                    output.write(responseBody);
+                }
+            } finally {
+                exchange.close();
+            }
+        });
+        server.start();
+
+        try {
+            ModelProperties properties = new ModelProperties(
+                    URI.create("http://127.0.0.1:" + server.getAddress().getPort()),
+                    "test-api-key",
+                    "deepseek-v4-flash"
+            );
+            DeepSeekToolCallingClient localClient = new DeepSeekToolCallingClient(
+                    properties,
+                    JsonMapper.builder().build(),
+                    HttpClient.newHttpClient(),
+                    Clock.fixed(NOW, ZoneOffset.UTC)
+            );
+
+            assertThatThrownBy(() -> localClient.call(
+                    initialRequest(VALID_SCHEMA, Duration.ofMillis(200))
+            )).isInstanceOfSatisfying(ModelException.class, exception ->
+                    assertThat(exception.getErrorType()).isEqualTo(ModelErrorType.TIMEOUT));
+        } finally {
+            server.stop(0);
+        }
     }
 
     @Test
@@ -480,19 +544,18 @@ class DeepSeekToolCallingClientTest {
         when(response.statusCode()).thenReturn(statusCode);
         when(response.body()).thenReturn(body);
         when(response.headers()).thenReturn(HttpHeaders.of(headers, (name, value) -> true));
-        when(httpClient.send(
+        when(httpClient.sendAsync(
                 any(HttpRequest.class),
                 org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()
-        )).thenReturn(response);
+        )).thenReturn(CompletableFuture.completedFuture(response));
     }
     /** Stub模型传输层异常。 */
-    private void stubSendFailure(IOException failure) throws Exception {
-        when(httpClient.send(
+    private void stubSendFailure(IOException failure) {
+        when(httpClient.sendAsync(
                 any(HttpRequest.class),
                 org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()
-        )).thenThrow(failure);
+        )).thenReturn(CompletableFuture.failedFuture(failure));
     }
-
     /** 断言调用失败被分类为配置错误。 */
     private void assertConfigurationError(ThrowingCall call) {
         assertModelError(call, ModelErrorType.CONFIGURATION_ERROR);

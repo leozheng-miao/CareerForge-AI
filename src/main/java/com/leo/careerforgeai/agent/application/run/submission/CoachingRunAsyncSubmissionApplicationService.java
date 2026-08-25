@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 import com.leo.careerforgeai.agent.application.run.execution.CoachingRunDispatchRejectedException;
+import com.leo.careerforgeai.memory.application.conversation.CoachingSessionVersionConflictException;
 
 /**
  * @program: CareerForge-AI
@@ -39,6 +40,7 @@ public class CoachingRunAsyncSubmissionApplicationService {
     private static final String RATE_LIMIT_UNAVAILABLE_FAILURE = "RATE_LIMIT_UNAVAILABLE";
     private static final String LOCAL_CAPACITY_REJECTED_FAILURE = "LOCAL_CAPACITY_REJECTED";
     private static final String EXECUTOR_NOT_ACCEPTING_FAILURE = "EXECUTOR_NOT_ACCEPTING";
+    private static final String SESSION_VERSION_DRIFT_FAILURE = "SESSION_VERSION_DRIFT";
 
     private final CurrentActorProvider currentActorProvider;
     private final CoachingRunClaimApplicationService claimService;
@@ -95,10 +97,24 @@ public class CoachingRunAsyncSubmissionApplicationService {
         boolean handedOff = false;
 
         try {
-            CoachingRun accepted = acceptanceService.accept(claimed.runId(), message);
+            CoachingRun accepted;
+
+            try {
+                accepted = acceptanceService.accept(claimed.runId(), message);
+            } catch (CoachingSessionVersionConflictException exception) {
+                CoachingRun converged = convergeAfterSessionConflict(
+                        ownerId,
+                        claimed.runId(),
+                        exception
+                );
+                if (converged != null && converged.status() != CoachingRunStatus.REJECTED) {
+                    return converged;
+                }
+                throw exception;
+            }
+
             requireOwner(ownerId, accepted);
             if (accepted.status() != CoachingRunStatus.ACCEPTED) return accepted;
-
             Instant submittedAt = clock.instant();
             RunExecutionContext context = new RunExecutionContext(
                     ownerId,
@@ -152,6 +168,23 @@ public class CoachingRunAsyncSubmissionApplicationService {
     private static void requireOwner(ActorId expectedOwner, CoachingRun run) {
         if (!expectedOwner.equals(run.ownerId())) {
             throw new IllegalStateException("Run不属于当前执行用户");
+        }
+    }
+
+    private CoachingRun convergeAfterSessionConflict(
+            ActorId ownerId,
+            UUID runId,
+            CoachingSessionVersionConflictException original
+    ) {
+        try {
+            return lifecycleService.rejectReceivedForActor(
+                    ownerId,
+                    runId,
+                    SESSION_VERSION_DRIFT_FAILURE
+            );
+        } catch (RuntimeException persistenceFailure) {
+            original.addSuppressed(persistenceFailure);
+            return null;
         }
     }
 }

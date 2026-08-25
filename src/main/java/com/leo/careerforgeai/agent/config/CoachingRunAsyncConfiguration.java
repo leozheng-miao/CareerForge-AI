@@ -11,7 +11,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * @program: CareerForge-AI
- * @description: 创建Coaching Run专用虚拟线程执行器和Deadline调度器
+ * @description: 创建可对照的平台或虚拟线程Run执行器及Deadline调度器
  * @author: Miao Zheng
  * @date: 2026-08-20
  **/
@@ -20,29 +20,31 @@ public class CoachingRunAsyncConfiguration {
 
     @Bean(destroyMethod = "close")
     public CoachingRunTaskExecutor coachingRunTaskExecutor(
-            CoachingRunExecutionProperties properties,
+            CoachingRunExecutionProperties runProperties,
+            CoachingRunExecutorProperties executorProperties,
             Clock agentClock
     ) {
-        ExecutorService virtualThreadExecutor =
-                Executors.newThreadPerTaskExecutor(
-                        Thread.ofVirtual()
-                                .name("careerforge-run-", 0)
-                                .factory()
-                );
-
-        ScheduledExecutorService deadlineScheduler =
-                Executors.newSingleThreadScheduledExecutor(
-                        Thread.ofPlatform()
-                                .daemon(true)
-                                .name("careerforge-run-deadline-", 0)
-                                .factory()
-                );
-
+        ExecutorService runExecutor = createRunExecutor(executorProperties);
+        ScheduledExecutorService deadlineScheduler = Executors.newSingleThreadScheduledExecutor(
+                Thread.ofPlatform().daemon(true).name("careerforge-run-deadline-", 0).factory()
+        );
         return new CoachingRunTaskExecutor(
-                virtualThreadExecutor,
+                runExecutor,
                 deadlineScheduler,
                 agentClock,
-                properties.shutdownGracePeriod()
+                runProperties.shutdownGracePeriod()
         );
+    }
+
+    private ExecutorService createRunExecutor(CoachingRunExecutorProperties properties) {
+        return switch (properties.mode()) {
+            case VIRTUAL -> Executors.newThreadPerTaskExecutor(
+                    Thread.ofVirtual().name("careerforge-run-", 0).factory()
+            );
+            case PLATFORM -> Executors.newFixedThreadPool(
+                    properties.platformThreadCount(),
+                    Thread.ofPlatform().name("careerforge-run-platform-", 0).factory()
+            );
+        };
     }
 }

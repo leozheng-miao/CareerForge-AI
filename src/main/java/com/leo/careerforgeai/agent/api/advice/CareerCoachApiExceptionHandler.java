@@ -10,6 +10,7 @@ import com.leo.careerforgeai.agent.application.run.execution.CoachingRunDispatch
 import com.leo.careerforgeai.agent.application.run.submission.CoachingRunRequestConflictException;
 import com.leo.careerforgeai.agent.application.run.lifecycle.CoachingRunVersionConflictException;
 import com.leo.careerforgeai.agent.application.run.execution.CoachingRunCapacityRejectedException;
+import com.leo.careerforgeai.memory.application.conversation.CoachingSessionVersionConflictException;
 import com.leo.careerforgeai.shared.exception.ErrorCode;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
@@ -25,6 +26,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitExceededException;
 import com.leo.careerforgeai.agent.application.run.ratelimit.CoachingRunRateLimitUnavailableException;
 import org.springframework.http.HttpHeaders;
+import com.leo.careerforgeai.memory.application.conversation.CoachingSessionVersionConflictException;
 
 /**
  * @program: CareerForge-AI
@@ -42,11 +44,10 @@ import org.springframework.http.HttpHeaders;
 public class CareerCoachApiExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public BaseResponse<?> handleUnreadableRequest(HttpMessageNotReadableException exception) {
+    public ResponseEntity<BaseResponse<?>> handleUnreadableRequest(HttpMessageNotReadableException exception) {
         log.warn("Career Coach请求JSON无法读取，exceptionType={}", exception.getClass().getSimpleName());
-        return ResultUtils.error(ErrorCode.PARAMS_ERROR, "请求JSON格式或字段不合法");
+        return ResponseEntity.badRequest().body(ResultUtils.error(ErrorCode.PARAMS_ERROR, "请求JSON格式或字段不合法"));
     }
-
     @ExceptionHandler(CoachingRunRequestConflictException.class)
     public ResponseEntity<BaseResponse<?>> handleRequestConflict(
             CoachingRunRequestConflictException exception
@@ -63,6 +64,18 @@ public class CareerCoachApiExceptionHandler {
         log.warn("Coaching Run版本冲突，runId={}, expectedVersion={}", exception.runId(), exception.expectedVersion());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ResultUtils.error(ErrorCode.CONFLICT_ERROR, "Run状态已经变化，请重新查询"));
+    }
+
+    @ExceptionHandler(CoachingSessionVersionConflictException.class)
+    public ResponseEntity<BaseResponse<?>> handleSessionVersionConflict(
+            CoachingSessionVersionConflictException exception
+    ) {
+        log.warn("Coaching Session版本冲突，error={}", exception.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ResultUtils.error(
+                        ErrorCode.CONFLICT_ERROR,
+                        "Session状态已经变化，请刷新后重新提交"
+                ));
     }
 
     @ExceptionHandler(CoachingRunCapacityRejectedException.class)

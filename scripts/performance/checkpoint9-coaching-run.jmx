@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="CareerForge Checkpoint9 Run Load" enabled="true">
+      <stringProp name="TestPlan.comments">创建Session、提交Run并轮询MySQL终态</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"/>
+    </TestPlan>
+    <hashTree>
+      <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP Defaults" enabled="true">
+        <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+          <collectionProp name="Arguments.arguments"/>
+        </elementProp>
+        <stringProp name="HTTPSampler.domain">${__P(host,localhost)}</stringProp>
+        <stringProp name="HTTPSampler.port">${__P(port,8080)}</stringProp>
+        <stringProp name="HTTPSampler.protocol">${__P(protocol,http)}</stringProp>
+        <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+        <stringProp name="HTTPSampler.connect_timeout">3000</stringProp>
+        <stringProp name="HTTPSampler.response_timeout">10000</stringProp>
+      </ConfigTestElement>
+      <hashTree/>
+
+      <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON Headers" enabled="true">
+        <collectionProp name="HeaderManager.headers">
+          <elementProp name="" elementType="Header">
+            <stringProp name="Header.name">Content-Type</stringProp>
+            <stringProp name="Header.value">application/json</stringProp>
+          </elementProp>
+          <elementProp name="" elementType="Header">
+            <stringProp name="Header.name">Accept</stringProp>
+            <stringProp name="Header.value">application/json</stringProp>
+          </elementProp>
+        </collectionProp>
+      </HeaderManager>
+      <hashTree/>
+
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Coaching Run Load" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">startnextloop</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">${__P(loops,5)}</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(threads,32)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">${__P(rampSeconds,10)}</stringProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"/>
+        <stringProp name="ThreadGroup.delay"/>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="session-create" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">{"title":"${__P(runLabel,checkpoint9)}"}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+          <stringProp name="HTTPSampler.path">/api/coaching-sessions</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="Extract sessionId" enabled="true">
+            <stringProp name="JSONPostProcessor.referenceNames">sessionId</stringProp>
+            <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.sessionId</stringProp>
+            <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
+            <stringProp name="JSONPostProcessor.defaultValues">NOT_FOUND</stringProp>
+            <boolProp name="JSONPostProcessor.compute_concat">false</boolProp>
+          </JSONPostProcessor>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Session HTTP 200" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="200">200</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.custom_message">创建Session必须返回200</stringProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+
+        <TransactionController guiclass="TransactionControllerGui" testclass="TransactionController" testname="run-completion" enabled="true">
+          <boolProp name="TransactionController.includeTimers">true</boolProp>
+          <boolProp name="TransactionController.parent">true</boolProp>
+        </TransactionController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="run-submit" enabled="true">
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{"sessionId":"${sessionId}","requestId":"${__UUID}","expectedSessionVersion":0,"message":"${__P(runLabel,checkpoint9)}固定压测请求"}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+            <stringProp name="HTTPSampler.path">/api/coaching-runs</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="Extract runId" enabled="true">
+              <stringProp name="JSONPostProcessor.referenceNames">runId</stringProp>
+              <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.runId</stringProp>
+              <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
+              <stringProp name="JSONPostProcessor.defaultValues">NOT_FOUND</stringProp>
+              <boolProp name="JSONPostProcessor.compute_concat">false</boolProp>
+            </JSONPostProcessor>
+            <hashTree/>
+            <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Initialize polling" enabled="true">
+              <stringProp name="scriptLanguage">groovy</stringProp>
+              <stringProp name="parameters"/>
+              <stringProp name="filename"/>
+              <stringProp name="cacheKey">checkpoint9-submit-init</stringProp>
+              <stringProp name="script"><![CDATA[
+def submitCode = prev.getResponseCode()
+def runId = vars.get('runId') ?: ''
+vars.put('submitCode', submitCode)
+vars.put('pollCount', '0')
+vars.put('runStatus', '')
+vars.put('runTerminal', 'false')
+
+if (!(submitCode in ['202', '429', '503'])) {
+    prev.setSuccessful(false)
+    prev.setResponseMessage('未预期的提交状态码=' + submitCode)
+}
+if (submitCode == '202' && (runId == '' || runId == 'NOT_FOUND')) {
+    prev.setSuccessful(false)
+    prev.setResponseMessage('202响应缺少runId')
+    runId = ''
+}
+if (submitCode != '202') runId = ''
+
+vars.put('runId', runId)
+vars.put('continuePolling', runId == '' ? 'false' : 'true')
+              ]]></stringProp>
+            </JSR223PostProcessor>
+            <hashTree/>
+          </hashTree>
+
+          <WhileController guiclass="WhileControllerGui" testclass="WhileController" testname="Poll until terminal" enabled="true">
+            <stringProp name="WhileController.condition">${continuePolling}</stringProp>
+          </WhileController>
+          <hashTree>
+            <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Poll interval" enabled="true">
+              <stringProp name="ConstantTimer.delay">${__P(pollMillis,100)}</stringProp>
+            </ConstantTimer>
+            <hashTree/>
+
+            <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="run-status-poll" enabled="true">
+              <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+                <collectionProp name="Arguments.arguments"/>
+              </elementProp>
+              <stringProp name="HTTPSampler.path">/api/coaching-runs/${runId}</stringProp>
+              <stringProp name="HTTPSampler.method">GET</stringProp>
+              <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+              <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+              <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            </HTTPSamplerProxy>
+            <hashTree>
+              <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="Extract run status" enabled="true">
+                <stringProp name="JSONPostProcessor.referenceNames">runStatus</stringProp>
+                <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.status</stringProp>
+                <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
+                <stringProp name="JSONPostProcessor.defaultValues">UNKNOWN</stringProp>
+                <boolProp name="JSONPostProcessor.compute_concat">false</boolProp>
+              </JSONPostProcessor>
+              <hashTree/>
+              <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Update polling state" enabled="true">
+                <stringProp name="scriptLanguage">groovy</stringProp>
+                <stringProp name="parameters"/>
+                <stringProp name="filename"/>
+                <stringProp name="cacheKey">checkpoint9-poll-state</stringProp>
+                <stringProp name="script"><![CDATA[
+int pollCount = (vars.get('pollCount') ?: '0') as int
+int maxPolls = (props.get('maxPolls') ?: '300') as int
+pollCount++
+vars.put('pollCount', pollCount.toString())
+
+if (prev.getResponseCode() != '200') {
+    vars.put('continuePolling', 'false')
+    return
+}
+
+def status = vars.get('runStatus') ?: 'UNKNOWN'
+def terminalStatuses = ['SUCCEEDED', 'FAILED', 'TIMED_OUT', 'REJECTED', 'INTERRUPTED']
+boolean terminal = terminalStatuses.contains(status)
+vars.put('runTerminal', terminal.toString())
+vars.put('continuePolling', (!terminal && pollCount < maxPolls).toString())
+              ]]></stringProp>
+              </JSR223PostProcessor>
+              <hashTree/>
+            </hashTree>
+          </hashTree>
+
+          <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="terminal-verification" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="parameters"/>
+            <stringProp name="filename"/>
+            <stringProp name="cacheKey">checkpoint9-terminal-verification</stringProp>
+            <stringProp name="script"><![CDATA[
+def submitCode = vars.get('submitCode') ?: ''
+def status = vars.get('runStatus') ?: 'UNKNOWN'
+def polls = vars.get('pollCount') ?: '0'
+
+SampleResult.setDataType('text')
+SampleResult.setResponseData("submitCode=${submitCode}, status=${status}, polls=${polls}", 'UTF-8')
+
+if (submitCode != '202') {
+    SampleResult.setResponseCode('204')
+    SampleResult.setResponseMessage('提交未被接受，无需轮询')
+    SampleResult.setSuccessful(true)
+} else if (vars.get('runTerminal') != 'true') {
+    SampleResult.setResponseCode('598')
+    SampleResult.setResponseMessage('Run未在最大轮询次数内进入终态')
+    SampleResult.setSuccessful(false)
+} else if (status != 'SUCCEEDED') {
+    SampleResult.setResponseCode('599')
+    SampleResult.setResponseMessage('Run进入失败终态=' + status)
+    SampleResult.setSuccessful(false)
+} else {
+    SampleResult.setResponseCode('200')
+    SampleResult.setResponseMessage('Run成功完成')
+    SampleResult.setSuccessful(true)
+}
+            ]]></stringProp>
+          </JSR223Sampler>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

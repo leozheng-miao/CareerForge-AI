@@ -140,6 +140,9 @@ careerforge:
     run-rate-limit:
       max-requests: ${COACHING_RUN_RATE_LIMIT_MAX_REQUESTS:10}
       window: ${COACHING_RUN_RATE_LIMIT_WINDOW:1m}
+    run-executor:
+      mode: ${COACHING_RUN_EXECUTOR_MODE:VIRTUAL}
+      platform-thread-count: ${COACHING_RUN_PLATFORM_THREADS:32}
 server:
   port: 8080
 # springdoc-openapi 项目配置

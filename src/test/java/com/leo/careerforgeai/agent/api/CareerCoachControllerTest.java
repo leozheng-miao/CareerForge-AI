@@ -146,7 +146,7 @@ class CareerCoachControllerTest {
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(40000))
                 .andExpect(jsonPath("$.message").value("请求JSON格式或字段不合法"));
 
@@ -181,7 +181,7 @@ class CareerCoachControllerTest {
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\":"))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(40000))
                 .andExpect(jsonPath("$.message").value("请求JSON格式或字段不合法"))
                 .andExpect(content().string(not(containsString("JsonEOFException"))));

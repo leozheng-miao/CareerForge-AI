@@ -41,11 +41,18 @@ import java.time.Clock;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.ZonedDateTime;
+import org.springframework.context.annotation.Profile;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * 负责公共 Tool Calling 协议与 DeepSeek HTTP 协议之间的双向转换，并拒绝结构异常或无法安全归类的响应。
  */
 @Component
+@Profile("!performance-stub")
 @Slf4j
 public class DeepSeekToolCallingClient implements ToolCallingGateway {
 
@@ -178,10 +185,7 @@ public class DeepSeekToolCallingClient implements ToolCallingGateway {
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8))
                 .build();
 
-        HttpResponse<String> response = httpClient.send(
-                request,
-                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
-        );
+        HttpResponse<String> response = sendWithinDeadline(request, timeout);
 
         if (response.statusCode() < 200 || response.statusCode() > 299) {
             throw mapHttpError(response);
@@ -197,6 +201,37 @@ public class DeepSeekToolCallingClient implements ToolCallingGateway {
         } catch (JacksonException e) {
             throw new ModelException(ModelErrorType.INVALID_RESPONSE, "Tool Calling 模型响应不是合法 JSON", e);
         }
+    }
+
+    private HttpResponse<String> sendWithinDeadline(HttpRequest request, Duration timeout)
+            throws IOException, InterruptedException {
+        CompletableFuture<HttpResponse<String>> responseFuture = httpClient.sendAsync(
+                request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+        );
+
+        try {
+            return responseFuture.get(timeout.toNanos(), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException exception) {
+            responseFuture.cancel(true);
+            HttpTimeoutException timeoutException = new HttpTimeoutException("等待模型供应商完整响应超时");
+            timeoutException.initCause(exception);
+            throw timeoutException;
+        } catch (InterruptedException exception) {
+            responseFuture.cancel(true);
+            throw exception;
+        } catch (ExecutionException exception) {
+            throw unwrapAsyncFailure(exception);
+        }
+    }
+
+    private IOException unwrapAsyncFailure(ExecutionException exception) {
+        Throwable cause = exception.getCause();
+        while (cause instanceof CompletionException && cause.getCause() != null) cause = cause.getCause();
+        if (cause instanceof IOException ioException) return ioException;
+        if (cause instanceof RuntimeException runtimeException) throw runtimeException;
+        if (cause instanceof Error error) throw error;
+        return new IOException("Tool Calling模型异步调用失败", cause);
     }
 
     private ToolCallingModelResult toDomainResult(DeepSeekToolCallingResponse response) {

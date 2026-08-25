@@ -50,7 +50,7 @@ public class CoachingRunController {
     @Operation(summary = "异步提交Coaching Run")
     @ApiResponses({
             @ApiResponse(responseCode = "202", description = "Run已经接受并提交异步执行"),
-            @ApiResponse(responseCode = "409", description = "requestId冲突或Run版本冲突"),
+            @ApiResponse(responseCode = "409", description = "requestId、Session版本或Run版本冲突"),
             @ApiResponse(responseCode = "429", description = "owner请求限流或本地执行容量已满"),
             @ApiResponse(responseCode = "503", description = "Redis限流基础设施不可用或Run执行器正在关闭")
     })

@@ -10,6 +10,7 @@ import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentTerminationReason;
 import com.leo.careerforgeai.agent.domain.loop.trace.AgentRunTrace;
 import com.leo.careerforgeai.memory.application.conversation.CoachingSessionApplicationService;
+import com.leo.careerforgeai.memory.application.conversation.CoachingSessionVersionConflictException;
 import com.leo.careerforgeai.memory.domain.conversation.CoachingSession;
 import com.leo.careerforgeai.memory.domain.conversation.ConversationTurn;
 import com.leo.careerforgeai.shared.actor.ActorId;
@@ -254,7 +255,7 @@ class CoachingSessionControllerTest {
                 )
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(40000))
                 .andExpect(jsonPath("$.message")
                         .value("请求JSON格式或字段不合法"));
@@ -299,35 +300,25 @@ class CoachingSessionControllerTest {
     }
 
     @Test
-    void shouldMapStaleVersionToSafeOperationError()
-            throws Exception {
+    void shouldMapStaleVersionToHttp409Conflict() throws Exception {
         when(conversationalCareerCoachService.coach(
                 SESSION_ID,
                 0,
                 "并发问题"
-        )).thenThrow(
-                new IllegalStateException(
-                        "Session版本已经过期-internal"
-                )
-        );
+        )).thenThrow(new CoachingSessionVersionConflictException("Session版本已经过期-internal"));
 
-        mockMvc.perform(post(
-                        BASE_URL + "/" + SESSION_ID + "/messages"
-                )
+        mockMvc.perform(post(BASE_URL + "/" + SESSION_ID + "/messages")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {
-                                  "expectedSessionVersion":0,
-                                  "message":"并发问题"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(50001))
-                .andExpect(jsonPath("$.message")
-                        .value("会话状态或版本已经变化，请刷新后重试"))
-                .andExpect(content().string(
-                        not(containsString("internal"))
-                ));
+                            {
+                              "expectedSessionVersion":0,
+                              "message":"并发问题"
+                            }
+                            """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(40900))
+                .andExpect(jsonPath("$.message").value("Session状态已经变化，请刷新后重新提交"))
+                .andExpect(content().string(not(containsString("internal"))));
     }
 
     @Test

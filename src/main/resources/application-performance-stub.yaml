@@ -1,0 +1,44 @@
+spring:
+  config:
+    activate:
+      on-profile: performance-stub
+  ai:
+    deepseek:
+      base-url: http://127.0.0.1
+      api-key: performance-stub-unused
+      chat:
+        model: performance-stub
+
+careerforge:
+  model:
+    base-url: http://127.0.0.1
+    api-key: performance-stub-unused
+    name: performance-stub
+  performance:
+    model-stub:
+      latency: ${PERFORMANCE_STUB_MODEL_LATENCY:200ms}
+  model-call-bulkhead:
+    max-concurrent-calls: ${MODEL_MAX_CONCURRENT_CALLS:64}
+  model-reliability:
+    max-attempts: 1
+    initial-backoff: 1ms
+    max-backoff: 1ms
+    backoff-multiplier: 1.0
+    max-retry-after: 1s
+    circuit-window-size: 100
+    circuit-minimum-calls: 100
+    circuit-failure-rate-threshold: 100
+    circuit-open-duration: 1s
+    circuit-half-open-permitted-calls: 1
+  agent:
+    loop:
+      total-timeout: 10s
+      model-call-timeout: 5s
+    run:
+      max-concurrent-runs: ${COACHING_RUN_MAX_CONCURRENT:64}
+      max-concurrent-runs-per-owner: ${COACHING_RUN_MAX_CONCURRENT_PER_OWNER:64}
+      execution-timeout: 30s
+      shutdown-grace-period: 20s
+    run-rate-limit:
+      max-requests: ${COACHING_RUN_RATE_LIMIT_MAX_REQUESTS:100000}
+      window: 1h

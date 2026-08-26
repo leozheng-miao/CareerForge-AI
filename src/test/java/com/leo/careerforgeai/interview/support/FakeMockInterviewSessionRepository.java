@@ -1,0 +1,63 @@
+package com.leo.careerforgeai.interview.support;
+
+import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
+import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.shared.actor.ActorId;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * @program: CareerForge-AI
+ * @description: 为模拟面试应用层测试提供owner隔离和CAS语义的内存Repository
+ * @author: Miao Zheng
+ * @date: 2026-08-27
+ **/
+public final class FakeMockInterviewSessionRepository implements MockInterviewSessionRepository {
+
+    private final Map<UUID, MockInterviewSession> sessions = new HashMap<>();
+    private boolean forceNextConflict;
+
+    public void save(MockInterviewSession session) {
+        sessions.put(session.interviewId(), session);
+    }
+
+    public MockInterviewSession findStored(UUID interviewId) {
+        return sessions.get(interviewId);
+    }
+
+    public void forceNextConflict() {
+        forceNextConflict = true;
+    }
+
+    @Override
+    public Optional<MockInterviewSession> findById(ActorId ownerId, UUID interviewId) {
+        return Optional.ofNullable(sessions.get(interviewId)).filter(session -> session.ownerId().equals(ownerId));
+    }
+
+    @Override
+    public boolean updateIfVersionMatches(
+            ActorId ownerId,
+            MockInterviewSession updatedSession,
+            long expectedVersion
+    ) {
+        if (forceNextConflict) {
+            forceNextConflict = false;
+            return false;
+        }
+
+        MockInterviewSession current = sessions.get(updatedSession.interviewId());
+        if (current == null
+                || !current.ownerId().equals(ownerId)
+                || !updatedSession.ownerId().equals(ownerId)
+                || current.version() != expectedVersion
+                || updatedSession.version() != expectedVersion + 1) {
+            return false;
+        }
+
+        sessions.put(updatedSession.interviewId(), updatedSession);
+        return true;
+    }
+}

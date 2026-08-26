@@ -19,6 +19,7 @@
         <springdoc-openapi.version>3.0.3</springdoc-openapi.version>
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <resilience4j.version>2.4.0</resilience4j.version>
+        <langgraph4j.version>1.8.24</langgraph4j.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -26,6 +27,13 @@
                 <groupId>org.springframework.ai</groupId>
                 <artifactId>spring-ai-bom</artifactId>
                 <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.bsc.langgraph4j</groupId>
+                <artifactId>langgraph4j-bom</artifactId>
+                <version>${langgraph4j.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -119,6 +127,16 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.bsc.langgraph4j</groupId>
+            <artifactId>langgraph4j-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.bsc.langgraph4j</groupId>
+            <artifactId>langgraph4j-mysql-saver</artifactId>
         </dependency>
 
     </dependencies>

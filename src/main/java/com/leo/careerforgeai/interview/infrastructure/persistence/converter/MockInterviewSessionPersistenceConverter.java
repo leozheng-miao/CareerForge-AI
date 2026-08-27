@@ -19,7 +19,7 @@ import java.util.UUID;
  * @date: 2026-08-27
  **/
 @Component
-public final class MockInterviewSessionPersistenceConverter {
+public class MockInterviewSessionPersistenceConverter {
 
     public MockInterviewSessionEntity toEntity(MockInterviewSession session) {
         Objects.requireNonNull(session, "session不能为空");

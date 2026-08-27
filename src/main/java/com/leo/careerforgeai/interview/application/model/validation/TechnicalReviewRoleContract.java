@@ -15,7 +15,7 @@ import java.util.Set;
  * @date: 2026-08-27
  **/
 @Component
-public final class TechnicalReviewRoleContract
+public class TechnicalReviewRoleContract
         extends AbstractInterviewRoleContract<TechnicalReviewInput, TechnicalReviewDraft> {
 
     public TechnicalReviewRoleContract(Validator validator) {

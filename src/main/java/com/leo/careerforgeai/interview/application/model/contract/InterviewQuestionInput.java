@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -24,7 +25,7 @@ import java.util.UUID;
  * @param difficulty 难度等级，范围1至5
  * @param blueprintSummary Java生成的冻结面试蓝图摘要
  * @param targetRoleSummary 已确认目标岗位摘要
- * @param allowedEvidenceChunkIds 本轮允许引用的个人证据片段ID
+ * @param evidenceByChunkId 本轮允许模型读取和引用的冻结证据片段ID及正文
  * @param completedQuestionSummaries 已完成问题摘要，用于避免重复
  * @param currentRoundGoal 本轮确定性考察目标
  **/
@@ -36,7 +37,7 @@ public record InterviewQuestionInput(
         @Min(1) @Max(5) int difficulty,
         @NotBlank @Size(max = 8_000) String blueprintSummary,
         @NotBlank @Size(max = 8_000) String targetRoleSummary,
-        @NotNull @Size(max = 20) List<@Pattern(regexp = "[0-9a-f]{64}") String> allowedEvidenceChunkIds,
+        @NotNull @Size(max = 20) Map<@Pattern(regexp = "[0-9a-f]{64}") String, @NotBlank @Size(max = 2_000) String> evidenceByChunkId,
         @NotNull @Size(max = 20) List<@NotBlank @Size(max = 1_000) String> completedQuestionSummaries,
         @NotBlank @Size(max = 1_000) String currentRoundGoal
 ) {

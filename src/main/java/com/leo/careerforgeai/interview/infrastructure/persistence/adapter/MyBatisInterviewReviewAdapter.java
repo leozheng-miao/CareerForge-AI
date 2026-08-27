@@ -21,7 +21,7 @@ import java.util.UUID;
  **/
 @Repository
 @ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
-public final class MyBatisInterviewReviewAdapter implements InterviewReviewRepository {
+public class MyBatisInterviewReviewAdapter implements InterviewReviewRepository {
 
     private final InterviewReviewFactMapper mapper;
     private final InterviewReviewPersistenceConverter converter;

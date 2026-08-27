@@ -20,5 +20,7 @@ public interface InterviewRoleContract<I, O> {
 
     void validateInput(I input);
 
+    void validateOutputStructure(O output);
+
     O validateOutput(I input, O output);
 }

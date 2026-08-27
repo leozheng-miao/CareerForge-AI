@@ -3,16 +3,16 @@ package com.leo.careerforgeai.interview.application.model.validation;
 import com.leo.careerforgeai.interview.application.model.contract.InterviewRoleContract;
 import com.leo.careerforgeai.interview.domain.InterviewRole;
 import jakarta.validation.Validator;
-import org.springframework.ai.converter.BeanOutputConverter;
 
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import com.leo.careerforgeai.interview.application.model.contract.InterviewRoleJsonSchemas;
 
 /**
  * @program: CareerForge-AI
- * @description: 统一处理角色类型、Spring AI JSON Schema和Jakarta Bean Validation
+ * @description: 统一处理角色类型、固定JSON Schema和Jakarta Bean Validation
  * @author: Miao Zheng
  * @date: 2026-08-27
  * @param <I> 角色输入类型
@@ -29,7 +29,7 @@ public abstract class AbstractInterviewRoleContract<I, O> implements InterviewRo
         this.role = Objects.requireNonNull(role, "role不能为空");
         this.outputType = Objects.requireNonNull(outputType, "outputType不能为空");
         this.validator = Objects.requireNonNull(validator, "validator不能为空");
-        this.outputJsonSchema = new BeanOutputConverter<>(outputType).getJsonSchema();
+        this.outputJsonSchema = InterviewRoleJsonSchemas.outputSchema(role, outputType);
     }
 
     @Override
@@ -54,13 +54,17 @@ public abstract class AbstractInterviewRoleContract<I, O> implements InterviewRo
     }
 
     @Override
+    public final void validateOutputStructure(O output) {
+        validateBean(output, InterviewRoleContractErrorType.OUTPUT_INVALID, "模型输出结构校验失败");
+    }
+
+    @Override
     public final O validateOutput(I input, O output) {
         validateInput(input);
-        validateBean(output, InterviewRoleContractErrorType.OUTPUT_INVALID, "模型输出结构校验失败");
+        validateOutputStructure(output);
         validateOutputRules(input, output);
         return output;
     }
-
     protected abstract void validateInputRules(I input);
 
     protected abstract void validateOutputRules(I input, O output);

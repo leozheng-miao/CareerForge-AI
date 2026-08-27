@@ -218,7 +218,7 @@ class InterviewRoleContractTest {
                 3,
                 "本轮覆盖数据库事务。",
                 "Java后端工程师，需要掌握MySQL。",
-                List.of(CHUNK_A),
+                Map.of(CHUNK_A, "项目材料记录了MySQL事务与并发控制实践。"),
                 List.of(),
                 "验证事务隔离和并发异常理解。"
         );

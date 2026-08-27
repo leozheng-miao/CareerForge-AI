@@ -13,7 +13,7 @@ import java.util.Objects;
  * @date: 2026-08-27
  **/
 @Component
-public final class InterviewSupervisor {
+public class InterviewSupervisor {
 
     public InterviewSupervisorDecision decide(InterviewSupervisorInput input) {
         Objects.requireNonNull(input, "input不能为空");

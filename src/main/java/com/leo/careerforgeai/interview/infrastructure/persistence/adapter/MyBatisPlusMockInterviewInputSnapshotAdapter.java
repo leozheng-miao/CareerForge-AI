@@ -26,7 +26,7 @@ import java.util.UUID;
  **/
 @Repository
 @ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
-public final class MyBatisPlusMockInterviewInputSnapshotAdapter
+public class MyBatisPlusMockInterviewInputSnapshotAdapter
         implements MockInterviewInputSnapshotRepository {
 
     private final MockInterviewInputSnapshotMapper snapshotMapper;

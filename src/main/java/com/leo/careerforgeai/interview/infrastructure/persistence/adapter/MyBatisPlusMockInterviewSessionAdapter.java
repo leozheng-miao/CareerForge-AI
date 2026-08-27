@@ -22,7 +22,7 @@ import java.util.UUID;
  **/
 @Repository
 @ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
-public final class MyBatisPlusMockInterviewSessionAdapter implements MockInterviewSessionRepository {
+public class MyBatisPlusMockInterviewSessionAdapter implements MockInterviewSessionRepository {
 
     private final MockInterviewSessionMapper mapper;
     private final MockInterviewSessionPersistenceConverter converter;

@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  * @date: 2026-08-27
  **/
 @Component
-public final class InterviewQuestionRoleContract
+public class InterviewQuestionRoleContract
         extends AbstractInterviewRoleContract<InterviewQuestionInput, InterviewQuestionDraft> {
 
     public InterviewQuestionRoleContract(Validator validator) {
@@ -22,7 +22,6 @@ public final class InterviewQuestionRoleContract
 
     @Override
     protected void validateInputRules(InterviewQuestionInput input) {
-        requireNoDuplicateInput(input.allowedEvidenceChunkIds(), "allowedEvidenceChunkIds");
         requireNoDuplicateInput(input.completedQuestionSummaries(), "completedQuestionSummaries");
     }
 
@@ -35,7 +34,7 @@ public final class InterviewQuestionRoleContract
             reject(InterviewRoleContractErrorType.OUTPUT_INVALID, "模型擅自改变了问题难度");
         }
 
-        requireAllowedReferences(output.evidenceReferenceIds(), input.allowedEvidenceChunkIds());
+        requireAllowedReferences(output.evidenceReferenceIds(), input.evidenceByChunkId().keySet());
         requireNoDuplicateOutput(output.targetSkills(), "targetSkills");
         requireNoDuplicateOutput(output.evaluationPoints(), "evaluationPoints");
         requireNoDuplicateOutput(output.evidenceReferenceIds(), "evidenceReferenceIds");

@@ -18,7 +18,7 @@ import java.util.UUID;
  * @date: 2026-08-27
  **/
 @Component
-public final class MockInterviewInputSnapshotPersistenceConverter {
+public class MockInterviewInputSnapshotPersistenceConverter {
 
     public MockInterviewInputSnapshotEntity toEntity(MockInterviewInputSnapshot snapshot) {
         Objects.requireNonNull(snapshot, "snapshot不能为空");

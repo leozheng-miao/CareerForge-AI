@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  * @date: 2026-08-27
  **/
 @Component
-public final class InterviewReportRoleContract
+public class InterviewReportRoleContract
         extends AbstractInterviewRoleContract<InterviewReportInput, InterviewReportDraft> {
 
     public InterviewReportRoleContract(Validator validator) {

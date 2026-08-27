@@ -86,6 +86,135 @@ public record InterviewNodeExecution(
         if (failureCode != null) requireText(failureCode, "failureCode", 64);
     }
 
+    public static InterviewNodeExecution start(
+            UUID executionId,
+            UUID interviewId,
+            ActorId ownerId,
+            int roundNo,
+            String nodeName,
+            String inputHash,
+            Instant now
+    ) {
+        Objects.requireNonNull(now, "now不能为空");
+        return new InterviewNodeExecution(
+                executionId,
+                interviewId,
+                ownerId,
+                roundNo,
+                nodeName,
+                inputHash,
+                InterviewNodeExecutionStatus.RUNNING,
+                null,
+                null,
+                1,
+                0,
+                new ModelUsage(0, 0, 0),
+                0,
+                null,
+                0,
+                now,
+                null,
+                now,
+                now
+        );
+    }
+
+    public InterviewNodeExecution succeed(
+            String outputReferenceId,
+            String modelRequestId,
+            int modelCallCount,
+            ModelUsage modelUsage,
+            long modelDurationMs,
+            Instant now
+    ) {
+        requireRunning(now);
+        return new InterviewNodeExecution(
+                executionId,
+                interviewId,
+                ownerId,
+                roundNo,
+                nodeName,
+                inputHash,
+                InterviewNodeExecutionStatus.SUCCEEDED,
+                outputReferenceId,
+                modelRequestId,
+                attemptCount,
+                modelCallCount,
+                modelUsage,
+                modelDurationMs,
+                null,
+                nextVersion(),
+                startedAt,
+                now,
+                createdAt,
+                now
+        );
+    }
+
+    public InterviewNodeExecution failWithoutModel(
+            String failureCode,
+            Instant now
+    ) {
+        return fail(
+                failureCode,
+                null,
+                0,
+                new ModelUsage(0, 0, 0),
+                0,
+                now
+        );
+    }
+
+    public InterviewNodeExecution fail(
+            String failureCode,
+            String modelRequestId,
+            int modelCallCount,
+            ModelUsage modelUsage,
+            long modelDurationMs,
+            Instant now
+    ) {
+        requireRunning(now);
+        return new InterviewNodeExecution(
+                executionId,
+                interviewId,
+                ownerId,
+                roundNo,
+                nodeName,
+                inputHash,
+                InterviewNodeExecutionStatus.FAILED,
+                null,
+                modelRequestId,
+                attemptCount,
+                modelCallCount,
+                modelUsage,
+                modelDurationMs,
+                failureCode,
+                nextVersion(),
+                startedAt,
+                now,
+                createdAt,
+                now
+        );
+    }
+
+    private void requireRunning(Instant now) {
+        Objects.requireNonNull(now, "now不能为空");
+        if (status != InterviewNodeExecutionStatus.RUNNING) {
+            throw new IllegalStateException("只有RUNNING节点执行可以完成或失败");
+        }
+        if (now.isBefore(updatedAt)) {
+            throw new IllegalArgumentException("操作时间不能早于节点更新时间");
+        }
+    }
+
+    private long nextVersion() {
+        try {
+            return Math.incrementExact(version);
+        } catch (ArithmeticException exception) {
+            throw new IllegalStateException("节点执行版本超出允许范围", exception);
+        }
+    }
+
     private static void validateUsage(
             int modelCallCount,
             String modelRequestId,

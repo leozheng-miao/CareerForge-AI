@@ -64,7 +64,7 @@ public class DeepSeekChatClient implements ModelGateway {
     public ModelResponse chat(ModelRequest request) {
         try {
             DeepSeekChatRequest providerRequest = toProviderRequest(request, false);
-            DeepSeekChatResponse providerResponse = execute(providerRequest);
+            DeepSeekChatResponse providerResponse = execute(providerRequest, request.timeout());
             return toModelResponse(providerResponse);
         } catch (HttpConnectTimeoutException e) {
             throw new ModelException(ModelErrorType.TIMEOUT, "连接模型供应商超时", e);
@@ -95,14 +95,8 @@ public class DeepSeekChatClient implements ModelGateway {
         ));
         StreamState state = new StreamState();
         try {
-            executeStream(providerRequest, chunk ->
-                    handleStreamChunk(
-                            chunk,
-                            requestID,
-                            eventConsumer,
-                            state
-                    )
-            );
+            executeStream(providerRequest, request.timeout(), chunk ->
+                    handleStreamChunk(chunk, requestID, eventConsumer, state));
             if (!"stop".equals(state.finishReason)) {
                 throw new ModelException(ModelErrorType.INVALID_RESPONSE, "大模型流式响应未正常完成，finishReason=" + state.finishReason);
             }
@@ -163,7 +157,7 @@ public class DeepSeekChatClient implements ModelGateway {
      * @throws IOException
      * @throws InterruptedException
      */
-    private DeepSeekChatResponse execute(DeepSeekChatRequest deepSeekChatRequest)
+    private DeepSeekChatResponse execute(DeepSeekChatRequest deepSeekChatRequest, Duration timeout)
             throws IOException, InterruptedException {
         long startNanos = System.nanoTime();
         //3. 序列化 请求
@@ -171,7 +165,7 @@ public class DeepSeekChatClient implements ModelGateway {
         //4. 构造请求
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(properties.getBaseUrl().resolve("/chat/completions"))
-                .timeout(Duration.ofSeconds(60))
+                .timeout(timeout)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
                 .header("Authorization", "Bearer " + properties.getApiKey())
@@ -236,12 +230,13 @@ public class DeepSeekChatClient implements ModelGateway {
      * @throws InterruptedException
      */
     private void executeStream(DeepSeekChatRequest providerRequest,
+                               Duration timeout,
                                Consumer<DeepSeekStreamChunk> chunkConsumer)
             throws IOException, InterruptedException {
         String jsonBody = serializeRequest(providerRequest);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(properties.getBaseUrl().resolve("/chat/completions"))
-                .timeout(Duration.ofSeconds(60))
+                .timeout(timeout)
                 .header("Content-Type", "application/json")
                 .header("Accept", "text/event-stream")
                 .header("Authorization", "Bearer " + properties.getApiKey())
@@ -296,6 +291,8 @@ public class DeepSeekChatClient implements ModelGateway {
                 new DeepSeekChatRequest.ResponseFormat(responseFormat),
                 properties.getName(),
                 messages,
+                request.maxOutputTokens(),
+                request.temperature(),
                 new DeepSeekChatRequest.Thinking("disabled"),
                 stream,
                 stream ? new DeepSeekChatRequest.StreamOptions(true) : null

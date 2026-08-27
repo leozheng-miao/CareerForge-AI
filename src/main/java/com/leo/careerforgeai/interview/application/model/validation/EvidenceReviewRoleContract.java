@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * @date: 2026-08-27
  **/
 @Component
-public final class EvidenceReviewRoleContract
+public class EvidenceReviewRoleContract
         extends AbstractInterviewRoleContract<EvidenceReviewInput, EvidenceReviewDraft> {
 
     public EvidenceReviewRoleContract(Validator validator) {

@@ -17,7 +17,7 @@ import java.util.UUID;
  * @date: 2026-08-27
  **/
 @Component
-public final class InterviewNodeExecutionPersistenceConverter {
+public class InterviewNodeExecutionPersistenceConverter {
 
     public InterviewNodeExecutionEntity toEntity(InterviewNodeExecution execution) {
         Objects.requireNonNull(execution, "execution不能为空");

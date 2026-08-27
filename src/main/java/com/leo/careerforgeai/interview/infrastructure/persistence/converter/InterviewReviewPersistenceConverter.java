@@ -24,7 +24,7 @@ import java.util.UUID;
  * @date: 2026-08-27
  **/
 @Component
-public final class InterviewReviewPersistenceConverter {
+public class InterviewReviewPersistenceConverter {
 
     private static final TypeReference<Map<String, Integer>> SCORE_MAP_TYPE = new TypeReference<>() {};
     private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {};

@@ -25,7 +25,7 @@ import java.util.UUID;
  * @date: 2026-08-27
  **/
 @Component
-public final class InterviewRoundFactPersistenceConverter {
+public class InterviewRoundFactPersistenceConverter {
 
     private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {};
     private final JsonMapper jsonMapper;

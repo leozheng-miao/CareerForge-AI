@@ -33,6 +33,25 @@ public final class FakeMockInterviewSessionRepository implements MockInterviewSe
     }
 
     @Override
+    public MockInterviewSession claim(MockInterviewSession candidate) {
+        Optional<MockInterviewSession> existing = findByRequestId(candidate.ownerId(), candidate.requestId());
+        if (existing.isPresent()) return existing.get();
+        if (sessions.containsKey(candidate.interviewId())) {
+            throw new IllegalStateException("interviewId冲突");
+        }
+        sessions.put(candidate.interviewId(), candidate);
+        return candidate;
+    }
+
+    @Override
+    public Optional<MockInterviewSession> findByRequestId(ActorId ownerId, UUID requestId) {
+        return sessions.values().stream()
+                .filter(session -> session.ownerId().equals(ownerId))
+                .filter(session -> session.requestId().equals(requestId))
+                .findFirst();
+    }
+
+    @Override
     public Optional<MockInterviewSession> findById(ActorId ownerId, UUID interviewId) {
         return Optional.ofNullable(sessions.get(interviewId)).filter(session -> session.ownerId().equals(ownerId));
     }

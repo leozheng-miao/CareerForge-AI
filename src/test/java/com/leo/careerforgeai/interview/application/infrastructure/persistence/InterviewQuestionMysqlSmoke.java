@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.interview.application.infrastructure.persistence;
 
 import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionDraft;
+import com.leo.careerforgeai.interview.application.port.InterviewNodeExecutionRepository;
 import com.leo.careerforgeai.interview.application.port.InterviewRoleModelGateway;
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
 import com.leo.careerforgeai.interview.application.question.InterviewQuestionPersistenceService;
@@ -11,6 +12,8 @@ import com.leo.careerforgeai.interview.domain.InterviewQuestion;
 import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
 import com.leo.careerforgeai.interview.domain.InterviewStatus;
 import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.infrastructure.persistence.adapter.MyBatisInterviewNodeExecutionAdapter;
+import com.leo.careerforgeai.interview.infrastructure.persistence.converter.InterviewNodeExecutionPersistenceConverter;
 import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.junit.jupiter.api.Test;
@@ -280,6 +283,8 @@ class InterviewQuestionMysqlSmoke {
             MyBatisPlusMockInterviewSessionAdapter.class,
             MyBatisInterviewRoundAdapter.class,
             MockInterviewSessionPersistenceConverter.class,
+            MyBatisInterviewNodeExecutionAdapter.class,
+            InterviewNodeExecutionPersistenceConverter.class,
             InterviewRoundFactPersistenceConverter.class
     })
     static class TestApplication {
@@ -335,16 +340,18 @@ class InterviewQuestionMysqlSmoke {
 
         @Bean
         InterviewQuestionPersistenceService interviewQuestionPersistenceService(
-                CurrentActorProvider currentActorProvider,
+                CurrentActorProvider actorProvider,
                 MockInterviewSessionRepository sessionRepository,
                 InterviewRoundRepository roundRepository,
+                InterviewNodeExecutionRepository executionRepository,
                 InterviewQuestionFactory questionFactory,
                 Clock clock
         ) {
             return new InterviewQuestionPersistenceService(
-                    currentActorProvider,
+                    actorProvider,
                     sessionRepository,
                     roundRepository,
+                    executionRepository,
                     questionFactory,
                     clock
             );

@@ -197,6 +197,30 @@ public record InterviewNodeExecution(
         );
     }
 
+    public InterviewNodeExecution retry(Instant now) {
+        Objects.requireNonNull(now, "now不能为空");
+        if (status != InterviewNodeExecutionStatus.FAILED) {
+            throw new IllegalStateException("只有FAILED节点执行可以重试");
+        }
+        if (now.isBefore(updatedAt)) {
+            throw new IllegalArgumentException("重试时间不能早于节点更新时间");
+        }
+
+        int nextAttempt;
+        try {
+            nextAttempt = Math.incrementExact(attemptCount);
+        } catch (ArithmeticException exception) {
+            throw new IllegalStateException("节点执行次数超出允许范围", exception);
+        }
+
+        return new InterviewNodeExecution(
+                executionId, interviewId, ownerId, roundNo, nodeName, inputHash,
+                InterviewNodeExecutionStatus.RUNNING, null, null, nextAttempt, 0,
+                new ModelUsage(0, 0, 0), 0, null, nextVersion(),
+                now, null, createdAt, now
+        );
+    }
+
     private void requireRunning(Instant now) {
         Objects.requireNonNull(now, "now不能为空");
         if (status != InterviewNodeExecutionStatus.RUNNING) {

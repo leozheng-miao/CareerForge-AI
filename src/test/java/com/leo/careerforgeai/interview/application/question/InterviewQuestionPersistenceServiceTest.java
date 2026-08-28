@@ -1,11 +1,14 @@
 package com.leo.careerforgeai.interview.application.question;
 
 import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionDraft;
+import com.leo.careerforgeai.interview.application.port.InterviewNodeExecutionRepository;
 import com.leo.careerforgeai.interview.application.port.InterviewRoleModelGateway;
 import com.leo.careerforgeai.interview.application.port.InterviewRoundRepository;
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
 import com.leo.careerforgeai.interview.domain.InterviewBudgetPolicy;
 import com.leo.careerforgeai.interview.domain.InterviewMode;
+import com.leo.careerforgeai.interview.domain.InterviewNodeExecution;
+import com.leo.careerforgeai.interview.domain.InterviewNodeExecutionStatus;
 import com.leo.careerforgeai.interview.domain.InterviewQuestion;
 import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
 import com.leo.careerforgeai.interview.domain.InterviewRound;
@@ -35,9 +38,9 @@ import static org.mockito.Mockito.when;
 
 /**
  * @program: CareerForge-AI
- * @description: 验证首题生成权、问题持久化和Session等待状态的幂等推进
+ * @description: 验证首题、模型调用收据和Session等待状态在同一业务链路中幂等推进
  * @author: Miao Zheng
- * @date: 2026-08-28
+ * @date: 2026-08-29
  **/
 class InterviewQuestionPersistenceServiceTest {
 
@@ -47,14 +50,16 @@ class InterviewQuestionPersistenceServiceTest {
     private static final Instant NOW = Instant.parse("2026-08-28T00:00:00Z");
 
     @Test
-    void shouldPersistFirstQuestionOnceAndReturnItOnReplay() {
+    void shouldPersistQuestionExecutionReceiptAndWaitingStateExactlyOnce() {
         MockInterviewSessionRepository sessionRepository = mock(MockInterviewSessionRepository.class);
         InterviewRoundRepository roundRepository = mock(InterviewRoundRepository.class);
+        InterviewNodeExecutionRepository executionRepository = mock(InterviewNodeExecutionRepository.class);
         MockInterviewSession created = session();
         MockInterviewSession generating = created.startQuestionGeneration(NOW);
         MockInterviewSession waiting = generating.waitForAnswer(NOW);
         AtomicReference<InterviewRound> storedRound = new AtomicReference<>();
         AtomicReference<InterviewQuestion> storedQuestion = new AtomicReference<>();
+        AtomicReference<InterviewNodeExecution> storedExecution = new AtomicReference<>();
 
         when(sessionRepository.findById(OWNER, INTERVIEW_ID))
                 .thenReturn(Optional.of(created), Optional.of(generating), Optional.of(waiting));
@@ -69,11 +74,22 @@ class InterviewQuestionPersistenceServiceTest {
         });
         when(roundRepository.findQuestionByRound(eq(OWNER), eq(INTERVIEW_ID), any()))
                 .thenAnswer(invocation -> Optional.of(storedQuestion.get()));
+        when(executionRepository.claim(any())).thenAnswer(invocation -> {
+            InterviewNodeExecution candidate = invocation.getArgument(0);
+            storedExecution.set(candidate);
+            return candidate;
+        });
+        when(executionRepository.updateIfVersionMatches(eq(OWNER), any(), any(Long.class)))
+                .thenAnswer(invocation -> {
+                    storedExecution.set(invocation.getArgument(1));
+                    return true;
+                });
 
         InterviewQuestionPersistenceService service = new InterviewQuestionPersistenceService(
                 () -> OWNER,
                 sessionRepository,
                 roundRepository,
+                executionRepository,
                 new InterviewQuestionFactory(JsonMapper.builder().build()),
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
@@ -84,7 +100,17 @@ class InterviewQuestionPersistenceServiceTest {
 
         assertThat(replay).contains(first);
         assertThat(first.roundId()).isEqualTo(storedRound.get().roundId());
+        assertThat(storedExecution.get().status()).isEqualTo(InterviewNodeExecutionStatus.SUCCEEDED);
+        assertThat(storedExecution.get().nodeName())
+                .isEqualTo(InterviewQuestionPersistenceService.GENERATE_QUESTION_NODE);
+        assertThat(storedExecution.get().outputReferenceId()).isEqualTo(first.questionId().toString());
+        assertThat(storedExecution.get().modelCallCount()).isEqualTo(1);
+        assertThat(storedExecution.get().modelUsage().totalTokens()).isEqualTo(280);
+
         verify(roundRepository, times(1)).claimQuestionReadyRound(any(), any());
+        verify(executionRepository, times(1)).claim(any());
+        verify(executionRepository, times(1))
+                .updateIfVersionMatches(eq(OWNER), any(), eq(0L));
 
         ArgumentCaptor<MockInterviewSession> sessionCaptor =
                 ArgumentCaptor.forClass(MockInterviewSession.class);

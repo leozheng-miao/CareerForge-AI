@@ -2,6 +2,7 @@ package com.leo.careerforgeai.interview.application.graph;
 
 import com.leo.careerforgeai.interview.domain.InterviewMode;
 import com.leo.careerforgeai.interview.domain.InterviewReviewPlan;
+import com.leo.careerforgeai.interview.domain.InterviewWaitReason;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -32,12 +33,20 @@ class InterviewGraphStateTest {
         );
         data.put(InterviewGraphState.REVIEW_PLAN, InterviewReviewPlan.TECHNICAL_ONLY.name());
 
+        UUID questionId = UUID.randomUUID();
+        data.putAll(InterviewGraphState.waitingForAnswerUpdate(1, questionId));
+
         InterviewGraphState state = new InterviewGraphState(data);
 
         assertThat(state.schemaVersion()).isEqualTo(1);
         assertThat(state.interviewId()).isEqualTo(interviewId);
         assertThat(state.mode()).isEqualTo(InterviewMode.TARGETED_MOCK);
-        assertThat(state.currentRound()).isZero();
+        assertThat(state.currentRound()).isEqualTo(1);
+        assertThat(state.currentQuestionId()).contains(questionId);
+        assertThat(state.answerId()).isEmpty();
+        assertThat(state.waitReason())
+                .contains(InterviewWaitReason.WAITING_FOR_ANSWER);
+        assertThat(state.lastErrorCode()).isEmpty();
     }
 
     @Test

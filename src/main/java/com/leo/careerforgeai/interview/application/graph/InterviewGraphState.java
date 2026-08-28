@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.Optional;
 
 /**
  * @program: CareerForge-AI
@@ -83,6 +84,44 @@ public final class InterviewGraphState extends AgentState {
         return requiredInteger(data(), CURRENT_ROUND);
     }
 
+    public Optional<UUID> currentQuestionId() {
+        return optionalString(CURRENT_QUESTION_ID).map(UUID::fromString);
+    }
+
+    public Optional<UUID> answerId() {
+        return optionalString(ANSWER_ID).map(UUID::fromString);
+    }
+
+    public Optional<InterviewWaitReason> waitReason() {
+        return optionalString(WAIT_REASON).map(InterviewWaitReason::valueOf);
+    }
+
+    public Optional<InterviewFailureCode> lastErrorCode() {
+        return optionalString(LAST_ERROR_CODE).map(InterviewFailureCode::valueOf);
+    }
+
+    public static Map<String, Object> waitingForAnswerUpdate(
+            int roundNo,
+            UUID questionId
+    ) {
+        if (roundNo < 1) throw new IllegalArgumentException("roundNo必须从1开始");
+        Objects.requireNonNull(questionId, "questionId不能为空");
+        return Map.of(
+                CURRENT_ROUND, roundNo,
+                CURRENT_QUESTION_ID, questionId.toString(),
+                WAIT_REASON, InterviewWaitReason.WAITING_FOR_ANSWER.name()
+        );
+    }
+
+    public static Map<String, Object> answerResumeUpdate(UUID answerId) {
+        Objects.requireNonNull(answerId, "answerId不能为空");
+        return Map.of(ANSWER_ID, answerId.toString());
+    }
+
+    public static Map<String, Object> clearWaitReasonUpdate() {
+        return Map.of(WAIT_REASON, AgentState.MARK_FOR_REMOVAL);
+    }
+
     private static Map<String, Object> validate(Map<String, Object> state) {
         Objects.requireNonNull(state, "state不能为空");
         state.forEach((key, value) -> {
@@ -150,6 +189,15 @@ public final class InterviewGraphState extends AgentState {
                 || value instanceof Double
                 || value instanceof BigInteger
                 || value instanceof BigDecimal;
+    }
+
+    private Optional<String> optionalString(String key) {
+        Object value = data().get(key);
+        if (value == null) return Optional.empty();
+        if (!(value instanceof String stringValue) || stringValue.isBlank()) {
+            throw new IllegalArgumentException(key + "必须是非空字符串");
+        }
+        return Optional.of(stringValue);
     }
 
     private static String requiredString(Map<String, Object> state, String key) {

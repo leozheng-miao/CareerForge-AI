@@ -23,7 +23,6 @@ import java.util.Map;
  **/
 public record TechnicalReviewDraft(
         @NotNull @Size(min = 1, max = 10)
-        @NotNull @Size(min = 1, max = 10)
         Map<
                 @Pattern(regexp = "[A-Z][A-Z0-9_]{0,63}") String,
                 @NotNull @Min(0) @Max(5) Integer

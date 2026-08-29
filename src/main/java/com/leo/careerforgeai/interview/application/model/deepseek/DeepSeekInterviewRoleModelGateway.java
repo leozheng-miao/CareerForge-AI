@@ -382,11 +382,15 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
                     evidenceReferenceIds只能引用evidenceByChunkId中的ID，不得伪造或重复。
                     """;
             case REPORT_COACH -> """
-                    只根据已持久化回合摘要生成待用户确认的复盘建议。
+                    只根据candidate_input_json中的已持久化回合摘要生成待用户确认的复盘报告。
                     不得虚构回合事实，不得声称已经修改Memory或训练计划。
-                    improvementActions至少包含一项。
-                    每个输出列表内部不得出现重复内容。
-                    proposedMemoryCandidates和proposedTrainingPlanAdjustments都只是待确认建议。
+                    improvementActions至少包含一项，各输出列表内部不得重复。
+                    proposedMemoryCandidates只能描述可验证的技能证据：
+                    skillName填写明确技能名称，content填写得到面试事实支持的能力证据。
+                    不得借Memory建议修改职业目标、学习偏好或时间约束。
+                    proposedTrainingPlanAdjustments只描述下一版训练计划应关注的主题和调整要求。
+                    focusArea填写技能或训练主题，adjustment填写具体调整要求。
+                    所有Memory和训练建议都只是候选，必须等待用户确认。
                     """;
         };
     }
@@ -396,7 +400,7 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
             case INTERVIEWER -> "interviewer-v1";
             case TECHNICAL_REVIEWER -> "technical-reviewer-v1";
             case EVIDENCE_REVIEWER -> "evidence-reviewer-v1";
-            case REPORT_COACH -> "report-coach-v1";
+            case REPORT_COACH -> "report-coach-v2";
         };
     }
 

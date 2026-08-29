@@ -32,6 +32,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
+import com.leo.careerforgeai.interview.application.model.contract.InterviewReportSuggestionDraft;
 
 /**
  * @program: CareerForge-AI
@@ -187,8 +188,14 @@ class InterviewRoleContractTest {
                 List.of("事务隔离理解不完整"),
                 List.of(),
                 List.of("补充事务隔离实验"),
-                List.of("具备基础并发能力"),
-                List.of("增加事务隔离训练项")
+                List.of(new InterviewReportSuggestionDraft.MemoryCandidate(
+                        "Java并发",
+                        "具备基础并发能力"
+                )),
+                List.of(new InterviewReportSuggestionDraft.TrainingPlanAdjustment(
+                        "事务隔离",
+                        "增加事务隔离训练项"
+                ))
         );
 
         assertThat(reportContract.validateOutput(input, valid)).isSameAs(valid);
@@ -197,8 +204,17 @@ class InterviewRoleContractTest {
                 valid.strengths(),
                 valid.technicalGaps(),
                 valid.evidenceExpressionRisks(),
-                List.of("补充事务隔离实验", "补充事务隔离实验"),
-                valid.proposedMemoryCandidates(),
+                valid.improvementActions(),
+                List.of(
+                        new InterviewReportSuggestionDraft.MemoryCandidate(
+                                "Java 并发",
+                                "具备基础并发能力"
+                        ),
+                        new InterviewReportSuggestionDraft.MemoryCandidate(
+                                "java 并发",
+                                "能够说明虚拟线程边界"
+                        )
+                ),
                 valid.proposedTrainingPlanAdjustments()
         );
         InterviewRoleContractException exception = catchThrowableOfType(
@@ -208,7 +224,6 @@ class InterviewRoleContractTest {
 
         assertThat(exception.errorType()).isEqualTo(InterviewRoleContractErrorType.OUTPUT_INVALID);
     }
-
     private InterviewQuestionInput questionInput() {
         return new InterviewQuestionInput(
                 UUID.randomUUID(),

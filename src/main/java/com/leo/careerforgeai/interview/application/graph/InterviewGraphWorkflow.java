@@ -19,16 +19,17 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 
 /**
  * @program: CareerForge-AI
- * @description: 定义多轮提问、HITL、并行评审和Java Supervisor条件路由主图
+ * @description: 定义多轮提问、HITL、并行评审、Java Supervisor和报告生成主图
  * @author: Miao Zheng
  * @date: 2026-08-29
- **/
+ */
 @Component
 @ConditionalOnBean({
         InterviewGraphNodes.class,
         InterviewReviewGraphNodes.class,
         InterviewSupervisionGraphNode.class,
-        InterviewRouteGraphNodes.class
+        InterviewRouteGraphNodes.class,
+        InterviewReportGraphNode.class
 })
 public class InterviewGraphWorkflow {
 
@@ -43,23 +44,27 @@ public class InterviewGraphWorkflow {
     public static final String SUPERVISE_ROUND = "supervise_round";
     public static final String CONTINUE_QUESTIONING = "continue_questioning";
     public static final String START_REPORT_GENERATION = "start_report_generation";
+    public static final String GENERATE_AND_PERSIST_REPORT = "generate_and_persist_report";
     public static final String FINALIZE_FAILURE = "finalize_failure";
 
     private final InterviewGraphNodes nodes;
     private final InterviewReviewGraphNodes reviewNodes;
     private final InterviewSupervisionGraphNode supervisionNode;
     private final InterviewRouteGraphNodes routeNodes;
+    private final InterviewReportGraphNode reportNode;
 
     public InterviewGraphWorkflow(
             InterviewGraphNodes nodes,
             InterviewReviewGraphNodes reviewNodes,
             InterviewSupervisionGraphNode supervisionNode,
-            InterviewRouteGraphNodes routeNodes
+            InterviewRouteGraphNodes routeNodes,
+            InterviewReportGraphNode reportNode
     ) {
         this.nodes = Objects.requireNonNull(nodes, "nodes不能为空");
         this.reviewNodes = Objects.requireNonNull(reviewNodes, "reviewNodes不能为空");
         this.supervisionNode = Objects.requireNonNull(supervisionNode, "supervisionNode不能为空");
         this.routeNodes = Objects.requireNonNull(routeNodes, "routeNodes不能为空");
+        this.reportNode = Objects.requireNonNull(reportNode, "reportNode不能为空");
     }
 
     public CompiledGraph<InterviewGraphState> compile(BaseCheckpointSaver checkpointSaver) throws GraphStateException {
@@ -76,6 +81,7 @@ public class InterviewGraphWorkflow {
         graph.addNode(SUPERVISE_ROUND, node_async(supervisionNode::superviseRound));
         graph.addNode(CONTINUE_QUESTIONING, node_async(routeNodes::continueQuestioning));
         graph.addNode(START_REPORT_GENERATION, node_async(routeNodes::startReportGeneration));
+        graph.addNode(GENERATE_AND_PERSIST_REPORT, node_async(reportNode::generateAndPersistReport));
         graph.addNode(FINALIZE_FAILURE, node_async(routeNodes::finalizeFailure));
 
         graph.addEdge(START, LOAD_FROZEN_CONTEXT);
@@ -100,13 +106,14 @@ public class InterviewGraphWorkflow {
         );
 
         graph.addEdge(CONTINUE_QUESTIONING, GENERATE_AND_PERSIST_QUESTION);
-        graph.addEdge(START_REPORT_GENERATION, END);
+        graph.addEdge(START_REPORT_GENERATION, GENERATE_AND_PERSIST_REPORT);
+        graph.addEdge(GENERATE_AND_PERSIST_REPORT, END);
         graph.addEdge(FINALIZE_FAILURE, END);
 
         return graph.compile(CompileConfig.builder()
                 .graphId(GRAPH_ID)
                 .checkpointSaver(checkpointSaver)
-                .interruptAfter(GENERATE_AND_PERSIST_QUESTION)
+                .interruptAfter(GENERATE_AND_PERSIST_QUESTION, GENERATE_AND_PERSIST_REPORT)
                 .releaseThread(false)
                 .build());
     }

@@ -8,8 +8,8 @@ import java.util.Objects;
  * @program: CareerForge-AI
  * @description: 集中维护四个面试角色稳定且不依赖模型框架的JSON Schema
  * @author: Miao Zheng
- * @date: 2026-08-27
- **/
+ * @date: 2026-08-29
+ */
 public class InterviewRoleJsonSchemas {
 
     private static final String INTERVIEW_QUESTION = """
@@ -76,8 +76,32 @@ public class InterviewRoleJsonSchemas {
                 "technicalGaps":{"type":"array","maxItems":20,"items":{"type":"string","minLength":1,"maxLength":1000}},
                 "evidenceExpressionRisks":{"type":"array","maxItems":20,"items":{"type":"string","minLength":1,"maxLength":1000}},
                 "improvementActions":{"type":"array","minItems":1,"maxItems":20,"items":{"type":"string","minLength":1,"maxLength":1000}},
-                "proposedMemoryCandidates":{"type":"array","maxItems":10,"items":{"type":"string","minLength":1,"maxLength":1000}},
-                "proposedTrainingPlanAdjustments":{"type":"array","maxItems":10,"items":{"type":"string","minLength":1,"maxLength":1000}}
+                "proposedMemoryCandidates":{
+                  "type":"array",
+                  "maxItems":10,
+                  "items":{
+                    "type":"object",
+                    "additionalProperties":false,
+                    "properties":{
+                      "skillName":{"type":"string","minLength":1,"maxLength":128},
+                      "content":{"type":"string","minLength":1,"maxLength":1000}
+                    },
+                    "required":["skillName","content"]
+                  }
+                },
+                "proposedTrainingPlanAdjustments":{
+                  "type":"array",
+                  "maxItems":10,
+                  "items":{
+                    "type":"object",
+                    "additionalProperties":false,
+                    "properties":{
+                      "focusArea":{"type":"string","minLength":1,"maxLength":128},
+                      "adjustment":{"type":"string","minLength":1,"maxLength":1000}
+                    },
+                    "required":["focusArea","adjustment"]
+                  }
+                }
               },
               "required":["strengths","technicalGaps","evidenceExpressionRisks","improvementActions","proposedMemoryCandidates","proposedTrainingPlanAdjustments"]
             }

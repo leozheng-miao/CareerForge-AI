@@ -92,6 +92,10 @@ public final class InterviewGraphState extends AgentState {
         return optionalString(ANSWER_ID).map(UUID::fromString);
     }
 
+    public Optional<UUID> reportId() {
+        return optionalString(REPORT_ID).map(UUID::fromString);
+    }
+
     public Optional<InterviewReviewPlan> reviewPlan() {
         return optionalString(REVIEW_PLAN).map(InterviewReviewPlan::valueOf);
     }
@@ -187,6 +191,19 @@ public final class InterviewGraphState extends AgentState {
                 EVIDENCE_REVIEW_ID, AgentState.MARK_FOR_REMOVAL,
                 ROUTE_DECISION, AgentState.MARK_FOR_REMOVAL,
                 LAST_ERROR_CODE, AgentState.MARK_FOR_REMOVAL
+        );
+    }
+
+    public static Map<String, Object> waitingForReportConfirmationUpdate(UUID reportId) {
+        Objects.requireNonNull(reportId, "reportId不能为空");
+        return Map.of(
+                REPORT_ID, reportId.toString(),
+                WAIT_REASON, InterviewWaitReason.WAITING_FOR_REPORT_CONFIRMATION.name(),
+                ROUTE_DECISION, AgentState.MARK_FOR_REMOVAL,
+                ANSWER_ID, AgentState.MARK_FOR_REMOVAL,
+                REVIEW_PLAN, AgentState.MARK_FOR_REMOVAL,
+                TECHNICAL_REVIEW_ID, AgentState.MARK_FOR_REMOVAL,
+                EVIDENCE_REVIEW_ID, AgentState.MARK_FOR_REMOVAL
         );
     }
 

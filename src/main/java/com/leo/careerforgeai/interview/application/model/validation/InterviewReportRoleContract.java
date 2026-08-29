@@ -2,16 +2,21 @@ package com.leo.careerforgeai.interview.application.model.validation;
 
 import com.leo.careerforgeai.interview.application.model.contract.InterviewReportDraft;
 import com.leo.careerforgeai.interview.application.model.contract.InterviewReportInput;
+import com.leo.careerforgeai.interview.application.model.contract.InterviewReportSuggestionDraft;
 import com.leo.careerforgeai.interview.domain.InterviewRole;
 import jakarta.validation.Validator;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
+
 /**
  * @program: CareerForge-AI
- * @description: 校验复盘报告各建议集合不重复且保持待确认语义
+ * @description: 校验复盘报告内容和结构化建议的唯一性及待确认语义
  * @author: Miao Zheng
- * @date: 2026-08-27
- **/
+ * @date: 2026-08-29
+ */
 @Component
 public class InterviewReportRoleContract
         extends AbstractInterviewRoleContract<InterviewReportInput, InterviewReportDraft> {
@@ -31,7 +36,39 @@ public class InterviewReportRoleContract
         requireNoDuplicateOutput(output.technicalGaps(), "technicalGaps");
         requireNoDuplicateOutput(output.evidenceExpressionRisks(), "evidenceExpressionRisks");
         requireNoDuplicateOutput(output.improvementActions(), "improvementActions");
-        requireNoDuplicateOutput(output.proposedMemoryCandidates(), "proposedMemoryCandidates");
-        requireNoDuplicateOutput(output.proposedTrainingPlanAdjustments(), "proposedTrainingPlanAdjustments");
+        requireUniqueMemorySkills(output.proposedMemoryCandidates());
+        requireUniqueTrainingFocusAreas(output.proposedTrainingPlanAdjustments());
+    }
+
+    private void requireUniqueMemorySkills(
+            Iterable<InterviewReportSuggestionDraft.MemoryCandidate> candidates
+    ) {
+        Set<String> skills = new HashSet<>();
+        for (InterviewReportSuggestionDraft.MemoryCandidate candidate : candidates) {
+            if (candidate == null || !skills.add(normalizeKey(candidate.skillName()))) {
+                reject(
+                        InterviewRoleContractErrorType.OUTPUT_INVALID,
+                        "proposedMemoryCandidates包含空元素或重复skillName"
+                );
+            }
+        }
+    }
+
+    private void requireUniqueTrainingFocusAreas(
+            Iterable<InterviewReportSuggestionDraft.TrainingPlanAdjustment> adjustments
+    ) {
+        Set<String> focusAreas = new HashSet<>();
+        for (InterviewReportSuggestionDraft.TrainingPlanAdjustment adjustment : adjustments) {
+            if (adjustment == null || !focusAreas.add(normalizeKey(adjustment.focusArea()))) {
+                reject(
+                        InterviewRoleContractErrorType.OUTPUT_INVALID,
+                        "proposedTrainingPlanAdjustments包含空元素或重复focusArea"
+                );
+            }
+        }
+    }
+
+    private String normalizeKey(String value) {
+        return value.strip().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
 }

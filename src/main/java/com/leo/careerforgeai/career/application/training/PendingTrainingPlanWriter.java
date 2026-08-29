@@ -14,11 +14,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.leo.careerforgeai.career.application.training.TrainingPlanGenerationException.ErrorType.*;
+import static com.leo.careerforgeai.career.application.training.TrainingPlanGenerationException.ErrorType.INPUT_INTEGRITY_VIOLATION;
+import static com.leo.careerforgeai.career.application.training.TrainingPlanGenerationException.ErrorType.INPUT_VERSION_CONFLICT;
+import static com.leo.careerforgeai.career.application.training.TrainingPlanGenerationException.ErrorType.MODEL_OUTPUT_INVALID;
+import static com.leo.careerforgeai.career.application.training.TrainingPlanGenerationException.ErrorType.PERSISTENCE_FAILED;
 
 /**
  * @program: CareerForge-AI
- * @description: 在短事务内最终复核训练计划输入并保存PENDING_CONFIRMATION计划版本
+ * @description: 在短事务内最终复核训练计划输入并幂等保存PENDING_CONFIRMATION计划版本
  * @author: Miao Zheng
  * @date: 2026-08-18
  */
@@ -42,16 +45,29 @@ public class PendingTrainingPlanWriter {
         this.clock = Objects.requireNonNull(clock, "clock不能为空");
     }
 
-    /**
-     * 模型调用已经结束。本事务只执行最终输入复核、版本分配和计划写入。
-     */
     @Transactional
     public TrainingPlan save(
             TrainingPlanGenerationInputReader.FixedInput expectedInput,
             TrainingPlanGenerator.GeneratedPlan generatedPlan
     ) {
+        return save(expectedInput, generatedPlan, UUID.randomUUID());
+    }
+
+    /**
+     * 模型调用已经结束。本事务只执行幂等检查、最终输入复核、版本分配和计划写入。
+     */
+    @Transactional
+    public TrainingPlan save(
+            TrainingPlanGenerationInputReader.FixedInput expectedInput,
+            TrainingPlanGenerator.GeneratedPlan generatedPlan,
+            UUID planId
+    ) {
         Objects.requireNonNull(expectedInput, "expectedInput不能为空");
         Objects.requireNonNull(generatedPlan, "generatedPlan不能为空");
+        Objects.requireNonNull(planId, "planId不能为空");
+
+        Optional<TrainingPlan> replay = findPlan(expectedInput, planId);
+        if (replay.isPresent()) return requireReplay(replay.get(), expectedInput, planId);
 
         TrainingPlanGenerationInputReader.FixedInput currentInput = readCurrentInput(
                 expectedInput.gapSnapshot().snapshotId()
@@ -81,7 +97,7 @@ public class PendingTrainingPlanWriter {
         );
 
         TrainingPlan pendingPlan = TrainingPlan.createGeneratedDraft(
-                UUID.randomUUID(),
+                planId,
                 expectedInput.ownerId(),
                 planVersion,
                 expectedInput.gapSnapshot().snapshotId(),
@@ -97,6 +113,32 @@ public class PendingTrainingPlanWriter {
             throw failure(PERSISTENCE_FAILED, "训练计划持久化失败", exception);
         }
         return pendingPlan;
+    }
+
+    private Optional<TrainingPlan> findPlan(
+            TrainingPlanGenerationInputReader.FixedInput input,
+            UUID planId
+    ) {
+        try {
+            return repository.findTrainingPlan(input.ownerId(), planId);
+        } catch (RuntimeException exception) {
+            throw failure(PERSISTENCE_FAILED, "训练计划幂等记录读取失败", exception);
+        }
+    }
+
+    private TrainingPlan requireReplay(
+            TrainingPlan existing,
+            TrainingPlanGenerationInputReader.FixedInput input,
+            UUID planId
+    ) {
+        if (!existing.planId().equals(planId)
+                || !existing.ownerId().equals(input.ownerId())
+                || !existing.gapSnapshotId().equals(input.gapSnapshot().snapshotId())
+                || existing.generationContext() == null
+                || existing.status() == TrainingPlan.PlanStatus.DRAFT) {
+            throw failure(INPUT_INTEGRITY_VIOLATION, "稳定planId已被不同训练计划占用");
+        }
+        return existing;
     }
 
     private TrainingPlanGenerationInputReader.FixedInput readCurrentInput(UUID snapshotId) {
@@ -116,7 +158,6 @@ public class PendingTrainingPlanWriter {
         } catch (RuntimeException exception) {
             throw failure(PERSISTENCE_FAILED, "训练计划版本读取失败", exception);
         }
-
         if (latest.isEmpty()) return 1L;
 
         TrainingPlan latestPlan = latest.get();
@@ -131,7 +172,9 @@ public class PendingTrainingPlanWriter {
         }
     }
 
-    private void validateGeneratedPlan(TrainingPlanGenerator.GeneratedPlan generatedPlan) {
+    private void validateGeneratedPlan(
+            TrainingPlanGenerator.GeneratedPlan generatedPlan
+    ) {
         if (generatedPlan.items().stream().anyMatch(item ->
                 item.status() != TrainingPlanItem.ItemStatus.NOT_STARTED
                         || !item.completionEvidenceRefs().isEmpty())) {
@@ -142,7 +185,6 @@ public class PendingTrainingPlanWriter {
                 .mapToInt(TrainingPlanItem::weekNumber)
                 .max()
                 .orElseThrow(() -> failure(MODEL_OUTPUT_INVALID, "训练计划任务不能为空"));
-
         if (actualDuration != generatedPlan.durationWeeks()) {
             throw failure(MODEL_OUTPUT_INVALID, "模型计划周期与任务周次不一致");
         }

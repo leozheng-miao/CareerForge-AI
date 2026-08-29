@@ -84,8 +84,7 @@ public class MockInterviewInputSnapshotApplicationService {
         MockInterviewInputSnapshot stored = snapshotRepository.claim(candidate);
 
         if (!ownerId.equals(stored.ownerId())
-                || !candidate.snapshotHash().equals(stored.snapshotHash())
-                || !candidate.snapshotContextJson().equals(stored.snapshotContextJson())) {
+                || !candidate.snapshotHash().equals(stored.snapshotHash())) {
             throw new IllegalStateException("输入快照幂等认领结果违反owner或Hash边界");
         }
         return stored;

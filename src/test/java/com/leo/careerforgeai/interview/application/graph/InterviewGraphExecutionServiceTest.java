@@ -79,7 +79,11 @@ class InterviewGraphExecutionServiceTest {
 
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             var graph = new InterviewGraphWorkflow(
-                    nodes, reviewNodes, nextQuestionSupervisionNode(), routeNodes
+                    nodes,
+                    reviewNodes,
+                    nextQuestionSupervisionNode(),
+                    routeNodes,
+                    mock(InterviewReportGraphNode.class)
             ).compile(new MemorySaver());
             var service = new InterviewGraphExecutionService(
                     () -> OWNER, sessionRepository, answerService, graph, executor
@@ -166,7 +170,11 @@ class InterviewGraphExecutionServiceTest {
 
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             var graph = new InterviewGraphWorkflow(
-                    nodes, reviewNodes, nextQuestionSupervisionNode(), routeNodes
+                    nodes,
+                    reviewNodes,
+                    nextQuestionSupervisionNode(),
+                    routeNodes,
+                    mock(InterviewReportGraphNode.class)
             ).compile(new MemorySaver());
             var service = new InterviewGraphExecutionService(
                     () -> OWNER, sessionRepository, answerService, graph, executor

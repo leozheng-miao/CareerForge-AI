@@ -4,6 +4,7 @@ import com.leo.careerforgeai.interview.application.answer.InterviewAnswerSubmiss
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
 import com.leo.careerforgeai.interview.application.session.MockInterviewNotFoundException;
 import com.leo.careerforgeai.interview.domain.InterviewAnswer;
+import com.leo.careerforgeai.interview.domain.InterviewStatus;
 import com.leo.careerforgeai.interview.domain.InterviewWaitReason;
 import com.leo.careerforgeai.interview.domain.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
@@ -20,10 +21,10 @@ import static org.bsc.langgraph4j.StateGraph.END;
 
 /**
  * @program: CareerForge-AI
- * @description: 使用固定threadId启动面试Graph并在每次答案提交后恢复到下一次interrupt或终态
+ * @description: 使用固定threadId启动面试Graph并恢复到下一题、报告确认或失败终态
  * @author: Miao Zheng
  * @date: 2026-08-29
- **/
+ */
 public class InterviewGraphExecutionService {
 
     private static final String THREAD_PREFIX = "interview:";
@@ -54,10 +55,19 @@ public class InterviewGraphExecutionService {
         RunnableConfig config = config(interviewId);
 
         var existing = graph.lastStateOf(config);
-        if (existing.isPresent()) return requireStateScope(existing.get().state(), session);
+        if (existing.isPresent()) {
+            InterviewGraphState state = requireStateScope(existing.get().state(), session);
+            if (END.equals(existing.get().next())
+                    && state.waitReason().orElse(null) == InterviewWaitReason.WAITING_FOR_REPORT_CONFIRMATION) {
+                requireWaitingForReportConfirmation(state, session);
+            }
+            return state;
+        }
 
         var interrupted = graph.invokeFinal(
-                GraphInput.args(InterviewGraphState.initialData(interviewId, session.mode(), session.inputSnapshotHash())),
+                GraphInput.args(InterviewGraphState.initialData(
+                        interviewId, session.mode(), session.inputSnapshotHash()
+                )),
                 config
         ).orElseThrow(() -> new IllegalStateException("面试Graph未返回首题中断结果"));
 
@@ -110,7 +120,12 @@ public class InterviewGraphExecutionService {
                 .orElseThrow(() -> new IllegalStateException("当前面试不存在可恢复的Checkpoint"));
         InterviewGraphState current = requireStateScope(checkpoint.state(), session);
 
-        if (END.equals(checkpoint.next())) return current;
+        if (END.equals(checkpoint.next())) {
+            if (current.waitReason().orElse(null) == InterviewWaitReason.WAITING_FOR_REPORT_CONFIRMATION) {
+                requireWaitingForReportConfirmation(current, session);
+            }
+            return current;
+        }
         if (current.answerId().isPresent() && !current.answerId().get().equals(answerId)) {
             throw new IllegalStateException("Checkpoint已经绑定其他答案");
         }
@@ -125,17 +140,20 @@ public class InterviewGraphExecutionService {
             throw new IllegalStateException("当前Checkpoint不在可恢复状态");
         }
 
-        graph.invoke(input, config)
-                .orElseThrow(() -> new IllegalStateException("面试Graph恢复后没有返回State"));
+        graph.invoke(input, config).orElseThrow(() -> new IllegalStateException("面试Graph恢复后没有返回State"));
 
         var resumedCheckpoint = graph.lastStateOf(config)
                 .orElseThrow(() -> new IllegalStateException("面试Graph恢复后缺少Checkpoint"));
-        InterviewGraphState resumed = requireStateScope(resumedCheckpoint.state(), requireSession(interviewId));
+        MockInterviewSession resumedSession = requireSession(interviewId);
+        InterviewGraphState resumed = requireStateScope(resumedCheckpoint.state(), resumedSession);
 
         if (END.equals(resumedCheckpoint.next())) {
-            if (resumed.waitReason().isPresent()) {
-                throw new IllegalStateException("终态Checkpoint不能继续等待答案");
+            InterviewWaitReason waitReason = resumed.waitReason().orElse(null);
+            if (waitReason == InterviewWaitReason.WAITING_FOR_REPORT_CONFIRMATION) {
+                requireWaitingForReportConfirmation(resumed, resumedSession);
+                return resumed;
             }
+            if (waitReason != null) throw new IllegalStateException("终态Checkpoint包含非法等待原因");
             return resumed;
         }
 
@@ -161,6 +179,17 @@ public class InterviewGraphExecutionService {
         }
     }
 
+    private void requireWaitingForReportConfirmation(
+            InterviewGraphState state,
+            MockInterviewSession session
+    ) {
+        if (state.reportId().isEmpty()
+                || state.waitReason().orElse(null) != InterviewWaitReason.WAITING_FOR_REPORT_CONFIRMATION
+                || session.status() != InterviewStatus.AWAITING_CONFIRMATION) {
+            throw new IllegalStateException("报告Checkpoint与MySQL待确认状态不一致");
+        }
+    }
+
     private RunnableConfig config(UUID interviewId) {
         return RunnableConfig.builder()
                 .threadId(threadId(interviewId))
@@ -174,7 +203,10 @@ public class InterviewGraphExecutionService {
                 .orElseThrow(() -> new MockInterviewNotFoundException(interviewId));
     }
 
-    private InterviewGraphState requireStateScope(InterviewGraphState state, MockInterviewSession session) {
+    private InterviewGraphState requireStateScope(
+            InterviewGraphState state,
+            MockInterviewSession session
+    ) {
         if (!state.interviewId().equals(session.interviewId())
                 || state.mode() != session.mode()
                 || !state.inputSnapshotHash().equals(session.inputSnapshotHash())) {

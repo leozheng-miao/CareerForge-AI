@@ -90,6 +90,8 @@ class InterviewParallelReviewDeepSeekSmoke {
         AtomicLong technicalFinished = new AtomicLong();
         AtomicLong evidenceStarted = new AtomicLong();
         AtomicLong evidenceFinished = new AtomicLong();
+        InterviewReportGraphNode reportNode = mock(InterviewReportGraphNode.class);
+        when(reportNode.generateAndPersistReport(any(InterviewGraphState.class))).thenReturn(Map.of());
         AtomicReference<InterviewRoleModelGateway.Result<TechnicalReviewDraft>> technicalResult =
                 new AtomicReference<>();
         AtomicReference<InterviewRoleModelGateway.Result<EvidenceReviewDraft>> evidenceResult =
@@ -139,8 +141,9 @@ class InterviewParallelReviewDeepSeekSmoke {
         try (ExecutorService executor = Executors.newThreadPerTaskExecutor(
                 Thread.ofVirtual().name("cp7-real-review-", 0).factory()
         )) {
-            var graph = new InterviewGraphWorkflow(nodes, reviewNodes, supervisionNode, routeNodes)
-                    .compile(new MemorySaver());
+            var graph = new InterviewGraphWorkflow(
+                    nodes, reviewNodes, supervisionNode, routeNodes, reportNode
+            ).compile(new MemorySaver());
             RunnableConfig config = RunnableConfig.builder()
                     .threadId("cp7-real-" + INTERVIEW_ID)
                     .addParallelNodeExecutor(InterviewGraphWorkflow.PREPARE_REVIEWS, executor)

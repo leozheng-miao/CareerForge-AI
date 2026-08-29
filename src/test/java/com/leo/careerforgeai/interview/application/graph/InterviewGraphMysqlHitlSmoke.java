@@ -517,9 +517,12 @@ class InterviewGraphMysqlHitlSmoke {
                 InterviewGraphNodes nodes,
                 InterviewReviewGraphNodes reviewNodes,
                 InterviewSupervisionGraphNode supervisionNode,
-                InterviewRouteGraphNodes routeNodes
+                InterviewRouteGraphNodes routeNodes,
+                InterviewReportGraphNode reportNode
         ) {
-            return new InterviewGraphWorkflow(nodes, reviewNodes, supervisionNode, routeNodes);
+            return new InterviewGraphWorkflow(
+                    nodes, reviewNodes, supervisionNode, routeNodes, reportNode
+            );
         }
 
         @Bean
@@ -535,6 +538,13 @@ class InterviewGraphMysqlHitlSmoke {
             InterviewRouteGraphNodes nodes = mock(InterviewRouteGraphNodes.class);
             when(nodes.startReportGeneration(any(InterviewGraphState.class))).thenReturn(Map.of());
             return nodes;
+        }
+
+        @Bean
+        InterviewReportGraphNode interviewReportGraphNode() {
+            InterviewReportGraphNode node = mock(InterviewReportGraphNode.class);
+            when(node.generateAndPersistReport(any(InterviewGraphState.class))).thenReturn(Map.of());
+            return node;
         }
     }
 }

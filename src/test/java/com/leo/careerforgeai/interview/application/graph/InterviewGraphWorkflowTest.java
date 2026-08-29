@@ -43,13 +43,13 @@ class InterviewGraphWorkflowTest {
         InterviewReviewGraphNodes reviewNodes = mock(InterviewReviewGraphNodes.class);
         InterviewSupervisionGraphNode supervisionNode = mock(InterviewSupervisionGraphNode.class);
         InterviewRouteGraphNodes routeNodes = mock(InterviewRouteGraphNodes.class);
+        InterviewReportGraphNode reportNode = mock(InterviewReportGraphNode.class);
 
         when(nodes.loadFrozenContext(any(InterviewGraphState.class))).thenReturn(Map.of());
         when(nodes.generateAndPersistQuestion(any(InterviewGraphState.class)))
                 .thenReturn(InterviewGraphState.waitingForAnswerUpdate(1, questionId));
 
-        var workflow = new InterviewGraphWorkflow(nodes, reviewNodes, supervisionNode, routeNodes)
-                .compile(new MemorySaver());
+        var workflow = new InterviewGraphWorkflow(nodes, reviewNodes, supervisionNode, routeNodes, reportNode).compile(new MemorySaver());
         RunnableConfig config = RunnableConfig.builder().threadId("cp8-interrupt-" + interviewId).build();
 
         var interrupted = workflow.invokeFinal(
@@ -89,6 +89,7 @@ class InterviewGraphWorkflowTest {
         AtomicReference<String> evidenceThread = new AtomicReference<>();
         InterviewSupervisionApplicationService supervisionService = mock(InterviewSupervisionApplicationService.class);
         InterviewSupervisionGraphNode supervisionNode = new InterviewSupervisionGraphNode(supervisionService);
+        InterviewReportGraphNode reportNode = mock(InterviewReportGraphNode.class);
 
         when(nodes.loadFrozenContext(any(InterviewGraphState.class))).thenReturn(Map.of());
         when(nodes.generateAndPersistQuestion(any(InterviewGraphState.class)))
@@ -118,8 +119,7 @@ class InterviewGraphWorkflowTest {
         try (ExecutorService executor = Executors.newThreadPerTaskExecutor(
                 Thread.ofVirtual().name("cp8-review-", 0).factory()
         )) {
-            var workflow = new InterviewGraphWorkflow(nodes, reviewNodes, supervisionNode, routeNodes)
-                    .compile(new MemorySaver());
+            var workflow = new InterviewGraphWorkflow(nodes, reviewNodes, supervisionNode, routeNodes, reportNode).compile(new MemorySaver());
             RunnableConfig config = RunnableConfig.builder()
                     .threadId("cp8-resume-" + interviewId)
                     .addParallelNodeExecutor(InterviewGraphWorkflow.PREPARE_REVIEWS, executor)
@@ -173,6 +173,7 @@ class InterviewGraphWorkflowTest {
             InterviewReviewGraphNodes reviewNodes = mock(InterviewReviewGraphNodes.class);
             InterviewSupervisionGraphNode supervisionNode = mock(InterviewSupervisionGraphNode.class);
             InterviewRouteGraphNodes routeNodes = mock(InterviewRouteGraphNodes.class);
+            InterviewReportGraphNode reportNode = mock(InterviewReportGraphNode.class);
 
             when(nodes.loadFrozenContext(any(InterviewGraphState.class))).thenReturn(Map.of());
             when(nodes.generateAndPersistQuestion(any(InterviewGraphState.class)))
@@ -193,9 +194,10 @@ class InterviewGraphWorkflowTest {
             );
             when(routeNodes.startReportGeneration(any(InterviewGraphState.class))).thenReturn(Map.of());
             when(routeNodes.finalizeFailure(any(InterviewGraphState.class))).thenReturn(Map.of());
+            when(reportNode.generateAndPersistReport(any(InterviewGraphState.class))).thenReturn(Map.of());
 
-            var workflow = new InterviewGraphWorkflow(nodes, reviewNodes, supervisionNode, routeNodes)
-                    .compile(new MemorySaver());
+            var workflow = new InterviewGraphWorkflow(nodes, reviewNodes, supervisionNode, routeNodes, reportNode).compile(new MemorySaver());
+
             RunnableConfig config = RunnableConfig.builder()
                     .threadId("cp8-terminal-" + decision + "-" + interviewId)
                     .build();
@@ -212,6 +214,7 @@ class InterviewGraphWorkflowTest {
             assertThat(workflow.lastStateOf(config).orElseThrow().next()).isEqualTo("__END__");
             if (decision == InterviewRouteDecision.GENERATE_REPORT) {
                 verify(routeNodes).startReportGeneration(any(InterviewGraphState.class));
+                verify(reportNode).generateAndPersistReport(any(InterviewGraphState.class));
             } else {
                 verify(routeNodes).finalizeFailure(any(InterviewGraphState.class));
             }

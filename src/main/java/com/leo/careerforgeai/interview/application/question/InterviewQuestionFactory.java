@@ -22,9 +22,9 @@ import java.util.UUID;
 
 /**
  * @program: CareerForge-AI
- * @description: 将通过角色契约校验的模型问题候选转换为不可变问题事实
+ * @description: 将通过角色契约校验的首题、下一题或追问候选转换为不可变问题事实
  * @author: Miao Zheng
- * @date: 2026-08-28
+ * @date: 2026-08-29
  **/
 @Component
 public class InterviewQuestionFactory {
@@ -43,12 +43,37 @@ public class InterviewQuestionFactory {
             InterviewRoleModelGateway.Result<InterviewQuestionDraft> result,
             Instant createdAt
     ) {
+        return createQuestion(
+                questionId,
+                interviewId,
+                roundId,
+                ownerId,
+                null,
+                false,
+                result,
+                createdAt
+        );
+    }
+
+    public InterviewQuestion createQuestion(
+            UUID questionId,
+            UUID interviewId,
+            UUID roundId,
+            ActorId ownerId,
+            UUID parentQuestionId,
+            boolean followUp,
+            InterviewRoleModelGateway.Result<InterviewQuestionDraft> result,
+            Instant createdAt
+    ) {
         Objects.requireNonNull(questionId, "questionId不能为空");
         Objects.requireNonNull(interviewId, "interviewId不能为空");
         Objects.requireNonNull(roundId, "roundId不能为空");
         Objects.requireNonNull(ownerId, "ownerId不能为空");
         Objects.requireNonNull(result, "result不能为空");
         Objects.requireNonNull(createdAt, "createdAt不能为空");
+        if (followUp != (parentQuestionId != null)) {
+            throw new IllegalArgumentException("followUp与parentQuestionId不匹配");
+        }
 
         InterviewQuestionDraft draft = result.output();
         List<String> targetSkills = List.copyOf(draft.targetSkills());
@@ -61,6 +86,7 @@ public class InterviewQuestionFactory {
                 targetSkills,
                 evaluationPoints,
                 draft.followUpAllowed(),
+                followUp,
                 evidenceReferenceIds
         );
 
@@ -69,14 +95,14 @@ public class InterviewQuestionFactory {
                 interviewId,
                 roundId,
                 ownerId,
-                null,
+                parentQuestionId,
                 draft.questionType(),
                 draft.question(),
                 draft.difficulty(),
                 targetSkills,
                 evaluationPoints,
                 draft.followUpAllowed(),
-                false,
+                followUp,
                 evidenceReferenceIds,
                 result.requestId(),
                 result.promptVersion(),
@@ -92,6 +118,7 @@ public class InterviewQuestionFactory {
             List<String> targetSkills,
             List<String> evaluationPoints,
             boolean followUpAllowed,
+            boolean followUp,
             List<String> evidenceReferenceIds
     ) {
         Map<String, Object> content = new LinkedHashMap<>();
@@ -102,7 +129,7 @@ public class InterviewQuestionFactory {
         content.put("targetSkills", targetSkills);
         content.put("evaluationPoints", evaluationPoints);
         content.put("followUpAllowed", followUpAllowed);
-        content.put("followUp", false);
+        content.put("followUp", followUp);
         content.put("evidenceReferenceIds", evidenceReferenceIds);
 
         try {

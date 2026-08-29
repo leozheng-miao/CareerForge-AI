@@ -142,4 +142,20 @@ public interface InterviewNodeExecutionMapper {
             @Param("updatedAt") Instant updatedAt,
             @Param("expectedVersion") long expectedVersion
     );
+
+    @Select("""
+        SELECT COALESCE(SUM(model_call_count), 0)
+        FROM interview_node_execution
+        WHERE owner_id = #{ownerId}
+          AND interview_id = #{interviewId}
+        """)
+    long sumModelCallCount(@Param("ownerId") String ownerId, @Param("interviewId") String interviewId);
+
+    @Select("""
+        SELECT COALESCE(SUM(total_tokens), 0)
+        FROM interview_node_execution
+        WHERE owner_id = #{ownerId}
+          AND interview_id = #{interviewId}
+        """)
+    long sumTotalTokens(@Param("ownerId") String ownerId, @Param("interviewId") String interviewId);
 }

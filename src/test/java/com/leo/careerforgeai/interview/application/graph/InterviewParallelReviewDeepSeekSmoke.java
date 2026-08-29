@@ -10,6 +10,7 @@ import com.leo.careerforgeai.interview.application.model.validation.TechnicalRev
 import com.leo.careerforgeai.interview.application.port.InterviewRoleModelGateway;
 import com.leo.careerforgeai.interview.domain.InterviewMode;
 import com.leo.careerforgeai.interview.domain.InterviewReviewPlan;
+import com.leo.careerforgeai.interview.domain.InterviewRouteDecision;
 import org.bsc.langgraph4j.GraphInput;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.checkpoint.MemorySaver;
@@ -93,6 +94,11 @@ class InterviewParallelReviewDeepSeekSmoke {
                 new AtomicReference<>();
         AtomicReference<InterviewRoleModelGateway.Result<EvidenceReviewDraft>> evidenceResult =
                 new AtomicReference<>();
+        InterviewSupervisionGraphNode supervisionNode = mock(InterviewSupervisionGraphNode.class);
+        InterviewRouteGraphNodes routeNodes = mock(InterviewRouteGraphNodes.class);
+        when(supervisionNode.superviseRound(any(InterviewGraphState.class)))
+                .thenReturn(InterviewGraphState.routeDecisionUpdate(InterviewRouteDecision.GENERATE_REPORT));
+        when(routeNodes.startReportGeneration(any(InterviewGraphState.class))).thenReturn(Map.of());
 
         when(nodes.loadFrozenContext(any(InterviewGraphState.class))).thenReturn(Map.of());
         when(nodes.generateAndPersistQuestion(any(InterviewGraphState.class)))
@@ -133,7 +139,8 @@ class InterviewParallelReviewDeepSeekSmoke {
         try (ExecutorService executor = Executors.newThreadPerTaskExecutor(
                 Thread.ofVirtual().name("cp7-real-review-", 0).factory()
         )) {
-            var graph = new InterviewGraphWorkflow(nodes, reviewNodes).compile(new MemorySaver());
+            var graph = new InterviewGraphWorkflow(nodes, reviewNodes, supervisionNode, routeNodes)
+                    .compile(new MemorySaver());
             RunnableConfig config = RunnableConfig.builder()
                     .threadId("cp7-real-" + INTERVIEW_ID)
                     .addParallelNodeExecutor(InterviewGraphWorkflow.PREPARE_REVIEWS, executor)
@@ -173,6 +180,7 @@ class InterviewParallelReviewDeepSeekSmoke {
             assertThat(maxInFlight.get()).isEqualTo(2);
             assertThat(overlapMs).isPositive();
             assertThat(parallelReviewSpanMs).isLessThan(serialEstimateMs);
+            assertThat(completed.routeDecision()).contains(InterviewRouteDecision.GENERATE_REPORT);
 
             System.out.printf(
                     Locale.ROOT,

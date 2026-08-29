@@ -5,6 +5,7 @@ import com.leo.careerforgeai.interview.domain.InterviewQuestion;
 import com.leo.careerforgeai.interview.domain.InterviewRound;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -43,4 +44,10 @@ public interface InterviewRoundRepository {
     );
 
     Optional<InterviewRound> findRoundByNumber(ActorId ownerId, UUID interviewId, int roundNo);
+
+    int countQuestions(ActorId ownerId, UUID interviewId);
+
+    int countFollowUps(ActorId ownerId, UUID interviewId);
+
+    List<InterviewQuestion> findQuestions(ActorId ownerId, UUID interviewId);
 }

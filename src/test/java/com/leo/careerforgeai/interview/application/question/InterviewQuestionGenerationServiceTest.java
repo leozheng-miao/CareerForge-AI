@@ -9,6 +9,7 @@ import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
 import com.leo.careerforgeai.interview.domain.InterviewMode;
 import com.leo.careerforgeai.interview.domain.InterviewQuestion;
 import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
+import com.leo.careerforgeai.interview.domain.InterviewRouteDecision;
 import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
@@ -33,14 +34,13 @@ import static org.mockito.Mockito.when;
 
 /**
  * @program: CareerForge-AI
- * @description: 验证首题成功生成、幂等重放和模型失败收敛链路
+ * @description: 验证任意回合问题生成、幂等重放和模型失败收敛链路
  * @author: Miao Zheng
- * @date: 2026-08-28
+ * @date: 2026-08-29
  **/
 class InterviewQuestionGenerationServiceTest {
 
-    private static final UUID INTERVIEW_ID =
-            UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID INTERVIEW_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
     private static final String CHUNK_ID = "a".repeat(64);
 
@@ -57,97 +57,87 @@ class InterviewQuestionGenerationServiceTest {
         modelGateway = mock(InterviewRoleModelGateway.class);
         persistenceService = mock(InterviewQuestionPersistenceService.class);
         service = new InterviewQuestionGenerationService(
-                blueprintService,
-                questionContract,
-                modelGateway,
-                persistenceService
+                blueprintService, questionContract, modelGateway, persistenceService
         );
     }
 
     @Test
-    void shouldGenerateAndPersistFirstQuestionInRequiredOrder() {
-        InterviewQuestionInput input = input();
+    void shouldGenerateAndPersistFollowUpInRequiredOrder() {
+        InterviewQuestionInput input = input(2);
         InterviewRoleModelGateway.Result<InterviewQuestionDraft> modelResult = modelResult();
         InterviewQuestion stored = mock(InterviewQuestion.class);
 
-        when(persistenceService.startFirstQuestionGeneration(INTERVIEW_ID))
-                .thenReturn(Optional.empty());
-        when(blueprintService.prepareFirstQuestion(INTERVIEW_ID))
+        when(persistenceService.startQuestionGeneration(INTERVIEW_ID, 2)).thenReturn(Optional.empty());
+        when(blueprintService.prepareNextQuestion(INTERVIEW_ID, InterviewRouteDecision.FOLLOW_UP))
                 .thenReturn(input);
-        when(modelGateway.generate(questionContract, input, TIMEOUT))
-                .thenReturn(modelResult);
-        when(persistenceService.persistFirstQuestion(INTERVIEW_ID, modelResult))
-                .thenReturn(stored);
+        when(modelGateway.generate(questionContract, input, TIMEOUT)).thenReturn(modelResult);
+        when(persistenceService.persistQuestion(
+                INTERVIEW_ID, input, InterviewRouteDecision.FOLLOW_UP, modelResult
+        )).thenReturn(stored);
 
-        InterviewQuestion result =
-                service.generateAndPersistFirstQuestion(INTERVIEW_ID, TIMEOUT);
+        InterviewQuestion result = service.generateAndPersistQuestion(
+                INTERVIEW_ID, 2, InterviewRouteDecision.FOLLOW_UP, TIMEOUT
+        );
 
         assertThat(result).isSameAs(stored);
-
         InOrder order = inOrder(persistenceService, blueprintService, modelGateway);
-        order.verify(persistenceService).startFirstQuestionGeneration(INTERVIEW_ID);
-        order.verify(blueprintService).prepareFirstQuestion(INTERVIEW_ID);
+        order.verify(persistenceService).startQuestionGeneration(INTERVIEW_ID, 2);
+        order.verify(blueprintService).prepareNextQuestion(INTERVIEW_ID, InterviewRouteDecision.FOLLOW_UP);
         order.verify(modelGateway).generate(questionContract, input, TIMEOUT);
-        order.verify(persistenceService).persistFirstQuestion(INTERVIEW_ID, modelResult);
+        order.verify(persistenceService).persistQuestion(
+                INTERVIEW_ID, input, InterviewRouteDecision.FOLLOW_UP, modelResult
+        );
     }
 
     @Test
-    void shouldReturnExistingQuestionWithoutCallingModelAgain() {
+    void shouldReturnExistingFirstQuestionWithoutCallingModelAgain() {
         InterviewQuestion existing = mock(InterviewQuestion.class);
-        when(persistenceService.startFirstQuestionGeneration(INTERVIEW_ID))
+        when(persistenceService.startQuestionGeneration(INTERVIEW_ID, 1))
                 .thenReturn(Optional.of(existing));
 
-        InterviewQuestion result =
-                service.generateAndPersistFirstQuestion(INTERVIEW_ID, TIMEOUT);
+        InterviewQuestion result = service.generateAndPersistFirstQuestion(INTERVIEW_ID, TIMEOUT);
 
         assertThat(result).isSameAs(existing);
         verifyNoInteractions(blueprintService, questionContract, modelGateway);
-        verify(persistenceService, never()).persistFirstQuestion(
-                INTERVIEW_ID,
-                modelResult()
+        verify(persistenceService, never()).persistQuestion(
+                INTERVIEW_ID, input(1), null, modelResult()
         );
     }
 
     @Test
     void shouldFailSessionWhenModelOutputRemainsInvalid() {
-        InterviewQuestionInput input = input();
+        InterviewQuestionInput input = input(1);
         ModelException failure = new ModelException(
                 ModelErrorType.STRUCTURED_OUTPUT_INVALID,
                 "模型输出结构非法"
         );
 
-        when(persistenceService.startFirstQuestionGeneration(INTERVIEW_ID))
-                .thenReturn(Optional.empty());
-        when(blueprintService.prepareFirstQuestion(INTERVIEW_ID))
-                .thenReturn(input);
-        when(modelGateway.generate(questionContract, input, TIMEOUT))
-                .thenThrow(failure);
+        when(persistenceService.startQuestionGeneration(INTERVIEW_ID, 1)).thenReturn(Optional.empty());
+        when(blueprintService.prepareFirstQuestion(INTERVIEW_ID)).thenReturn(input);
+        when(modelGateway.generate(questionContract, input, TIMEOUT)).thenThrow(failure);
 
-        assertThatThrownBy(() ->
-                service.generateAndPersistFirstQuestion(INTERVIEW_ID, TIMEOUT)
-        ).isSameAs(failure);
+        assertThatThrownBy(() -> service.generateAndPersistFirstQuestion(INTERVIEW_ID, TIMEOUT))
+                .isSameAs(failure);
 
-        verify(persistenceService).failFirstQuestionGeneration(
-                INTERVIEW_ID,
-                InterviewFailureCode.MODEL_OUTPUT_INVALID
+        verify(persistenceService).failQuestionGeneration(
+                INTERVIEW_ID, InterviewFailureCode.MODEL_OUTPUT_INVALID
         );
-        verify(persistenceService, never()).persistFirstQuestion(
-                INTERVIEW_ID,
-                modelResult()
+        verify(persistenceService, never()).persistQuestion(
+                INTERVIEW_ID, input, null, modelResult()
         );
     }
 
-    private InterviewQuestionInput input() {
+    private InterviewQuestionInput input(int roundNo) {
         return new InterviewQuestionInput(
                 INTERVIEW_ID,
-                1,
+                roundNo,
                 InterviewMode.TARGETED_MOCK,
                 InterviewQuestionType.TECHNICAL_KNOWLEDGE,
                 2,
                 "模式=TARGETED_MOCK；第1题=TECHNICAL_KNOWLEDGE/难度2/技能Java并发",
                 "岗位=Java AI应用开发工程师；核心要求=Java并发、Agent可靠性",
                 Map.of(CHUNK_ID, "候选人简历记录了Java并发和虚拟线程实践。"),
-                List.of(),
+                roundNo == 1 ? List.of() : List.of("第1题：虚拟线程的适用边界"),
                 "验证候选人对Java并发原理、适用边界和失败场景的理解。"
         );
     }

@@ -17,6 +17,7 @@ import com.leo.careerforgeai.interview.domain.InterviewMode;
 import com.leo.careerforgeai.interview.domain.InterviewQuestion;
 import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
 import com.leo.careerforgeai.interview.domain.InterviewRound;
+import com.leo.careerforgeai.interview.domain.InterviewRouteDecision;
 import com.leo.careerforgeai.interview.domain.InterviewStatus;
 import com.leo.careerforgeai.interview.domain.InterviewWaitReason;
 import com.leo.careerforgeai.interview.domain.MockInterviewSession;
@@ -58,6 +59,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import com.leo.careerforgeai.interview.domain.InterviewReviewPlan;
@@ -227,8 +229,10 @@ class InterviewGraphMysqlHitlSmoke {
                     persistenceService.startFirstQuestionGeneration(interviewId);
             if (existing.isPresent()) return existing.get();
             return persistenceService.persistFirstQuestion(interviewId, modelResult(interviewId));
-        }).when(generationService).generateAndPersistFirstQuestion(
+        }).when(generationService).generateAndPersistQuestion(
                 eq(interviewId),
+                eq(1),
+                isNull(),
                 any(Duration.class)
         );
     }
@@ -434,6 +438,7 @@ class InterviewGraphMysqlHitlSmoke {
                 InterviewRoundRepository roundRepository,
                 InterviewNodeExecutionRepository executionRepository,
                 InterviewQuestionFactory questionFactory,
+                JsonMapper jsonMapper,
                 Clock clock
         ) {
             return new InterviewQuestionPersistenceService(
@@ -442,6 +447,7 @@ class InterviewGraphMysqlHitlSmoke {
                     roundRepository,
                     executionRepository,
                     questionFactory,
+                    jsonMapper,
                     clock
             );
         }
@@ -509,9 +515,26 @@ class InterviewGraphMysqlHitlSmoke {
         @Bean
         InterviewGraphWorkflow interviewGraphWorkflow(
                 InterviewGraphNodes nodes,
-                InterviewReviewGraphNodes reviewNodes
+                InterviewReviewGraphNodes reviewNodes,
+                InterviewSupervisionGraphNode supervisionNode,
+                InterviewRouteGraphNodes routeNodes
         ) {
-            return new InterviewGraphWorkflow(nodes, reviewNodes);
+            return new InterviewGraphWorkflow(nodes, reviewNodes, supervisionNode, routeNodes);
+        }
+
+        @Bean
+        InterviewSupervisionGraphNode interviewSupervisionGraphNode() {
+            InterviewSupervisionGraphNode node = mock(InterviewSupervisionGraphNode.class);
+            when(node.superviseRound(any(InterviewGraphState.class)))
+                    .thenReturn(InterviewGraphState.routeDecisionUpdate(InterviewRouteDecision.GENERATE_REPORT));
+            return node;
+        }
+
+        @Bean
+        InterviewRouteGraphNodes interviewRouteGraphNodes() {
+            InterviewRouteGraphNodes nodes = mock(InterviewRouteGraphNodes.class);
+            when(nodes.startReportGeneration(any(InterviewGraphState.class))).thenReturn(Map.of());
+            return nodes;
         }
     }
 }

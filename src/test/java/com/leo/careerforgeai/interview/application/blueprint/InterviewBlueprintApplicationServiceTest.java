@@ -4,6 +4,8 @@ import com.leo.careerforgeai.career.application.port.CareerPlanningRepository;
 import com.leo.careerforgeai.career.domain.JobRequirements;
 import com.leo.careerforgeai.career.domain.TargetRole;
 import com.leo.careerforgeai.interview.application.evidence.PersonalEvidenceArtifactFactory;
+import com.leo.careerforgeai.interview.application.port.InterviewReviewRepository;
+import com.leo.careerforgeai.interview.application.port.InterviewRoundRepository;
 import com.leo.careerforgeai.interview.application.port.MockInterviewInputSnapshotRepository;
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
 import com.leo.careerforgeai.interview.application.port.PersonalEvidenceArtifactRepository;
@@ -55,6 +57,8 @@ class InterviewBlueprintApplicationServiceTest {
     private MockInterviewInputSnapshotRepository snapshotRepository;
     private CareerPlanningRepository careerRepository;
     private PersonalEvidenceArtifactRepository evidenceRepository;
+    private InterviewRoundRepository roundRepository;
+    private InterviewReviewRepository reviewRepository;
     private InterviewBlueprintApplicationService service;
 
     @BeforeEach
@@ -63,12 +67,16 @@ class InterviewBlueprintApplicationServiceTest {
         snapshotRepository = mock(MockInterviewInputSnapshotRepository.class);
         careerRepository = mock(CareerPlanningRepository.class);
         evidenceRepository = mock(PersonalEvidenceArtifactRepository.class);
+        roundRepository = mock(InterviewRoundRepository.class);
+        reviewRepository = mock(InterviewReviewRepository.class);
         service = new InterviewBlueprintApplicationService(
                 () -> OWNER,
                 sessionRepository,
                 snapshotRepository,
                 careerRepository,
                 evidenceRepository,
+                roundRepository,
+                reviewRepository,
                 new InterviewBlueprintPlanner()
         );
     }

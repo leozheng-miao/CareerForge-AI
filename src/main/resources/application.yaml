@@ -60,6 +60,12 @@ spring:
     deserialization:
       fail-on-unknown-properties: true
 careerforge:
+  interview:
+    supervisor:
+      next-round-model-calls: ${INTERVIEW_NEXT_ROUND_MODEL_CALLS:3}
+      next-round-tokens: ${INTERVIEW_NEXT_ROUND_TOKENS:4000}
+      report-model-calls: ${INTERVIEW_REPORT_MODEL_CALLS:1}
+      report-tokens: ${INTERVIEW_REPORT_TOKENS:4000}
   actor:
     fixed-id: ${CAREERFORGE_ACTOR_ID:actor-dev}
   persistence:

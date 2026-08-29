@@ -135,6 +135,18 @@ public class MyBatisInterviewNodeExecutionAdapter
         return affectedRows == 1;
     }
 
+    @Override
+    public int sumModelCallCount(ActorId ownerId, UUID interviewId) {
+        requireScope(ownerId, interviewId);
+        return Math.toIntExact(mapper.sumModelCallCount(ownerId.value(), interviewId.toString()));
+    }
+
+    @Override
+    public long sumTotalTokens(ActorId ownerId, UUID interviewId) {
+        requireScope(ownerId, interviewId);
+        return mapper.sumTotalTokens(ownerId.value(), interviewId.toString());
+    }
+
     private static void requireScope(ActorId ownerId, UUID interviewId) {
         Objects.requireNonNull(ownerId, "ownerId不能为空");
         Objects.requireNonNull(interviewId, "interviewId不能为空");

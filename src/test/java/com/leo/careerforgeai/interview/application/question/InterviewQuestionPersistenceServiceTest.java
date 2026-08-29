@@ -60,6 +60,7 @@ class InterviewQuestionPersistenceServiceTest {
         AtomicReference<InterviewRound> storedRound = new AtomicReference<>();
         AtomicReference<InterviewQuestion> storedQuestion = new AtomicReference<>();
         AtomicReference<InterviewNodeExecution> storedExecution = new AtomicReference<>();
+        JsonMapper jsonMapper = JsonMapper.builder().build();
 
         when(sessionRepository.findById(OWNER, INTERVIEW_ID))
                 .thenReturn(Optional.of(created), Optional.of(generating), Optional.of(waiting));
@@ -90,7 +91,8 @@ class InterviewQuestionPersistenceServiceTest {
                 sessionRepository,
                 roundRepository,
                 executionRepository,
-                new InterviewQuestionFactory(JsonMapper.builder().build()),
+                new InterviewQuestionFactory(jsonMapper),
+                jsonMapper,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
 

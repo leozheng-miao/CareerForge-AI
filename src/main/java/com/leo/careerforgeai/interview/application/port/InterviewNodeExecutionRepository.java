@@ -35,4 +35,8 @@ public interface InterviewNodeExecutionRepository {
             InterviewNodeExecution updatedExecution,
             long expectedVersion
     );
+
+    int sumModelCallCount(ActorId ownerId, UUID interviewId);
+
+    long sumTotalTokens(ActorId ownerId, UUID interviewId);
 }

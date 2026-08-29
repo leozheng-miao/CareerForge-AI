@@ -345,6 +345,7 @@ class InterviewQuestionMysqlSmoke {
                 InterviewRoundRepository roundRepository,
                 InterviewNodeExecutionRepository executionRepository,
                 InterviewQuestionFactory questionFactory,
+                JsonMapper jsonMapper,
                 Clock clock
         ) {
             return new InterviewQuestionPersistenceService(
@@ -353,6 +354,7 @@ class InterviewQuestionMysqlSmoke {
                     roundRepository,
                     executionRepository,
                     questionFactory,
+                    jsonMapper,
                     clock
             );
         }

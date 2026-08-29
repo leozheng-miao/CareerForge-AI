@@ -92,6 +92,22 @@ public final class InterviewGraphState extends AgentState {
         return optionalString(ANSWER_ID).map(UUID::fromString);
     }
 
+    public Optional<InterviewReviewPlan> reviewPlan() {
+        return optionalString(REVIEW_PLAN).map(InterviewReviewPlan::valueOf);
+    }
+
+    public Optional<UUID> technicalReviewId() {
+        return optionalString(TECHNICAL_REVIEW_ID).map(UUID::fromString);
+    }
+
+    public Optional<UUID> evidenceReviewId() {
+        return optionalString(EVIDENCE_REVIEW_ID).map(UUID::fromString);
+    }
+
+    public Optional<InterviewRouteDecision> routeDecision() {
+        return optionalString(ROUTE_DECISION).map(InterviewRouteDecision::valueOf);
+    }
+
     public Optional<InterviewWaitReason> waitReason() {
         return optionalString(WAIT_REASON).map(InterviewWaitReason::valueOf);
     }
@@ -113,6 +129,26 @@ public final class InterviewGraphState extends AgentState {
         );
     }
 
+    public static Map<String, Object> waitingForNextAnswerUpdate(int roundNo, UUID questionId) {
+        if (roundNo < 2) throw new IllegalArgumentException("后续问题roundNo必须从2开始");
+        Objects.requireNonNull(questionId, "questionId不能为空");
+        return Map.of(
+                CURRENT_ROUND, roundNo,
+                CURRENT_QUESTION_ID, questionId.toString(),
+                WAIT_REASON, InterviewWaitReason.WAITING_FOR_ANSWER.name(),
+                ROUTE_DECISION, AgentState.MARK_FOR_REMOVAL
+        );
+    }
+
+    public static Map<String, Object> clearCompletedRoundForNextQuestionUpdate() {
+        return Map.of(
+                ANSWER_ID, AgentState.MARK_FOR_REMOVAL,
+                REVIEW_PLAN, AgentState.MARK_FOR_REMOVAL,
+                TECHNICAL_REVIEW_ID, AgentState.MARK_FOR_REMOVAL,
+                EVIDENCE_REVIEW_ID, AgentState.MARK_FOR_REMOVAL
+        );
+    }
+
     public static Map<String, Object> answerResumeUpdate(UUID answerId) {
         Objects.requireNonNull(answerId, "answerId不能为空");
         return Map.of(ANSWER_ID, answerId.toString());
@@ -120,6 +156,38 @@ public final class InterviewGraphState extends AgentState {
 
     public static Map<String, Object> clearWaitReasonUpdate() {
         return Map.of(WAIT_REASON, AgentState.MARK_FOR_REMOVAL);
+    }
+
+    public static Map<String, Object> routeDecisionUpdate(InterviewRouteDecision decision) {
+        Objects.requireNonNull(decision, "decision不能为空");
+        return Map.of(ROUTE_DECISION, decision.name());
+    }
+
+    public static Map<String, Object> supervisionDecisionUpdate(
+            InterviewRouteDecision routeDecision,
+            InterviewFailureCode failureCode
+    ) {
+        Objects.requireNonNull(routeDecision, "routeDecision不能为空");
+        boolean failureRoute = routeDecision == InterviewRouteDecision.FINALIZE_FAILURE;
+        if (failureRoute != (failureCode != null)) {
+            throw new IllegalArgumentException("failureCode与routeDecision不匹配");
+        }
+        if (failureCode == null) return Map.of(ROUTE_DECISION, routeDecision.name());
+        return Map.of(
+                ROUTE_DECISION, routeDecision.name(),
+                LAST_ERROR_CODE, failureCode.name()
+        );
+    }
+
+    public static Map<String, Object> clearCompletedRoundUpdate() {
+        return Map.of(
+                ANSWER_ID, AgentState.MARK_FOR_REMOVAL,
+                REVIEW_PLAN, AgentState.MARK_FOR_REMOVAL,
+                TECHNICAL_REVIEW_ID, AgentState.MARK_FOR_REMOVAL,
+                EVIDENCE_REVIEW_ID, AgentState.MARK_FOR_REMOVAL,
+                ROUTE_DECISION, AgentState.MARK_FOR_REMOVAL,
+                LAST_ERROR_CODE, AgentState.MARK_FOR_REMOVAL
+        );
     }
 
     private static Map<String, Object> validate(Map<String, Object> state) {

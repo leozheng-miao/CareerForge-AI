@@ -15,6 +15,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -201,6 +202,26 @@ public class MyBatisInterviewRoundAdapter implements InterviewRoundRepository {
         );
         if (affectedRows > 1) throw new IllegalStateException("回合CAS更新影响了多行数据");
         return affectedRows == 1;
+    }
+
+    @Override
+    public int countQuestions(ActorId ownerId, UUID interviewId) {
+        requireOwnerAndId(ownerId, interviewId, "interviewId");
+        return Math.toIntExact(mapper.countQuestions(ownerId.value(), interviewId.toString()));
+    }
+
+    @Override
+    public int countFollowUps(ActorId ownerId, UUID interviewId) {
+        requireOwnerAndId(ownerId, interviewId, "interviewId");
+        return Math.toIntExact(mapper.countFollowUps(ownerId.value(), interviewId.toString()));
+    }
+
+    @Override
+    public List<InterviewQuestion> findQuestions(ActorId ownerId, UUID interviewId) {
+        requireOwnerAndId(ownerId, interviewId, "interviewId");
+        return mapper.findQuestions(ownerId.value(), interviewId.toString()).stream()
+                .map(converter::toDomain)
+                .toList();
     }
 
     private static void requireQuestionScope(

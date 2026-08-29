@@ -10,6 +10,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * @program: CareerForge-AI
@@ -191,5 +192,54 @@ public interface InterviewRoundFactMapper {
             @Param("answeredAt") Instant answeredAt,
             @Param("reviewedAt") Instant reviewedAt,
             @Param("expectedVersion") long expectedVersion
+    );
+
+    @Select("""
+        SELECT COUNT(*)
+        FROM interview_question
+        WHERE owner_id = #{ownerId}
+          AND interview_id = #{interviewId}
+        """)
+    long countQuestions(@Param("ownerId") String ownerId, @Param("interviewId") String interviewId);
+
+    @Select("""
+        SELECT COUNT(*)
+        FROM interview_question
+        WHERE owner_id = #{ownerId}
+          AND interview_id = #{interviewId}
+          AND is_follow_up = TRUE
+        """)
+    long countFollowUps(@Param("ownerId") String ownerId, @Param("interviewId") String interviewId);
+
+    @Select("""
+        SELECT q.question_id AS questionId,
+               q.interview_id AS interviewId,
+               q.round_id AS roundId,
+               q.owner_id AS ownerId,
+               q.parent_question_id AS parentQuestionId,
+               q.question_type AS questionType,
+               q.question_text AS questionText,
+               q.difficulty,
+               q.target_skills_json AS targetSkillsJson,
+               q.evaluation_points_json AS evaluationPointsJson,
+               q.follow_up_allowed AS followUpAllowed,
+               q.is_follow_up AS followUp,
+               q.evidence_refs_json AS evidenceRefsJson,
+               q.model_request_id AS modelRequestId,
+               q.prompt_version AS promptVersion,
+               q.content_hash AS contentHash,
+               q.created_at AS createdAt
+        FROM interview_question q
+        INNER JOIN interview_round r
+            ON r.round_id = q.round_id
+           AND r.interview_id = q.interview_id
+           AND r.owner_id = q.owner_id
+        WHERE q.owner_id = #{ownerId}
+          AND q.interview_id = #{interviewId}
+        ORDER BY r.round_no ASC
+        """)
+    List<InterviewQuestionEntity> findQuestions(
+            @Param("ownerId") String ownerId,
+            @Param("interviewId") String interviewId
     );
 }

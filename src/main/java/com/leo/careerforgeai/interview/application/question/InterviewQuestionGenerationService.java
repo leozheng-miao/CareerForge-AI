@@ -3,27 +3,28 @@ package com.leo.careerforgeai.interview.application.question;
 import com.leo.careerforgeai.interview.application.blueprint.InterviewBlueprintApplicationService;
 import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionDraft;
 import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionInput;
+import com.leo.careerforgeai.interview.application.model.validation.InterviewRoleContractException;
 import com.leo.careerforgeai.interview.application.model.validation.InterviewQuestionRoleContract;
 import com.leo.careerforgeai.interview.application.port.InterviewRoleModelGateway;
+import com.leo.careerforgeai.interview.application.snapshot.MockInterviewInputConflictException;
+import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.InterviewQuestion;
+import com.leo.careerforgeai.interview.domain.InterviewRouteDecision;
+import com.leo.careerforgeai.model.exception.ModelErrorType;
+import com.leo.careerforgeai.model.exception.ModelException;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.Objects;
-import java.util.UUID;
-import com.leo.careerforgeai.interview.application.snapshot.MockInterviewInputConflictException;
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
-import com.leo.careerforgeai.interview.domain.InterviewQuestion;
-import com.leo.careerforgeai.model.exception.ModelErrorType;
-import com.leo.careerforgeai.model.exception.ModelException;
-
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * @program: CareerForge-AI
- * @description: 从冻结面试输入生成经过Java角色契约校验的首题候选
+ * @description: 从冻结输入生成并幂等持久化首题、下一题或技术追问
  * @author: Miao Zheng
- * @date: 2026-08-28
+ * @date: 2026-08-29
  **/
 @Service
 @ConditionalOnBean({
@@ -56,7 +57,6 @@ public class InterviewQuestionGenerationService {
     ) {
         Objects.requireNonNull(interviewId, "interviewId不能为空");
         requireTimeout(timeout);
-
         InterviewQuestionInput input = blueprintService.prepareFirstQuestion(interviewId);
         return modelGateway.generate(questionContract, input, timeout);
     }
@@ -65,30 +65,59 @@ public class InterviewQuestionGenerationService {
             UUID interviewId,
             Duration timeout
     ) {
+        return generateAndPersistQuestion(interviewId, 1, null, timeout);
+    }
+
+    public InterviewQuestion generateAndPersistQuestion(
+            UUID interviewId,
+            int roundNo,
+            InterviewRouteDecision routeDecision,
+            Duration timeout
+    ) {
         Objects.requireNonNull(interviewId, "interviewId不能为空");
         requireTimeout(timeout);
+        if (roundNo < 1) throw new IllegalArgumentException("roundNo必须从1开始");
+        if (roundNo == 1 && routeDecision != null) {
+            throw new IllegalArgumentException("首题不能包含后续路由");
+        }
+        if (roundNo > 1
+                && routeDecision != InterviewRouteDecision.FOLLOW_UP
+                && routeDecision != InterviewRouteDecision.NEXT_QUESTION) {
+            throw new IllegalArgumentException("后续问题必须来自FOLLOW_UP或NEXT_QUESTION");
+        }
 
         Optional<InterviewQuestion> existing =
-                persistenceService.startFirstQuestionGeneration(interviewId);
+                persistenceService.startQuestionGeneration(interviewId, roundNo);
         if (existing.isPresent()) return existing.get();
 
+        InterviewQuestionInput input;
         InterviewRoleModelGateway.Result<InterviewQuestionDraft> result;
         try {
-            result = generateFirstQuestion(interviewId, timeout);
+            input = roundNo == 1
+                    ? blueprintService.prepareFirstQuestion(interviewId)
+                    : blueprintService.prepareNextQuestion(interviewId, routeDecision);
+            result = modelGateway.generate(questionContract, input, timeout);
         } catch (RuntimeException exception) {
-            convergeModelFailure(interviewId, exception);
+            convergeFailure(interviewId, exception);
             throw exception;
         }
 
-        return persistenceService.persistFirstQuestion(interviewId, result);
+        try {
+            return persistenceService.persistQuestion(
+                    interviewId,
+                    input,
+                    routeDecision,
+                    result
+            );
+        } catch (InterviewRoleContractException exception) {
+            convergeFailure(interviewId, exception);
+            throw exception;
+        }
     }
 
-    private void convergeModelFailure(UUID interviewId, RuntimeException exception) {
+    private void convergeFailure(UUID interviewId, RuntimeException exception) {
         try {
-            persistenceService.failFirstQuestionGeneration(
-                    interviewId,
-                    failureCode(exception)
-            );
+            persistenceService.failQuestionGeneration(interviewId, failureCode(exception));
         } catch (RuntimeException convergenceFailure) {
             exception.addSuppressed(convergenceFailure);
         }
@@ -97,6 +126,9 @@ public class InterviewQuestionGenerationService {
     private InterviewFailureCode failureCode(RuntimeException exception) {
         if (exception instanceof MockInterviewInputConflictException) {
             return InterviewFailureCode.INPUT_SNAPSHOT_UNAVAILABLE;
+        }
+        if (exception instanceof InterviewRoleContractException) {
+            return InterviewFailureCode.MODEL_OUTPUT_INVALID;
         }
         if (exception instanceof ModelException modelException) {
             ModelErrorType errorType = modelException.getErrorType();

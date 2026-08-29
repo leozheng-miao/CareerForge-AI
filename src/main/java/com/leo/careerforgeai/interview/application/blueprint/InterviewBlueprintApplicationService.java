@@ -34,6 +34,15 @@ import java.util.UUID;
 import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionInput;
 
 import java.util.Collections;
+import com.leo.careerforgeai.interview.application.port.InterviewReviewRepository;
+import com.leo.careerforgeai.interview.application.port.InterviewRoundRepository;
+import com.leo.careerforgeai.interview.domain.InterviewAnswer;
+import com.leo.careerforgeai.interview.domain.InterviewQuestion;
+import com.leo.careerforgeai.interview.domain.InterviewRouteDecision;
+import com.leo.careerforgeai.interview.domain.InterviewRound;
+import com.leo.careerforgeai.interview.domain.InterviewRoundStatus;
+import com.leo.careerforgeai.interview.domain.TechnicalReview;
+import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
 
 /**
  * @program: CareerForge-AI
@@ -46,7 +55,9 @@ import java.util.Collections;
         MockInterviewSessionRepository.class,
         MockInterviewInputSnapshotRepository.class,
         CareerPlanningRepository.class,
-        PersonalEvidenceArtifactRepository.class
+        PersonalEvidenceArtifactRepository.class,
+        InterviewRoundRepository.class,
+        InterviewReviewRepository.class
 })
 public class InterviewBlueprintApplicationService {
 
@@ -60,6 +71,8 @@ public class InterviewBlueprintApplicationService {
     private final CareerPlanningRepository careerRepository;
     private final PersonalEvidenceArtifactRepository evidenceRepository;
     private final InterviewBlueprintPlanner planner;
+    private final InterviewRoundRepository roundRepository;
+    private final InterviewReviewRepository reviewRepository;
 
     public InterviewBlueprintApplicationService(
             CurrentActorProvider currentActorProvider,
@@ -67,6 +80,8 @@ public class InterviewBlueprintApplicationService {
             MockInterviewInputSnapshotRepository snapshotRepository,
             CareerPlanningRepository careerRepository,
             PersonalEvidenceArtifactRepository evidenceRepository,
+            InterviewRoundRepository roundRepository,
+            InterviewReviewRepository reviewRepository,
             InterviewBlueprintPlanner planner
     ) {
         this.currentActorProvider = Objects.requireNonNull(currentActorProvider, "currentActorProvider不能为空");
@@ -74,6 +89,8 @@ public class InterviewBlueprintApplicationService {
         this.snapshotRepository = Objects.requireNonNull(snapshotRepository, "snapshotRepository不能为空");
         this.careerRepository = Objects.requireNonNull(careerRepository, "careerRepository不能为空");
         this.evidenceRepository = Objects.requireNonNull(evidenceRepository, "evidenceRepository不能为空");
+        this.roundRepository = Objects.requireNonNull(roundRepository, "roundRepository不能为空");
+        this.reviewRepository = Objects.requireNonNull(reviewRepository, "reviewRepository不能为空");
         this.planner = Objects.requireNonNull(planner, "planner不能为空");
     }
 
@@ -99,6 +116,163 @@ public class InterviewBlueprintApplicationService {
                 List.of(),
                 firstQuestion.currentRoundGoal()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public InterviewQuestionInput prepareNextQuestion(
+            UUID interviewId,
+            InterviewRouteDecision routeDecision
+    ) {
+        Objects.requireNonNull(routeDecision, "routeDecision不能为空");
+        if (routeDecision != InterviewRouteDecision.FOLLOW_UP
+                && routeDecision != InterviewRouteDecision.NEXT_QUESTION) {
+            throw new IllegalArgumentException("只允许准备FOLLOW_UP或NEXT_QUESTION");
+        }
+
+        PlanningContext context = prepare(interviewId);
+        MockInterviewSession session = context.session();
+        if (session.status() != InterviewStatus.GENERATING_QUESTION) {
+            throw new IllegalStateException("只有GENERATING_QUESTION状态可以准备下一轮问题");
+        }
+
+        ActorId ownerId = session.ownerId();
+        List<InterviewQuestion> questions = roundRepository.findQuestions(ownerId, interviewId);
+        if (questions.isEmpty()) throw new IllegalStateException("生成下一轮问题前必须存在已完成问题");
+        if (questions.size() >= session.budgetPolicy().maxQuestions()) {
+            throw new IllegalStateException("已达到最大问题数，不能继续生成问题");
+        }
+
+        int previousRoundNo = questions.size();
+        int nextRoundNo = previousRoundNo + 1;
+        InterviewQuestion previousQuestion = questions.get(previousRoundNo - 1);
+        InterviewRound previousRound = roundRepository.findRoundByNumber(ownerId, interviewId, previousRoundNo)
+                .orElseThrow(() -> new IllegalStateException("MySQL缺少上一面试回合"));
+        requirePreviousQuestionScope(ownerId, interviewId, previousRoundNo, previousRound, previousQuestion);
+
+        List<String> completedQuestions = completedQuestionSummaries(questions);
+        if (routeDecision == InterviewRouteDecision.FOLLOW_UP) {
+            return prepareFollowUp(
+                    context,
+                    previousRound,
+                    previousQuestion,
+                    nextRoundNo,
+                    completedQuestions
+            );
+        }
+
+        int completedPlannedQuestions = Math.toIntExact(
+                questions.stream().filter(question -> !question.followUp()).count()
+        );
+        InterviewBlueprint.QuestionPlan plan = context.blueprint()
+                .questionAt(completedPlannedQuestions + 1);
+        return questionInput(
+                context,
+                nextRoundNo,
+                plan.questionType(),
+                plan.difficulty(),
+                completedQuestions,
+                plan.currentRoundGoal()
+        );
+    }
+
+    private InterviewQuestionInput prepareFollowUp(
+            PlanningContext context,
+            InterviewRound previousRound,
+            InterviewQuestion previousQuestion,
+            int nextRoundNo,
+            List<String> completedQuestions
+    ) {
+        if (!previousQuestion.followUpAllowed()) {
+            throw new IllegalStateException("上一问题不允许追问");
+        }
+
+        ActorId ownerId = context.session().ownerId();
+        UUID interviewId = context.session().interviewId();
+        InterviewAnswer answer = roundRepository
+                .findAnswerByQuestion(ownerId, interviewId, previousQuestion.questionId())
+                .orElseThrow(() -> new IllegalStateException("MySQL缺少上一问题答案"));
+        TechnicalReview review = reviewRepository
+                .findTechnicalReviewByAnswer(ownerId, interviewId, answer.answerId())
+                .orElseThrow(() -> new IllegalStateException("MySQL缺少上一轮技术评审"));
+
+        if (!answer.ownerId().equals(ownerId)
+                || !answer.interviewId().equals(interviewId)
+                || !answer.roundId().equals(previousRound.roundId())
+                || !answer.questionId().equals(previousQuestion.questionId())
+                || !review.ownerId().equals(ownerId)
+                || !review.interviewId().equals(interviewId)
+                || !review.roundId().equals(previousRound.roundId())
+                || !review.questionId().equals(previousQuestion.questionId())
+                || !review.answerId().equals(answer.answerId())) {
+            throw new IllegalStateException("追问依据的答案或技术评审作用域不一致");
+        }
+
+        String followUpGoal = boundedText(review.suggestedFollowUp(), 1_000);
+        if (followUpGoal.isBlank()) throw new IllegalStateException("技术评审没有提供追问建议");
+
+        return questionInput(
+                context,
+                nextRoundNo,
+                previousQuestion.questionType(),
+                previousQuestion.difficulty(),
+                completedQuestions,
+                followUpGoal
+        );
+    }
+
+    private InterviewQuestionInput questionInput(
+            PlanningContext context,
+            int roundNo,
+            InterviewQuestionType questionType,
+            int difficulty,
+            List<String> completedQuestions,
+            String currentRoundGoal
+    ) {
+        return new InterviewQuestionInput(
+                context.session().interviewId(),
+                roundNo,
+                context.session().mode(),
+                questionType,
+                difficulty,
+                blueprintSummary(context.blueprint()),
+                targetRoleSummary(context.targetRole().requirementsSnapshot()),
+                evidenceByChunkId(context.artifacts()),
+                completedQuestions,
+                boundedText(currentRoundGoal, 1_000)
+        );
+    }
+
+    private List<String> completedQuestionSummaries(List<InterviewQuestion> questions) {
+        return questions.stream()
+                .map(question -> boundedText(question.questionText(), 1_000))
+                .toList();
+    }
+
+    private String boundedText(String value, int maxCodePoints) {
+        if (value == null || value.isBlank()) return "";
+        String normalized = value.strip().replaceAll("\\s+", " ");
+        int length = normalized.codePointCount(0, normalized.length());
+        if (length <= maxCodePoints) return normalized;
+        int endIndex = normalized.offsetByCodePoints(0, maxCodePoints - 1);
+        return normalized.substring(0, endIndex) + "…";
+    }
+
+    private void requirePreviousQuestionScope(
+            ActorId ownerId,
+            UUID interviewId,
+            int roundNo,
+            InterviewRound round,
+            InterviewQuestion question
+    ) {
+        if (!round.ownerId().equals(ownerId)
+                || !round.interviewId().equals(interviewId)
+                || round.roundNo() != roundNo
+                || round.status() != InterviewRoundStatus.REVIEWED
+                || !question.ownerId().equals(ownerId)
+                || !question.interviewId().equals(interviewId)
+                || !question.roundId().equals(round.roundId())) {
+            throw new IllegalStateException("上一问题、回合或owner作用域不一致");
+        }
     }
 
     private PlanningContext prepare(UUID interviewId) {

@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.interview.api.advice;
 
-import com.leo.careerforgeai.interview.api.report.InterviewReportController;
+import com.leo.careerforgeai.interview.api.controller.InterviewReportController;
 import com.leo.careerforgeai.interview.application.report.InterviewReportConfirmationException;
 import com.leo.careerforgeai.interview.application.session.MockInterviewNotFoundException;
 import com.leo.careerforgeai.shared.exception.ErrorCode;

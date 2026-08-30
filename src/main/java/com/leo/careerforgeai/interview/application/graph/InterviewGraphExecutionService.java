@@ -110,6 +110,76 @@ public class InterviewGraphExecutionService {
         return resumeAfterAnswer(interviewId, answer.answerId());
     }
 
+    public void recoverExecution(UUID interviewId) {
+        Objects.requireNonNull(interviewId, "interviewId不能为空");
+        MockInterviewSession session = requireSession(interviewId);
+        if (!isExecutionRequired(session)) return;
+
+        RunnableConfig config = config(interviewId);
+        var checkpoint = graph.lastStateOf(config);
+
+        if (checkpoint.isEmpty()) {
+            if (session.status() != InterviewStatus.GENERATING_QUESTION) {
+                throw new IllegalStateException("执行中面试缺少可恢复Checkpoint");
+            }
+            start(interviewId);
+            return;
+        }
+
+        InterviewGraphState current = requireStateScope(checkpoint.get().state(), session);
+        InterviewWaitReason waitReason = current.waitReason().orElse(null);
+
+        if (waitReason == InterviewWaitReason.WAITING_FOR_ANSWER) {
+            if (session.status() != InterviewStatus.REVIEWING) {
+                throw new IllegalStateException("MySQL状态与等待答案Checkpoint不一致");
+            }
+            UUID questionId = current.currentQuestionId()
+                    .orElseThrow(() -> new IllegalStateException("等待答案Checkpoint缺少questionId"));
+            InterviewAnswer answer = answerSubmissionService.requireSubmittedAnswer(interviewId, questionId);
+            resumeAfterAnswer(interviewId, answer.answerId());
+            return;
+        }
+
+        if (waitReason != null) throw new IllegalStateException("执行中面试包含不可自动恢复的等待原因");
+        if (END.equals(checkpoint.get().next())) throw new IllegalStateException("执行中面试的Checkpoint已经结束");
+
+        graph.invoke(GraphInput.resume(), config)
+                .orElseThrow(() -> new IllegalStateException("面试Graph启动恢复后没有返回State"));
+        requireRecoveredBoundary(interviewId);
+    }
+    private InterviewGraphState requireRecoveredBoundary(UUID interviewId) {
+        var checkpoint = graph.lastStateOf(config(interviewId))
+                .orElseThrow(() -> new IllegalStateException("面试Graph启动恢复后缺少Checkpoint"));
+        MockInterviewSession session = requireSession(interviewId);
+        InterviewGraphState state = requireStateScope(checkpoint.state(), session);
+
+        if (InterviewGraphWorkflow.VALIDATE_ANSWER_RESUME.equals(checkpoint.next())) {
+            requireWaitingForAnswer(state, state.currentRound());
+            if (state.answerId().isPresent() || state.routeDecision().isPresent()) {
+                throw new IllegalStateException("恢复到下一题后仍残留上一回合状态");
+            }
+            return state;
+        }
+
+        if (!END.equals(checkpoint.next())) {
+            throw new IllegalStateException("面试Graph启动恢复后没有收敛到等待点或终点");
+        }
+
+        InterviewWaitReason waitReason = state.waitReason().orElse(null);
+        if (waitReason == InterviewWaitReason.WAITING_FOR_REPORT_CONFIRMATION) {
+            requireWaitingForReportConfirmation(state, session);
+            return state;
+        }
+        if (waitReason != null) throw new IllegalStateException("终态Checkpoint包含非法等待原因");
+        if (!session.isTerminal()) throw new IllegalStateException("终态Checkpoint与MySQL非终态不一致");
+        return state;
+    }
+
+    private boolean isExecutionRequired(MockInterviewSession session) {
+        return session.status() == InterviewStatus.GENERATING_QUESTION
+                || session.status() == InterviewStatus.REVIEWING
+                || session.status() == InterviewStatus.GENERATING_REPORT;
+    }
     public InterviewGraphState resumeAfterAnswer(UUID interviewId, UUID answerId) {
         Objects.requireNonNull(interviewId, "interviewId不能为空");
         Objects.requireNonNull(answerId, "answerId不能为空");

@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.interview.api.evidence;
+package com.leo.careerforgeai.interview.api.controller;
 
 import com.leo.careerforgeai.interview.api.dto.evidence.CreatePersonalEvidenceRequest;
 import com.leo.careerforgeai.interview.api.dto.evidence.PersonalEvidenceResponse;

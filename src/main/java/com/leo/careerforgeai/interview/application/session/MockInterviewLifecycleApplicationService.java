@@ -10,6 +10,8 @@ import java.time.Clock;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
 
 /**
  * @program: CareerForge-AI
@@ -17,7 +19,9 @@ import java.util.function.UnaryOperator;
  * @author: Miao Zheng
  * @date: 2026-08-27
  **/
-public final class MockInterviewLifecycleApplicationService {
+@ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
+@Service
+public class MockInterviewLifecycleApplicationService {
 
     private final CurrentActorProvider currentActorProvider;
     private final MockInterviewSessionRepository repository;

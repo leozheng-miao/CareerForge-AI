@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.interview.api.report;
 
 import com.leo.careerforgeai.interview.api.advice.InterviewReportApiExceptionHandler;
+import com.leo.careerforgeai.interview.api.controller.InterviewReportController;
 import com.leo.careerforgeai.interview.application.report.InterviewReportConfirmationFacade;
 import com.leo.careerforgeai.interview.application.report.InterviewReportConfirmationFactory;
 import com.leo.careerforgeai.interview.application.report.InterviewReportQueryApplicationService;

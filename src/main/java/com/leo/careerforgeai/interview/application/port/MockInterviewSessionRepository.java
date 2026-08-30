@@ -3,6 +3,8 @@ package com.leo.careerforgeai.interview.application.port;
 import com.leo.careerforgeai.interview.domain.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,5 +23,7 @@ public interface MockInterviewSessionRepository {
     Optional<MockInterviewSession> findByRequestId(ActorId ownerId, UUID requestId);
 
     boolean updateIfVersionMatches(ActorId ownerId, MockInterviewSession updatedSession, long expectedVersion);
+
+    List<MockInterviewSession> findExecutionRequiredUpdatedBefore(ActorId ownerId, Instant updatedBefore, int limit);
 
 }

@@ -1,13 +1,18 @@
 package com.leo.careerforgeai.interview.support;
 
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
+import com.leo.careerforgeai.interview.domain.InterviewStatus;
 import com.leo.careerforgeai.interview.domain.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
+import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Comparator;
+
 
 /**
  * @program: CareerForge-AI
@@ -78,5 +83,20 @@ public final class FakeMockInterviewSessionRepository implements MockInterviewSe
 
         sessions.put(updatedSession.interviewId(), updatedSession);
         return true;
+    }
+
+    @Override
+    public List<MockInterviewSession> findExecutionRequiredUpdatedBefore(ActorId ownerId, Instant updatedBefore, int limit) {
+        if (limit < 1 || limit > 1000) throw new IllegalArgumentException("limit必须在1到1000之间");
+        return sessions.values().stream()
+                .filter(session -> session.ownerId().equals(ownerId))
+                .filter(session -> session.updatedAt().isBefore(updatedBefore))
+                .filter(session -> session.status() == InterviewStatus.GENERATING_QUESTION
+                        || session.status() == InterviewStatus.REVIEWING
+                        || session.status() == InterviewStatus.GENERATING_REPORT)
+                .sorted(Comparator.comparing(MockInterviewSession::updatedAt)
+                        .thenComparing(MockInterviewSession::interviewId))
+                .limit(limit)
+                .toList();
     }
 }

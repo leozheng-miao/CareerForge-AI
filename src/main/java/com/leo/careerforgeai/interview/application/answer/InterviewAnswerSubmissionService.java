@@ -174,6 +174,14 @@ public class InterviewAnswerSubmissionService {
         return stored;
     }
 
+    @Transactional(readOnly = true)
+    public InterviewAnswer requireSubmittedAnswer(UUID interviewId, UUID questionId) {
+        Objects.requireNonNull(interviewId, "interviewId不能为空");
+        Objects.requireNonNull(questionId, "questionId不能为空");
+        return roundRepository.findAnswerByQuestion(currentActor(), interviewId, questionId)
+                .orElseThrow(() -> new IllegalStateException("当前Checkpoint问题缺少已提交答案"));
+    }
+
     private InterviewAnswer requireRequestReplay(
             InterviewAnswer stored,
             UUID interviewId,

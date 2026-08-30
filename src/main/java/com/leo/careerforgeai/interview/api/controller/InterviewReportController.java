@@ -1,4 +1,4 @@
-package com.leo.careerforgeai.interview.api.report;
+package com.leo.careerforgeai.interview.api.controller;
 
 import com.leo.careerforgeai.interview.api.dto.report.ConfirmInterviewReportRequest;
 import com.leo.careerforgeai.interview.api.dto.report.InterviewReportConfirmationResponse;

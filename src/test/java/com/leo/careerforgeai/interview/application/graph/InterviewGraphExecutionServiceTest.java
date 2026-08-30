@@ -37,6 +37,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 /**
  * @program: CareerForge-AI
@@ -207,6 +208,53 @@ class InterviewGraphExecutionServiceTest {
             );
             verify(answerService, times(2))
                     .submit(INTERVIEW_ID, 1, FIRST_QUESTION_ID, REQUEST_ID, 2, ANSWER_TEXT);
+        }
+    }
+
+    @Test
+    void shouldRecoverFromPersistedAnswerWhenCheckpointStillWaitsForAnswer() throws Exception {
+        MockInterviewSessionRepository sessionRepository = mock(MockInterviewSessionRepository.class);
+        InterviewRoundRepository roundRepository = mock(InterviewRoundRepository.class);
+        InterviewQuestionGenerationService generationService = mock(InterviewQuestionGenerationService.class);
+        InterviewAnswerSubmissionService answerService = mock(InterviewAnswerSubmissionService.class);
+        InterviewReviewGraphNodes reviewNodes = mock(InterviewReviewGraphNodes.class);
+        InterviewRouteGraphNodes routeNodes = nextQuestionRouteNodes();
+        AtomicReference<MockInterviewSession> session = new AtomicReference<>(session(InterviewStatus.CREATED));
+        InterviewAnswer answer = answer();
+
+        configureBusinessFacts(sessionRepository, roundRepository, generationService, answerService, session);
+        configureSuccessfulReviews(reviewNodes);
+        when(answerService.requireSubmittedAnswer(INTERVIEW_ID, FIRST_QUESTION_ID)).thenReturn(answer);
+
+        InterviewGraphNodes nodes = spy(new InterviewGraphNodes(
+                () -> OWNER, sessionRepository, roundRepository, generationService, MODEL_TIMEOUT
+        ));
+
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var graph = new InterviewGraphWorkflow(
+                    nodes,
+                    reviewNodes,
+                    nextQuestionSupervisionNode(),
+                    routeNodes,
+                    mock(InterviewReportGraphNode.class)
+            ).compile(new MemorySaver());
+            var service = new InterviewGraphExecutionService(
+                    () -> OWNER, sessionRepository, answerService, graph, executor
+            );
+
+            service.start(INTERVIEW_ID);
+            session.set(session(InterviewStatus.REVIEWING));
+            service.recoverExecution(INTERVIEW_ID);
+            InterviewGraphState recovered = service.start(INTERVIEW_ID);
+
+            assertThat(recovered.currentRound()).isEqualTo(2);
+            assertThat(recovered.currentQuestionId()).contains(SECOND_QUESTION_ID);
+            assertThat(recovered.waitReason()).contains(InterviewWaitReason.WAITING_FOR_ANSWER);
+            assertThat(recovered.answerId()).isEmpty();
+            verify(answerService).requireSubmittedAnswer(INTERVIEW_ID, FIRST_QUESTION_ID);
+            verify(answerService, never()).submit(
+                    INTERVIEW_ID, 1, FIRST_QUESTION_ID, REQUEST_ID, 2, ANSWER_TEXT
+            );
         }
     }
 

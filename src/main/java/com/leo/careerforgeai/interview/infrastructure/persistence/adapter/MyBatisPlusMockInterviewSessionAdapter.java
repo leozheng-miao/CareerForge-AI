@@ -2,6 +2,7 @@ package com.leo.careerforgeai.interview.infrastructure.persistence.adapter;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
+import com.leo.careerforgeai.interview.domain.InterviewStatus;
 import com.leo.careerforgeai.interview.domain.MockInterviewSession;
 import com.leo.careerforgeai.interview.infrastructure.persistence.converter.MockInterviewSessionPersistenceConverter;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.MockInterviewSessionEntity;
@@ -10,6 +11,8 @@ import com.leo.careerforgeai.shared.actor.ActorId;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -91,6 +94,24 @@ public class MyBatisPlusMockInterviewSessionAdapter implements MockInterviewSess
         );
         if (affectedRows > 1) throw new IllegalStateException("面试CAS更新影响了多行数据");
         return affectedRows == 1;
+    }
+
+    @Override
+    public List<MockInterviewSession> findExecutionRequiredUpdatedBefore(ActorId ownerId, Instant updatedBefore, int limit) {
+        Objects.requireNonNull(ownerId, "ownerId不能为空");
+        Objects.requireNonNull(updatedBefore, "updatedBefore不能为空");
+        if (limit < 1 || limit > 1000) throw new IllegalArgumentException("limit必须在1到1000之间");
+
+        LambdaQueryWrapper<MockInterviewSessionEntity> query = new LambdaQueryWrapper<>();
+        query.eq(MockInterviewSessionEntity::getOwnerId, ownerId.value())
+                .in(MockInterviewSessionEntity::getInterviewStatus,
+                        InterviewStatus.GENERATING_QUESTION.name(),
+                        InterviewStatus.REVIEWING.name(),
+                        InterviewStatus.GENERATING_REPORT.name())
+                .lt(MockInterviewSessionEntity::getUpdatedAt, updatedBefore)
+                .orderByAsc(MockInterviewSessionEntity::getUpdatedAt)
+                .last("LIMIT " + limit);
+        return mapper.selectList(query).stream().map(converter::toDomain).toList();
     }
 
     private static void requireOwnerAndId(ActorId ownerId, UUID id, String fieldName) {

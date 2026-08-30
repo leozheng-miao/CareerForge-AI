@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.interview.api.advice;
 
-import com.leo.careerforgeai.interview.api.evidence.PersonalEvidenceController;
+import com.leo.careerforgeai.interview.api.controller.PersonalEvidenceController;
 import com.leo.careerforgeai.interview.application.evidence.PersonalEvidenceNotFoundException;
 import com.leo.careerforgeai.interview.application.evidence.PersonalEvidenceVersionConflictException;
 import com.leo.careerforgeai.shared.exception.ErrorCode;

@@ -3,10 +3,12 @@ package com.leo.careerforgeai.interview.api.session;
 import com.leo.careerforgeai.interview.api.advice.MockInterviewApiExceptionHandler;
 import com.leo.careerforgeai.interview.api.controller.MockInterviewController;
 import com.leo.careerforgeai.interview.application.execution.MockInterviewAsyncSubmissionApplicationService;
+import com.leo.careerforgeai.interview.application.session.MockInterviewCancellationConflictException;
 import com.leo.careerforgeai.interview.application.session.MockInterviewCreationApplicationService;
 import com.leo.careerforgeai.interview.application.session.MockInterviewLifecycleApplicationService;
 import com.leo.careerforgeai.interview.domain.InterviewBudgetPolicy;
 import com.leo.careerforgeai.interview.domain.InterviewMode;
+import com.leo.careerforgeai.interview.domain.InterviewStatus;
 import com.leo.careerforgeai.interview.domain.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.web.GlobalExceptionHandler;
@@ -130,6 +132,47 @@ class MockInterviewControllerTest {
                 .andExpect(jsonPath("$.code").value(40000));
 
         verifyNoInteractions(asyncSubmissionService, lifecycleService, creationService);
+    }
+
+    @Test
+    void shouldCancelInterviewAndMapTerminalConflict() throws Exception {
+        MockInterviewSession waiting = createdSession()
+                .startQuestionGeneration(NOW.plusSeconds(1))
+                .waitForAnswer(NOW.plusSeconds(2));
+        MockInterviewSession cancelled = waiting.cancel(NOW.plusSeconds(3));
+
+        when(lifecycleService.cancel(INTERVIEW_ID, 2)).thenReturn(cancelled);
+        when(lifecycleService.cancel(INTERVIEW_ID, 3))
+                .thenThrow(new MockInterviewCancellationConflictException(
+                        INTERVIEW_ID, InterviewStatus.COMPLETED
+                ));
+
+        mockMvc.perform(post("/api/mock-interviews/{interviewId}/cancel", INTERVIEW_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "expectedVersion": 2
+                            }
+                            """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.data.version").value(3));
+
+        mockMvc.perform(post("/api/mock-interviews/{interviewId}/cancel", INTERVIEW_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "expectedVersion": 3
+                            }
+                            """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(40900))
+                .andExpect(jsonPath("$.message").value("当前面试已经进入COMPLETED状态，不能取消"));
+
+        verify(lifecycleService).cancel(INTERVIEW_ID, 2);
+        verify(lifecycleService).cancel(INTERVIEW_ID, 3);
+        verifyNoInteractions(creationService, asyncSubmissionService);
     }
 
     private MockInterviewSession createdSession() {

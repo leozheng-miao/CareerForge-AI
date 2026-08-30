@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Objects;
 import java.util.UUID;
+import com.leo.careerforgeai.interview.api.dto.session.CancelMockInterviewRequest;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
 /**
  * @program: CareerForge-AI
@@ -66,5 +69,22 @@ public class MockInterviewController {
     @Operation(summary = "查询当前用户模拟面试的MySQL事实状态")
     public BaseResponse<MockInterviewSessionResponse> get(@PathVariable UUID interviewId) {
         return ResultUtils.success(MockInterviewSessionResponse.from(lifecycleService.get(interviewId)));
+    }
+
+    @PostMapping("/{interviewId}/cancel")
+    @Operation(summary = "使用乐观锁取消当前用户的非终态模拟面试")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "取消成功或返回已经取消的幂等结果"),
+            @ApiResponse(responseCode = "400", description = "请求参数不合法"),
+            @ApiResponse(responseCode = "404", description = "模拟面试不存在或不属于当前用户"),
+            @ApiResponse(responseCode = "409", description = "版本冲突或面试已进入其他终态")
+    })
+    public BaseResponse<MockInterviewSessionResponse> cancel(
+            @PathVariable UUID interviewId,
+            @Valid @RequestBody CancelMockInterviewRequest request
+    ) {
+        return ResultUtils.success(MockInterviewSessionResponse.from(
+                lifecycleService.cancel(interviewId, request.expectedVersion())
+        ));
     }
 }

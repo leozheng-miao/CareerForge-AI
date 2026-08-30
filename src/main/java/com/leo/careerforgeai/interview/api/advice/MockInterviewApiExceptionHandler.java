@@ -5,6 +5,7 @@ import com.leo.careerforgeai.agent.application.run.execution.CoachingRunDispatch
 import com.leo.careerforgeai.agent.application.run.execution.RunExecutionDeadlineExceededException;
 import com.leo.careerforgeai.interview.api.controller.InterviewEventController;
 import com.leo.careerforgeai.interview.api.controller.MockInterviewController;
+import com.leo.careerforgeai.interview.application.session.MockInterviewCancellationConflictException;
 import com.leo.careerforgeai.interview.application.session.MockInterviewNotFoundException;
 import com.leo.careerforgeai.interview.application.session.MockInterviewRequestConflictException;
 import com.leo.careerforgeai.interview.application.session.MockInterviewVersionConflictException;
@@ -120,5 +121,13 @@ public class MockInterviewApiExceptionHandler {
                 ErrorCode.CONFLICT_ERROR,
                 "当前面试状态为" + exception.interviewStatus() + "，尚无可回答问题"
         );
+    }
+
+    @ExceptionHandler(MockInterviewCancellationConflictException.class)
+    public BaseResponse<?> handleCancellationConflict(MockInterviewCancellationConflictException exception) {
+        log.info("模拟面试取消冲突，interviewId={}, status={}",
+                exception.interviewId(), exception.status());
+        return ResultUtils.error(ErrorCode.CONFLICT_ERROR,
+                "当前面试已经进入" + exception.status() + "状态，不能取消");
     }
 }

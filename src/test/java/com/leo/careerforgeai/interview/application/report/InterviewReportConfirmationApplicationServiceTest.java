@@ -35,6 +35,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.leo.careerforgeai.interview.application.session.MockInterviewNotFoundException;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * @program: CareerForge-AI
@@ -52,6 +57,7 @@ class InterviewReportConfirmationApplicationServiceTest {
     private static final UUID MEMORY_ID = UUID.fromString("10000000-0000-0000-0000-000000000005");
     private static final UUID PLAN_ID = UUID.fromString("10000000-0000-0000-0000-000000000006");
     private static final Instant NOW = Instant.parse("2026-08-30T00:00:00Z");
+    private static final ActorId OTHER_OWNER = new ActorId("other-confirmation-owner");
 
     private CurrentActorProvider currentActorProvider;
     private InterviewReportRepository reportRepository;
@@ -181,6 +187,23 @@ class InterviewReportConfirmationApplicationServiceTest {
         assertThat(trainingDecision.outputReferenceId()).isEqualTo(PLAN_ID);
         assertThat(reportState.get().status()).isEqualTo(InterviewReport.Status.DECIDED);
         assertThat(sessionState.get().status()).isEqualTo(InterviewStatus.COMPLETED);
+    }
+
+    @Test
+    void shouldRejectOtherOwnerBeforeReadingReportOrApplyingSuggestions() {
+        when(currentActorProvider.currentActor()).thenReturn(OTHER_OWNER);
+        when(sessionRepository.findById(OTHER_OWNER, INTERVIEW_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.apply(INTERVIEW_ID, REPORT_ID))
+                .isInstanceOf(MockInterviewNotFoundException.class);
+
+        verify(reportRepository, never()).findById(any(), any(), any());
+        verifyNoInteractions(
+                confirmationRepository,
+                inputSnapshotRepository,
+                memoryPort,
+                trainingPlanPort
+        );
     }
 
     private InterviewReport report() {

@@ -38,6 +38,12 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
+import org.bsc.langgraph4j.RunnableConfig;
+import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
+import org.bsc.langgraph4j.checkpoint.Checkpoint;
+
+import java.util.Collection;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @program: CareerForge-AI
@@ -258,6 +264,78 @@ class InterviewGraphExecutionServiceTest {
         }
     }
 
+    @Test
+    void shouldRepairCheckpointAfterQuestionFactCommittedWithoutRepeatingCompletedFlow() throws Exception {
+        MockInterviewSessionRepository sessionRepository = mock(MockInterviewSessionRepository.class);
+        InterviewRoundRepository roundRepository = mock(InterviewRoundRepository.class);
+        InterviewQuestionGenerationService generationService = mock(InterviewQuestionGenerationService.class);
+        InterviewAnswerSubmissionService answerService = mock(InterviewAnswerSubmissionService.class);
+        InterviewReviewGraphNodes reviewNodes = mock(InterviewReviewGraphNodes.class);
+        InterviewRouteGraphNodes routeNodes = nextQuestionRouteNodes();
+        AtomicReference<MockInterviewSession> session = new AtomicReference<>(session(InterviewStatus.CREATED));
+        AtomicInteger firstQuestionExecutions = new AtomicInteger();
+        InterviewQuestion firstQuestion = question(FIRST_QUESTION_ID, FIRST_ROUND_ID);
+        InterviewQuestion secondQuestion = question(SECOND_QUESTION_ID, SECOND_ROUND_ID);
+        InterviewRound firstRound = round();
+        InterviewAnswer answer = answer();
+
+        when(sessionRepository.findById(OWNER, INTERVIEW_ID))
+                .thenAnswer(invocation -> Optional.of(session.get()));
+        when(generationService.generateAndPersistQuestion(INTERVIEW_ID, 1, null, MODEL_TIMEOUT))
+                .thenAnswer(invocation -> {
+                    if (firstQuestionExecutions.incrementAndGet() == 1) {
+                        session.set(session(InterviewStatus.WAITING_FOR_ANSWER));
+                    }
+                    return firstQuestion;
+                });
+        when(generationService.generateAndPersistQuestion(
+                INTERVIEW_ID, 2, InterviewRouteDecision.NEXT_QUESTION, MODEL_TIMEOUT
+        )).thenReturn(secondQuestion);
+        when(roundRepository.findRoundByNumber(OWNER, INTERVIEW_ID, 1))
+                .thenReturn(Optional.of(firstRound));
+        when(roundRepository.findQuestionByRound(OWNER, INTERVIEW_ID, FIRST_ROUND_ID))
+                .thenReturn(Optional.of(firstQuestion));
+        when(roundRepository.findAnswerByQuestion(OWNER, INTERVIEW_ID, FIRST_QUESTION_ID))
+                .thenReturn(Optional.of(answer));
+        configureSuccessfulReviews(reviewNodes);
+
+        InterviewGraphNodes nodes = spy(new InterviewGraphNodes(
+                () -> OWNER, sessionRepository, roundRepository, generationService, MODEL_TIMEOUT
+        ));
+
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var graph = new InterviewGraphWorkflow(
+                    nodes,
+                    reviewNodes,
+                    nextQuestionSupervisionNode(),
+                    routeNodes,
+                    mock(InterviewReportGraphNode.class)
+            ).compile(new FailQuestionCheckpointOnceSaver());
+            var service = new InterviewGraphExecutionService(
+                    () -> OWNER, sessionRepository, answerService, graph, executor
+            );
+
+            assertThatThrownBy(() -> service.start(INTERVIEW_ID))
+                    .isInstanceOf(RuntimeException.class);
+            assertThat(session.get().status()).isEqualTo(InterviewStatus.WAITING_FOR_ANSWER);
+
+            session.set(session(InterviewStatus.REVIEWING));
+            InterviewGraphState recovered = service.resumeAfterAnswer(INTERVIEW_ID, ANSWER_ID);
+
+            assertThat(recovered.currentRound()).isEqualTo(2);
+            assertThat(recovered.currentQuestionId()).contains(SECOND_QUESTION_ID);
+            assertThat(recovered.waitReason()).contains(InterviewWaitReason.WAITING_FOR_ANSWER);
+            assertThat(recovered.answerId()).isEmpty();
+
+            verify(generationService, times(2))
+                    .generateAndPersistQuestion(INTERVIEW_ID, 1, null, MODEL_TIMEOUT);
+            verify(generationService).generateAndPersistQuestion(
+                    INTERVIEW_ID, 2, InterviewRouteDecision.NEXT_QUESTION, MODEL_TIMEOUT
+            );
+            verify(nodes).validateAnswerResume(any(InterviewGraphState.class));
+        }
+    }
+
     private InterviewSupervisionGraphNode nextQuestionSupervisionNode() {
         InterviewSupervisionGraphNode node = mock(InterviewSupervisionGraphNode.class);
         when(node.superviseRound(any(InterviewGraphState.class)))
@@ -345,5 +423,41 @@ class InterviewGraphExecutionServiceTest {
         when(answer.questionId()).thenReturn(FIRST_QUESTION_ID);
         when(answer.ownerId()).thenReturn(OWNER);
         return answer;
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 首次保存包含问题身份的Checkpoint时模拟持久化失败
+     * @author: Miao Zheng
+     * @date: 2026-08-30
+     **/
+    private static class FailQuestionCheckpointOnceSaver implements BaseCheckpointSaver {
+
+        private final MemorySaver delegate = new MemorySaver();
+        private final AtomicBoolean failed = new AtomicBoolean();
+
+        @Override
+        public Collection<Checkpoint> list(RunnableConfig config) {
+            return delegate.list(config);
+        }
+
+        @Override
+        public Optional<Checkpoint> get(RunnableConfig config) {
+            return delegate.get(config);
+        }
+
+        @Override
+        public RunnableConfig put(RunnableConfig config, Checkpoint checkpoint) throws Exception {
+            if (checkpoint.getState().containsKey(InterviewGraphState.CURRENT_QUESTION_ID)
+                    && failed.compareAndSet(false, true)) {
+                throw new IllegalStateException("模拟问题业务提交后的Checkpoint写入失败");
+            }
+            return delegate.put(config, checkpoint);
+        }
+
+        @Override
+        public Tag release(RunnableConfig config) throws Exception {
+            return delegate.release(config);
+        }
     }
 }

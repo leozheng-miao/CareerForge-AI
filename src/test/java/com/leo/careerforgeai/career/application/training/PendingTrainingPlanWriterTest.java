@@ -150,7 +150,8 @@ class PendingTrainingPlanWriterTest {
                 .hasMessage("训练计划生成期间输入已经变化，请重新生成");
 
         verify(inputReader).read(SNAPSHOT_ID);
-        verifyNoInteractions(repository);
+        verify(repository).findTrainingPlan(eq(ACTOR_A), any(UUID.class));
+        verifyNoMoreInteractions(repository);
     }
 
     @Test
@@ -172,7 +173,8 @@ class PendingTrainingPlanWriterTest {
                 )
                 .hasMessage("待确认计划项不能包含进度或完成证据");
 
-        verifyNoInteractions(repository);
+        verify(repository).findTrainingPlan(eq(ACTOR_A), any(UUID.class));
+        verifyNoMoreInteractions(repository);
     }
 
     @Test

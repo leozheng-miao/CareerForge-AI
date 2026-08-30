@@ -83,6 +83,45 @@ class MockInterviewLifecycleApplicationServiceTest {
         assertThat(repository.findStored(initial.interviewId()).version()).isZero();
     }
 
+    @Test
+    void shouldCancelIdempotentlyAndRejectOtherOwnerOrCompletedInterview() {
+        AtomicReference<ActorId> actor = new AtomicReference<>(OWNER_A);
+        FakeMockInterviewSessionRepository repository = new FakeMockInterviewSessionRepository();
+        MockInterviewSession initial = newSession();
+        repository.save(initial);
+        MockInterviewLifecycleApplicationService service = service(actor, repository);
+
+        MockInterviewSession cancelled = service.cancel(initial.interviewId(), 0);
+        MockInterviewSession replay = service.cancel(initial.interviewId(), 0);
+
+        assertThat(cancelled.status()).isEqualTo(InterviewStatus.CANCELLED);
+        assertThat(cancelled.version()).isEqualTo(1);
+        assertThat(replay).isEqualTo(cancelled);
+        assertThat(repository.findStored(initial.interviewId())).isEqualTo(cancelled);
+
+        MockInterviewSession other = newSession();
+        repository.save(other);
+        actor.set(OWNER_B);
+        assertThatThrownBy(() -> service.cancel(other.interviewId(), 0))
+                .isInstanceOf(MockInterviewNotFoundException.class);
+
+        actor.set(OWNER_A);
+        MockInterviewSession completed = other.startQuestionGeneration(NOW)
+                .waitForAnswer(NOW)
+                .startReview(NOW)
+                .startReportGeneration(NOW)
+                .awaitConfirmation(NOW)
+                .complete(NOW);
+        repository.save(completed);
+
+        assertThatThrownBy(() -> service.cancel(completed.interviewId(), completed.version()))
+                .isInstanceOf(MockInterviewCancellationConflictException.class)
+                .satisfies(exception -> assertThat(
+                        ((MockInterviewCancellationConflictException) exception).status()
+                ).isEqualTo(InterviewStatus.COMPLETED));
+        assertThat(repository.findStored(completed.interviewId())).isEqualTo(completed);
+    }
+
     private MockInterviewLifecycleApplicationService service(
             AtomicReference<ActorId> actor,
             FakeMockInterviewSessionRepository repository

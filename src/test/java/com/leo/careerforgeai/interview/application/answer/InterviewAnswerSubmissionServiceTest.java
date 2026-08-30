@@ -29,6 +29,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.leo.careerforgeai.interview.application.session.MockInterviewNotFoundException;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.anyInt;
 
 /**
  * @program: CareerForge-AI
@@ -156,6 +162,38 @@ class InterviewAnswerSubmissionServiceTest {
         assertThat(roundCaptor.getValue().status())
                 .isEqualTo(InterviewRoundStatus.ANSWERED);
         assertThat(roundCaptor.getValue().version()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldRejectOtherOwnerBeforeReadingQuestionOrWritingAnswer() {
+        ActorId otherOwner = new ActorId("other-owner");
+        MockInterviewSessionRepository sessionRepository = mock(MockInterviewSessionRepository.class);
+        InterviewRoundRepository roundRepository = mock(InterviewRoundRepository.class);
+
+        when(roundRepository.findAnswerByRequest(otherOwner, REQUEST_ID)).thenReturn(Optional.empty());
+        when(sessionRepository.findById(otherOwner, INTERVIEW_ID)).thenReturn(Optional.empty());
+
+        InterviewAnswerSubmissionService service = new InterviewAnswerSubmissionService(
+                () -> otherOwner,
+                sessionRepository,
+                roundRepository,
+                JsonMapper.builder().build(),
+                Clock.fixed(NOW, ZoneOffset.UTC)
+        );
+
+        assertThatThrownBy(() -> service.submit(
+                INTERVIEW_ID,
+                1,
+                QUESTION_ID,
+                REQUEST_ID,
+                2,
+                "不能提交其他用户面试的答案。"
+        )).isInstanceOf(MockInterviewNotFoundException.class);
+
+        verify(roundRepository, never()).findRoundByNumber(any(), any(), anyInt());
+        verify(roundRepository, never()).claimAnswer(any());
+        verify(roundRepository, never()).updateRoundIfVersionMatches(any(), any(), anyLong());
+        verify(sessionRepository, never()).updateIfVersionMatches(any(), any(), anyLong());
     }
 
     private MockInterviewSession waitingSession() {

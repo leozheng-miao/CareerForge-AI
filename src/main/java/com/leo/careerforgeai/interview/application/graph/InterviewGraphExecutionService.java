@@ -190,6 +190,21 @@ public class InterviewGraphExecutionService {
                 .orElseThrow(() -> new IllegalStateException("当前面试不存在可恢复的Checkpoint"));
         InterviewGraphState current = requireStateScope(checkpoint.state(), session);
 
+        if (session.status() == InterviewStatus.REVIEWING
+                && InterviewGraphWorkflow.GENERATE_AND_PERSIST_QUESTION.equals(checkpoint.next())) {
+            graph.invoke(GraphInput.resume(), config)
+                    .orElseThrow(() -> new IllegalStateException("问题Checkpoint修复没有返回State"));
+
+            checkpoint = graph.lastStateOf(config)
+                    .orElseThrow(() -> new IllegalStateException("问题Checkpoint修复后仍缺少Checkpoint"));
+            session = requireSession(interviewId);
+            current = requireStateScope(checkpoint.state(), session);
+
+            if (!InterviewGraphWorkflow.VALIDATE_ANSWER_RESUME.equals(checkpoint.next())
+                    || current.waitReason().orElse(null) != InterviewWaitReason.WAITING_FOR_ANSWER) {
+                throw new IllegalStateException("问题Checkpoint没有修复到答案恢复边界");
+            }
+        }
         if (END.equals(checkpoint.next())) {
             if (current.waitReason().orElse(null) == InterviewWaitReason.WAITING_FOR_REPORT_CONFIRMATION) {
                 requireWaitingForReportConfirmation(current, session);

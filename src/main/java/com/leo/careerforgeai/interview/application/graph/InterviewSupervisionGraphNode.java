@@ -3,6 +3,7 @@ package com.leo.careerforgeai.interview.application.graph;
 import com.leo.careerforgeai.interview.application.supervision.InterviewSupervisionApplicationService;
 import com.leo.careerforgeai.interview.application.supervision.InterviewSupervisorDecision;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -16,6 +17,7 @@ import java.util.UUID;
  * @date: 2026-08-29
  **/
 @Component
+@ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
 @ConditionalOnBean(InterviewSupervisionApplicationService.class)
 public class InterviewSupervisionGraphNode {
 

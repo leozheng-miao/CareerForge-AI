@@ -26,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 /**
  * @program: CareerForge-AI
@@ -34,6 +35,7 @@ import java.util.UUID;
  * @date: 2026-08-29
  */
 @Service
+@ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
 @ConditionalOnBean({
         InterviewReportPreparationService.class,
         InterviewReportRoleContract.class,

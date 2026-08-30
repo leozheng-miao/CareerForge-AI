@@ -4,6 +4,7 @@ import com.leo.careerforgeai.interview.application.supervision.InterviewRouteApp
 import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
 import com.leo.careerforgeai.interview.domain.InterviewRouteDecision;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -16,6 +17,7 @@ import java.util.Objects;
  * @date: 2026-08-29
  **/
 @Component
+@ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
 @ConditionalOnBean(InterviewRouteApplicationService.class)
 public class InterviewRouteGraphNodes {
 

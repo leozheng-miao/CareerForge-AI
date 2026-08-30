@@ -2,6 +2,7 @@ package com.leo.careerforgeai.interview.application.session;
 
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
 import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.InterviewStatus;
 import com.leo.careerforgeai.interview.domain.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
@@ -88,7 +89,24 @@ public class MockInterviewLifecycleApplicationService {
     }
 
     public MockInterviewSession cancel(UUID interviewId, long expectedVersion) {
-        return mutate(interviewId, expectedVersion, session -> session.cancel(clock.instant()));
+        Objects.requireNonNull(interviewId, "interviewId不能为空");
+        if (expectedVersion < 0) throw new IllegalArgumentException("expectedVersion不能小于0");
+
+        ActorId ownerId = currentActor();
+        MockInterviewSession current = requireOwnedSession(ownerId, interviewId);
+        if (current.status() == InterviewStatus.CANCELLED) return current;
+        if (current.isTerminal()) {
+            throw new MockInterviewCancellationConflictException(interviewId, current.status());
+        }
+        if (current.version() != expectedVersion) {
+            throw new MockInterviewVersionConflictException(interviewId, expectedVersion);
+        }
+
+        MockInterviewSession cancelled = current.cancel(clock.instant());
+        if (!repository.updateIfVersionMatches(ownerId, cancelled, expectedVersion)) {
+            throw new MockInterviewVersionConflictException(interviewId, expectedVersion);
+        }
+        return cancelled;
     }
 
     private MockInterviewSession mutate(

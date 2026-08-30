@@ -14,6 +14,7 @@ import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,7 @@ import java.util.UUID;
  * @date: 2026-08-29
  **/
 @Component
+@ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
 @ConditionalOnBean({
         InterviewReviewPreparationService.class,
         InterviewReviewApplicationService.class,

@@ -7,6 +7,7 @@ import org.bsc.langgraph4j.GraphStateException;
 import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -24,6 +25,7 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
  * @date: 2026-08-29
  */
 @Component
+@ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
 @ConditionalOnBean({
         InterviewGraphNodes.class,
         InterviewReviewGraphNodes.class,

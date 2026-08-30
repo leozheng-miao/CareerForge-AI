@@ -61,6 +61,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 import javax.sql.DataSource;
 import com.mysql.cj.jdbc.MysqlDataSource;
 import java.time.ZoneOffset;
+import com.leo.careerforgeai.interview.application.answer.InterviewAnswerSubmissionService;
+import com.leo.careerforgeai.interview.domain.InterviewAnswer;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @program: CareerForge-AI
@@ -92,6 +100,9 @@ class InterviewQuestionMysqlSmoke {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private InterviewAnswerSubmissionService answerSubmissionService;
 
     @DynamicPropertySource
     static void mysqlProperties(DynamicPropertyRegistry registry) {
@@ -166,6 +177,102 @@ class InterviewQuestionMysqlSmoke {
                 .orElseThrow();
         assertThat(session.status()).isEqualTo(InterviewStatus.GENERATING_QUESTION);
         assertThat(session.version()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldCommitAnswerAndReviewingStatusExactlyOnce() {
+        UUID interviewId = createSession(3, 'e');
+        assertThat(persistenceService.startFirstQuestionGeneration(interviewId)).isEmpty();
+        InterviewQuestion question = persistenceService.persistFirstQuestion(interviewId, result());
+        UUID requestId = UUID.randomUUID();
+        String answerText = "虚拟线程适合大量阻塞任务，但不适合替代CPU密集计算优化。";
+
+        InterviewAnswer first = answerSubmissionService.submit(
+                interviewId, 1, question.questionId(), requestId, 2, answerText
+        );
+        InterviewAnswer replay = answerSubmissionService.submit(
+                interviewId, 1, question.questionId(), requestId, 2, answerText
+        );
+
+        assertThat(replay.answerId()).isEqualTo(first.answerId());
+        assertThat(count(
+                "SELECT COUNT(*) FROM interview_answer WHERE interview_id = ? AND owner_id = ?",
+                interviewId.toString(), OWNER.value()
+        )).isEqualTo(1);
+
+        MockInterviewSession session = sessionRepository.findById(OWNER, interviewId).orElseThrow();
+        assertThat(session.status()).isEqualTo(InterviewStatus.REVIEWING);
+        assertThat(session.version()).isEqualTo(3);
+        assertThat(roundStatus(interviewId)).isEqualTo("ANSWERED");
+    }
+
+    @Test
+    void shouldRollbackAnswerWhenSessionCasFails() {
+        UUID interviewId = createSession(4, '0');
+        assertThat(persistenceService.startFirstQuestionGeneration(interviewId)).isEmpty();
+        InterviewQuestion question = persistenceService.persistFirstQuestion(interviewId, result());
+
+        doReturn(false).when(sessionRepository).updateIfVersionMatches(
+                eq(OWNER),
+                argThat(session -> session.status() == InterviewStatus.REVIEWING),
+                eq(2L)
+        );
+
+        assertThatThrownBy(() -> answerSubmissionService.submit(
+                interviewId,
+                1,
+                question.questionId(),
+                UUID.randomUUID(),
+                2,
+                "这次答案必须随Session CAS失败一起回滚。"
+        )).isInstanceOf(MockInterviewVersionConflictException.class);
+
+        assertThat(count(
+                "SELECT COUNT(*) FROM interview_answer WHERE interview_id = ? AND owner_id = ?",
+                interviewId.toString(), OWNER.value()
+        )).isZero();
+
+        MockInterviewSession session = sessionRepository.findById(OWNER, interviewId).orElseThrow();
+        assertThat(session.status()).isEqualTo(InterviewStatus.WAITING_FOR_ANSWER);
+        assertThat(session.version()).isEqualTo(2);
+        assertThat(roundStatus(interviewId)).isEqualTo("QUESTION_READY");
+    }
+
+    @Test
+    void shouldKeepOneAnswerFactWhenTwoDifferentAnswersRace() throws Exception {
+        UUID interviewId = createSession(5, '2');
+        assertThat(persistenceService.startFirstQuestionGeneration(interviewId)).isEmpty();
+        InterviewQuestion question = persistenceService.persistFirstQuestion(interviewId, result());
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future<Object> firstFuture = executor.submit(() -> submitConcurrently(
+                    interviewId, question.questionId(), UUID.randomUUID(),
+                    "并发答案A：虚拟线程适合阻塞任务。", ready, start
+            ));
+            Future<Object> secondFuture = executor.submit(() -> submitConcurrently(
+                    interviewId, question.questionId(), UUID.randomUUID(),
+                    "并发答案B：虚拟线程不提升CPU计算速度。", ready, start
+            ));
+
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            List<Object> outcomes = List.of(firstFuture.get(), secondFuture.get());
+            assertThat(outcomes.stream().filter(InterviewAnswer.class::isInstance).count()).isEqualTo(1);
+            assertThat(outcomes.stream().filter(RuntimeException.class::isInstance).count()).isEqualTo(1);
+        }
+
+        assertThat(count(
+                "SELECT COUNT(*) FROM interview_answer WHERE interview_id = ? AND owner_id = ?",
+                interviewId.toString(), OWNER.value()
+        )).isEqualTo(1);
+
+        MockInterviewSession session = sessionRepository.findById(OWNER, interviewId).orElseThrow();
+        assertThat(session.status()).isEqualTo(InterviewStatus.REVIEWING);
+        assertThat(session.version()).isEqualTo(3);
+        assertThat(roundStatus(interviewId)).isEqualTo("ANSWERED");
     }
 
     private UUID createSession(long targetRoleVersion, char hashSeed) {
@@ -276,6 +383,32 @@ class InterviewQuestionMysqlSmoke {
         return value;
     }
 
+    private Object submitConcurrently(UUID interviewId,
+                                      UUID questionId,
+                                      UUID requestId,
+                                      String answerText,
+                                      CountDownLatch ready,
+                                      CountDownLatch start) throws InterruptedException {
+        ready.countDown();
+        start.await();
+        try {
+            return answerSubmissionService.submit(
+                    interviewId, 1, questionId, requestId, 2, answerText
+            );
+        } catch (RuntimeException exception) {
+            return exception;
+        }
+    }
+
+    private String roundStatus(UUID interviewId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT round_status FROM interview_round WHERE interview_id = ? AND owner_id = ?",
+                String.class,
+                interviewId.toString(),
+                OWNER.value()
+        );
+    }
+
     @SpringBootConfiguration(proxyBeanMethods = false)
     @EnableAutoConfiguration
     @MapperScan(basePackageClasses = MockInterviewSessionMapper.class)
@@ -356,6 +489,19 @@ class InterviewQuestionMysqlSmoke {
                     questionFactory,
                     jsonMapper,
                     clock
+            );
+        }
+
+        @Bean
+        InterviewAnswerSubmissionService interviewAnswerSubmissionService(
+                CurrentActorProvider actorProvider,
+                MockInterviewSessionRepository sessionRepository,
+                InterviewRoundRepository roundRepository,
+                JsonMapper jsonMapper,
+                Clock clock
+        ) {
+            return new InterviewAnswerSubmissionService(
+                    actorProvider, sessionRepository, roundRepository, jsonMapper, clock
             );
         }
     }

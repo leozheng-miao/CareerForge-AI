@@ -62,7 +62,7 @@ public class InterviewReportController {
                         interviewId,
                         reportId,
                         request.requestId(),
-                        request.expectedReportVersion(),
+                        request.expectedVersion(),
                         request.decisions().stream()
                                 .map(decision -> new InterviewReportConfirmationFactory.Selection(
                                         decision.suggestionId(),

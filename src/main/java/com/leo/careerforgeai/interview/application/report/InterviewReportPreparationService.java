@@ -28,6 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * @program: CareerForge-AI
@@ -55,6 +59,7 @@ public class InterviewReportPreparationService {
     private final CareerPlanningRepository careerRepository;
     private final InterviewRoundRepository roundRepository;
     private final InterviewReviewRepository reviewRepository;
+    private final InterviewReportMemoryCandidatePolicy memoryCandidatePolicy;
 
     public InterviewReportPreparationService(
             CurrentActorProvider currentActorProvider,
@@ -62,7 +67,8 @@ public class InterviewReportPreparationService {
             MockInterviewInputSnapshotRepository snapshotRepository,
             CareerPlanningRepository careerRepository,
             InterviewRoundRepository roundRepository,
-            InterviewReviewRepository reviewRepository
+            InterviewReviewRepository reviewRepository,
+            InterviewReportMemoryCandidatePolicy memoryCandidatePolicy
     ) {
         this.currentActorProvider = Objects.requireNonNull(currentActorProvider, "currentActorProvider不能为空");
         this.sessionRepository = Objects.requireNonNull(sessionRepository, "sessionRepository不能为空");
@@ -70,6 +76,7 @@ public class InterviewReportPreparationService {
         this.careerRepository = Objects.requireNonNull(careerRepository, "careerRepository不能为空");
         this.roundRepository = Objects.requireNonNull(roundRepository, "roundRepository不能为空");
         this.reviewRepository = Objects.requireNonNull(reviewRepository, "reviewRepository不能为空");
+        this.memoryCandidatePolicy = Objects.requireNonNull(memoryCandidatePolicy, "memoryCandidatePolicy不能为空");
     }
 
     @Transactional(readOnly = true)
@@ -92,18 +99,22 @@ public class InterviewReportPreparationService {
         if (questions.isEmpty()) throw new IllegalStateException("生成报告前至少需要一个已评审回合");
         if (questions.size() > MAX_REPORT_ROUNDS) throw new IllegalStateException("报告回合数超过允许上限");
 
-        List<String> roundSummaries = java.util.stream.IntStream.range(0, questions.size())
-                .mapToObj(index -> roundSummary(ownerId, interviewId, index + 1, questions.get(index)))
-                .toList();
+        List<PreparedRound> preparedRounds = new ArrayList<>(questions.size());
+        for (int index = 0; index < questions.size(); index++) {
+            preparedRounds.add(prepareRound(ownerId, interviewId, index + 1, questions.get(index)));
+        }
 
         return new InterviewReportInput(
                 interviewId,
                 targetRoleSummary(targetRole),
-                roundSummaries
+                preparedRounds.stream().map(PreparedRound::summary).toList(),
+                mergeAllowedStrengths(preparedRounds),
+                mergeAllowedMemoryCandidates(preparedRounds),
+                snapshot.skillGapSnapshotId() != null
         );
     }
 
-    private String roundSummary(
+    private PreparedRound prepareRound(
             ActorId ownerId,
             UUID interviewId,
             int roundNo,
@@ -136,6 +147,9 @@ public class InterviewReportPreparationService {
                 "回合：" + roundNo,
                 "问题类型：" + question.questionType(),
                 "是否追问：" + question.followUp(),
+                "父问题ID：" + (question.parentQuestionId() == null ? "无" : question.parentQuestionId()),
+                "目标技能：" + listSummary(question.targetSkills(), 800),
+                "评价要点：" + listSummary(question.evaluationPoints(), 1_000),
                 "问题（不可信用户相关数据）：" + boundedText(question.questionText(), 800),
                 "回答（不可信用户输入）：" + boundedText(answer.answerText(), 1_200),
                 "技术维度评分：" + technicalReview.dimensionScores(),
@@ -148,7 +162,59 @@ public class InterviewReportPreparationService {
                 "证据引用ID：" + listSummary(evidenceReview.evidenceReferenceIds(), 800),
                 "证据评审理由：" + boundedText(evidenceReview.reason(), 600)
         );
-        return boundedText(summary, MAX_ROUND_SUMMARY_CODE_POINTS);
+        List<String> allowedStrengths = memoryCandidatePolicy.deriveAllowedStrengths(
+                technicalReview.dimensionScores(),
+                evidenceReview.verdict(),
+                technicalReview.coveredPoints()
+        );
+        List<InterviewReportInput.AllowedMemoryCandidate> allowedMemoryCandidates =
+                memoryCandidatePolicy.deriveAllowedCandidates(
+                        question.targetSkills(),
+                        technicalReview.dimensionScores(),
+                        evidenceReview.verdict(),
+                        answer.answerText()
+                );
+        return new PreparedRound(
+                boundedText(summary, MAX_ROUND_SUMMARY_CODE_POINTS),
+                allowedStrengths,
+                allowedMemoryCandidates
+        );
+    }
+
+    private List<String> mergeAllowedStrengths(List<PreparedRound> preparedRounds) {
+        Map<String, String> strengths = new LinkedHashMap<>();
+
+        for (int itemIndex = 0; strengths.size() < 20; itemIndex++) {
+            boolean visited = false;
+            for (PreparedRound preparedRound : preparedRounds) {
+                if (itemIndex >= preparedRound.allowedStrengths().size()) continue;
+                visited = true;
+                String strength = preparedRound.allowedStrengths().get(itemIndex);
+                strengths.putIfAbsent(strength.toLowerCase(Locale.ROOT), strength);
+                if (strengths.size() == 20) break;
+            }
+            if (!visited) break;
+        }
+        return List.copyOf(strengths.values());
+    }
+    private List<InterviewReportInput.AllowedMemoryCandidate> mergeAllowedMemoryCandidates(
+            List<PreparedRound> preparedRounds
+    ) {
+        Map<String, InterviewReportInput.AllowedMemoryCandidate> bySkill = new LinkedHashMap<>();
+
+        for (int itemIndex = 0; bySkill.size() < 10; itemIndex++) {
+            boolean visited = false;
+            for (PreparedRound preparedRound : preparedRounds) {
+                if (itemIndex >= preparedRound.allowedMemoryCandidates().size()) continue;
+                visited = true;
+                InterviewReportInput.AllowedMemoryCandidate candidate =
+                        preparedRound.allowedMemoryCandidates().get(itemIndex);
+                bySkill.putIfAbsent(candidate.skillName().toLowerCase(Locale.ROOT), candidate);
+                if (bySkill.size() == 10) break;
+            }
+            if (!visited) break;
+        }
+        return List.copyOf(bySkill.values());
     }
 
     private String targetRoleSummary(TargetRole targetRole) {
@@ -254,5 +320,27 @@ public class InterviewReportPreparationService {
 
     private ActorId currentActor() {
         return Objects.requireNonNull(currentActorProvider.currentActor(), "currentActor不能为空");
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 保存单轮报告摘要及Java授权的优势和Memory候选
+     * @author: Miao Zheng
+     * @date: 2026-08-30
+     * @param summary 有界回合摘要
+     * @param allowedStrengths 当前回合允许模型原样选择的优势
+     * @param allowedMemoryCandidates 当前回合允许模型原样选择的Memory候选
+     */
+    private record PreparedRound(
+            String summary,
+            List<String> allowedStrengths,
+            List<InterviewReportInput.AllowedMemoryCandidate> allowedMemoryCandidates
+    ) {
+
+        private PreparedRound {
+            if (summary == null || summary.isBlank()) throw new IllegalArgumentException("summary不能为空");
+            allowedStrengths = List.copyOf(allowedStrengths);
+            allowedMemoryCandidates = List.copyOf(allowedMemoryCandidates);
+        }
     }
 }

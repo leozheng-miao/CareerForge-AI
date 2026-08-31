@@ -110,6 +110,30 @@ public class InterviewGraphExecutionService {
         return resumeAfterAnswer(interviewId, answer.answerId());
     }
 
+    public void requireReportRecoveryBoundary(UUID interviewId) {
+        Objects.requireNonNull(interviewId, "interviewId不能为空");
+        MockInterviewSession session = requireSession(interviewId);
+        if (session.status() != InterviewStatus.INTERRUPTED) {
+            throw new IllegalStateException("只有INTERRUPTED面试可以校验报告恢复边界");
+        }
+
+        var checkpoint = graph.lastStateOf(config(interviewId))
+                .orElseThrow(() -> new IllegalStateException("中断面试缺少报告Checkpoint"));
+        InterviewGraphState state = requireStateScope(checkpoint.state(), session);
+
+        if (!InterviewGraphWorkflow.GENERATE_AND_PERSIST_REPORT.equals(checkpoint.next())
+                || state.currentRound() < 1
+                || state.waitReason().isPresent()
+                || state.reportId().isPresent()
+                || state.answerId().isPresent()
+                || state.reviewPlan().isPresent()
+                || state.technicalReviewId().isPresent()
+                || state.evidenceReviewId().isPresent()
+                || state.routeDecision().isPresent()) {
+            throw new IllegalStateException("Checkpoint不处于可安全重试的报告生成边界");
+        }
+    }
+
     public void recoverExecution(UUID interviewId) {
         Objects.requireNonNull(interviewId, "interviewId不能为空");
         MockInterviewSession session = requireSession(interviewId);
@@ -147,6 +171,7 @@ public class InterviewGraphExecutionService {
                 .orElseThrow(() -> new IllegalStateException("面试Graph启动恢复后没有返回State"));
         requireRecoveredBoundary(interviewId);
     }
+
     private InterviewGraphState requireRecoveredBoundary(UUID interviewId) {
         var checkpoint = graph.lastStateOf(config(interviewId))
                 .orElseThrow(() -> new IllegalStateException("面试Graph启动恢复后缺少Checkpoint"));

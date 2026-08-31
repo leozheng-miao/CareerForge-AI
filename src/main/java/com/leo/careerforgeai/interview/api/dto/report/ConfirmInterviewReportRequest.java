@@ -11,16 +11,16 @@ import java.util.UUID;
 
 /**
  * @program: CareerForge-AI
- * @description: 接收报告版本、请求幂等键和全部建议的逐项用户决定
+ * @description: 接收报告乐观锁版本、请求幂等键和全部建议的逐项用户决定
  * @author: Miao Zheng
- * @date: 2026-08-30
+ * @date: 2026-08-31
  * @param requestId 客户端生成的本次确认幂等UUID
- * @param expectedReportVersion 用户读取报告时看到的乐观锁版本
+ * @param expectedVersion 用户读取报告时看到的乐观锁version
  * @param decisions 报告全部建议的确认或拒绝决定
  */
 public record ConfirmInterviewReportRequest(
         @NotNull UUID requestId,
-        @NotNull @PositiveOrZero long expectedReportVersion,
+        @NotNull @PositiveOrZero Long expectedVersion,
         @NotNull @Size(max = 20) @Valid List<DecisionRequest> decisions
 ) {
 

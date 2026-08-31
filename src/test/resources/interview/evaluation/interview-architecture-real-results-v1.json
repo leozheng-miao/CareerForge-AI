@@ -1,0 +1,303 @@
+{
+  "schemaVersion": "interview-architecture-real-result-v1",
+  "evaluationSetVersion": "careerforge-interview-architecture-eval-v1",
+  "model": "deepseek-v4-flash",
+  "baselinePromptVersion": "cp12-single-review-v1",
+  "technicalPromptVersion": "technical-reviewer-v1",
+  "evidencePromptVersion": "evidence-reviewer-v1",
+  "reportPromptVersion": "report-coach-v4",
+  "measurementScope": "相同固定问题、回答和证据下的单评审与多角色Graph评审质量、Token及耗时对照",
+  "limitations": [
+    "该次Smoke使用固定问题与回答，只比较评审链路，不评测Interviewer出题质量。",
+    "Graph的HITL只验证MemorySaver进程内answer resume，不代表真实MySQL Saver跨JVM恢复。",
+    "duplicateModelSideEffectCount、stateRegressionCount和crossOwnerLeakCount填0只表示本次Smoke未观察到，CP11独立测试才是可靠性证据。",
+    "confirmedActionCount为0，因为本次Smoke没有进入真实用户确认API。"
+  ],
+  "baseline": {
+    "architecture": "SINGLE_REVIEW_BASELINE",
+    "observations": [
+      {
+        "caseId": "TECHNICAL_KNOWLEDGE_001",
+        "successful": true,
+        "adjudicatedTargetSkills": [
+          "HashMap底层结构",
+          "ConcurrentHashMap并发机制"
+        ],
+        "questionCount": 1,
+        "duplicateQuestionCount": 0,
+        "dimensionScores": {
+          "CORRECTNESS": 3,
+          "DEPTH": 2,
+          "FAILURE_HANDLING": 1
+        },
+        "adjudicatedCoveredConcepts": [
+          "数组链表红黑树",
+          "CAS",
+          "synchronized"
+        ],
+        "adjudicatedIssueConcepts": [
+          "TREEIFY_THRESHOLD为8",
+          "MIN_TREEIFY_CAPACITY为64",
+          "HashMap并发写入风险"
+        ],
+        "evidenceVerdict": "NOT_APPLICABLE",
+        "evidenceReferenceIds": [],
+        "adjudicatedActionTopics": [
+          "HashMap树化条件",
+          "ConcurrentHashMap并发写入流程"
+        ],
+        "confirmedActionCount": 0,
+        "proposedActionCount": 4,
+        "hitlResumeSucceeded": false,
+        "duplicateModelSideEffectCount": 0,
+        "stateRegressionCount": 0,
+        "crossOwnerLeakCount": 0,
+        "modelCallCount": 1,
+        "totalTokens": 1027,
+        "durationMs": 3468
+      },
+      {
+        "caseId": "PROJECT_DEEP_DIVE_001",
+        "successful": true,
+        "adjudicatedTargetSkills": [
+          "并发准入",
+          "资源释放",
+          "可靠性验证"
+        ],
+        "questionCount": 1,
+        "duplicateQuestionCount": 0,
+        "dimensionScores": {
+          "CORRECTNESS": 4,
+          "DEPTH": 2,
+          "FAILURE_HANDLING": 3
+        },
+        "adjudicatedCoveredConcepts": [
+          "owner级Semaphore",
+          "最大并发数为2",
+          "finally释放许可"
+        ],
+        "adjudicatedIssueConcepts": [
+          "缺少多实例全局限制",
+          "一万并发压测没有证据"
+        ],
+        "evidenceVerdict": "PARTIALLY_SUPPORTED",
+        "evidenceReferenceIds": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "adjudicatedActionTopics": [
+          "多实例并发控制边界",
+          "补充容量压测证据"
+        ],
+        "confirmedActionCount": 0,
+        "proposedActionCount": 3,
+        "hitlResumeSucceeded": false,
+        "duplicateModelSideEffectCount": 0,
+        "stateRegressionCount": 0,
+        "crossOwnerLeakCount": 0,
+        "modelCallCount": 1,
+        "totalTokens": 958,
+        "durationMs": 2567
+      },
+      {
+        "caseId": "SYSTEM_DESIGN_001",
+        "successful": true,
+        "adjudicatedTargetSkills": [
+          "MySQL事实源",
+          "Checkpoint恢复",
+          "Redis SSE降级"
+        ],
+        "questionCount": 1,
+        "duplicateQuestionCount": 0,
+        "dimensionScores": {
+          "CORRECTNESS": 1,
+          "DEPTH": 1,
+          "FAILURE_HANDLING": 1
+        },
+        "adjudicatedCoveredConcepts": [
+          "Redis承载SSE事件",
+          "SSE事件续读"
+        ],
+        "adjudicatedIssueConcepts": [
+          "MySQL必须是业务真相源",
+          "Checkpoint只保存流程进度",
+          "Redis丢失后从MySQL恢复"
+        ],
+        "evidenceVerdict": "CONTRADICTED",
+        "evidenceReferenceIds": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "adjudicatedActionTopics": [
+          "重新划分MySQL与Redis职责",
+          "补充Redis丢失恢复设计"
+        ],
+        "confirmedActionCount": 0,
+        "proposedActionCount": 3,
+        "hitlResumeSucceeded": false,
+        "duplicateModelSideEffectCount": 0,
+        "stateRegressionCount": 0,
+        "crossOwnerLeakCount": 0,
+        "modelCallCount": 1,
+        "totalTokens": 1007,
+        "durationMs": 2413
+      }
+    ]
+  },
+  "multiRoleGraph": {
+    "architecture": "MULTI_ROLE_GRAPH",
+    "observations": [
+      {
+        "caseId": "TECHNICAL_KNOWLEDGE_001",
+        "successful": true,
+        "adjudicatedTargetSkills": [
+          "HashMap底层结构",
+          "ConcurrentHashMap并发机制"
+        ],
+        "questionCount": 1,
+        "duplicateQuestionCount": 0,
+        "dimensionScores": {
+          "CORRECTNESS": 4,
+          "DEPTH": 2,
+          "FAILURE_HANDLING": 1
+        },
+        "adjudicatedCoveredConcepts": [
+          "数组链表红黑树",
+          "CAS",
+          "synchronized"
+        ],
+        "adjudicatedIssueConcepts": [
+          "TREEIFY_THRESHOLD为8",
+          "MIN_TREEIFY_CAPACITY为64",
+          "HashMap并发写入风险"
+        ],
+        "evidenceVerdict": "NOT_APPLICABLE",
+        "evidenceReferenceIds": [],
+        "adjudicatedActionTopics": [
+          "HashMap树化条件",
+          "ConcurrentHashMap并发写入流程"
+        ],
+        "confirmedActionCount": 0,
+        "proposedActionCount": 2,
+        "hitlResumeSucceeded": true,
+        "duplicateModelSideEffectCount": 0,
+        "stateRegressionCount": 0,
+        "crossOwnerLeakCount": 0,
+        "modelCallCount": 3,
+        "totalTokens": 2883,
+        "durationMs": 4626
+      },
+      {
+        "caseId": "PROJECT_DEEP_DIVE_001",
+        "successful": true,
+        "adjudicatedTargetSkills": [
+          "并发准入",
+          "资源释放",
+          "可靠性验证"
+        ],
+        "questionCount": 1,
+        "duplicateQuestionCount": 0,
+        "dimensionScores": {
+          "CORRECTNESS": 5,
+          "DEPTH": 2,
+          "FAILURE_HANDLING": 3
+        },
+        "adjudicatedCoveredConcepts": [
+          "owner级Semaphore",
+          "最大并发数为2",
+          "finally释放许可"
+        ],
+        "adjudicatedIssueConcepts": [
+          "缺少多实例全局限制",
+          "一万并发压测没有证据"
+        ],
+        "evidenceVerdict": "PARTIALLY_SUPPORTED",
+        "evidenceReferenceIds": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "adjudicatedActionTopics": [
+          "多实例并发控制边界",
+          "补充容量压测证据"
+        ],
+        "confirmedActionCount": 0,
+        "proposedActionCount": 3,
+        "hitlResumeSucceeded": true,
+        "duplicateModelSideEffectCount": 0,
+        "stateRegressionCount": 0,
+        "crossOwnerLeakCount": 0,
+        "modelCallCount": 3,
+        "totalTokens": 2891,
+        "durationMs": 5021
+      },
+      {
+        "caseId": "SYSTEM_DESIGN_001",
+        "successful": true,
+        "adjudicatedTargetSkills": [
+          "MySQL事实源",
+          "Checkpoint恢复",
+          "Redis SSE降级"
+        ],
+        "questionCount": 1,
+        "duplicateQuestionCount": 0,
+        "dimensionScores": {
+          "CORRECTNESS": 1,
+          "DEPTH": 1,
+          "FAILURE_HANDLING": 1
+        },
+        "adjudicatedCoveredConcepts": [
+          "Redis承载SSE事件",
+          "SSE事件续读"
+        ],
+        "adjudicatedIssueConcepts": [
+          "MySQL必须是业务真相源",
+          "Checkpoint只保存流程进度",
+          "Redis丢失后从MySQL恢复"
+        ],
+        "evidenceVerdict": "CONTRADICTED",
+        "evidenceReferenceIds": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "adjudicatedActionTopics": [
+          "重新划分MySQL与Redis职责",
+          "补充Redis丢失恢复设计"
+        ],
+        "confirmedActionCount": 0,
+        "proposedActionCount": 3,
+        "hitlResumeSucceeded": true,
+        "duplicateModelSideEffectCount": 0,
+        "stateRegressionCount": 0,
+        "crossOwnerLeakCount": 0,
+        "modelCallCount": 3,
+        "totalTokens": 3205,
+        "durationMs": 5252
+      }
+    ]
+  },
+  "responseDigests": [
+    {
+      "caseId": "TECHNICAL_KNOWLEDGE_001",
+      "baselineResponseHash": "6273174d00fc30ce0aee5fc498b6010d2b31e4ede468193772484ed232a1e8bc",
+      "technicalResponseHash": "1d2f92a0ff102cc7f049c212d1290a6604d21791d410a0de1fa078d142096fd9",
+      "evidenceResponseHash": "ffaf7e92b3a488b27ab64095fbd8d8b7ab72dbe8ae9f0448a1b2785f11d99f73",
+      "reportResponseHash": "081ddbfb1c8cb8b6df0fb3116287279f21fcd60f1f6d67c64754ee97683c5167",
+      "reportStrengthCount": 0,
+      "memoryCandidateCount": 0
+    },
+    {
+      "caseId": "PROJECT_DEEP_DIVE_001",
+      "baselineResponseHash": "f1684b2602f41e46113d969b85d1811289f4a5c4d264c6da3ebece7ae8fbc2dc",
+      "technicalResponseHash": "7eee90e866e4aac36babe679b66cc736b5aa42a617e6e8bda8c881111fce9668",
+      "evidenceResponseHash": "eb62168a30429c0f350acd0386db62bb549083d023489adb84f2159b65b68822",
+      "reportResponseHash": "ee9015ba1ef9b3aea38acdf25cde1d439421baaad78e641fafc36da53e75d958",
+      "reportStrengthCount": 0,
+      "memoryCandidateCount": 0
+    },
+    {
+      "caseId": "SYSTEM_DESIGN_001",
+      "baselineResponseHash": "786487d7d17d7dbb1c9b2620bac24cdfdac0d5835fc0031cf7270e686734e054",
+      "technicalResponseHash": "1821dc3d11d246b1302c6a04df430998272ecbf6e346e1fc03f5c773fe63c08a",
+      "evidenceResponseHash": "e666bf130bd271558119298fcae8e0ddabf358b5886fe7877a30fcb9aa552acb",
+      "reportResponseHash": "03a83db2183844918ed46f57a3eba6821fff00306a3c54a39deb551eb3316709",
+      "reportStrengthCount": 0,
+      "memoryCandidateCount": 0
+    }
+  ]
+}

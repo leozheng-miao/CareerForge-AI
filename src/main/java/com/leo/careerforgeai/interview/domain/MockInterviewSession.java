@@ -199,6 +199,20 @@ public record MockInterviewSession(
         );
     }
 
+    public MockInterviewSession retryReportGeneration(Instant now) {
+        Objects.requireNonNull(now, "now不能为空");
+        if (status != InterviewStatus.INTERRUPTED) {
+            throw new IllegalStateException("只有INTERRUPTED面试可以重新生成报告");
+        }
+        if (now.isBefore(updatedAt)) throw new IllegalArgumentException("操作时间不能早于面试更新时间");
+
+        return new MockInterviewSession(
+                interviewId, ownerId, requestId, requestFingerprint, mode,
+                inputSnapshotId, inputSnapshotHash, InterviewStatus.GENERATING_REPORT,
+                budgetPolicy, null, nextVersion(), createdAt, now, null
+        );
+    }
+
     public MockInterviewSession cancel(Instant now) {
         return transitionTo(
                 InterviewStatus.CANCELLED,

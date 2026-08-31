@@ -1,0 +1,167 @@
+{
+  "schemaVersion": "interview-architecture-evaluation-v1",
+  "evaluationSetVersion": "careerforge-interview-architecture-eval-v1",
+  "cases": [
+    {
+      "caseId": "TECHNICAL_KNOWLEDGE_001",
+      "questionType": "TECHNICAL_KNOWLEDGE",
+      "question": "请说明Java 8中HashMap的存储结构、树化条件，以及ConcurrentHashMap如何保证并发安全。",
+      "answer": "HashMap由数组、链表和红黑树组成，put时根据哈希定位桶并处理冲突，get时定位桶后比较键。并发场景应使用ConcurrentHashMap，它通过CAS和桶头synchronized控制写入。",
+      "evidenceByChunkId": {},
+      "targetSkills": [
+        "HashMap底层结构",
+        "ConcurrentHashMap并发机制"
+      ],
+      "scoreDimensions": [
+        "CORRECTNESS",
+        "DEPTH",
+        "FAILURE_HANDLING"
+      ],
+      "scoringRubric": [
+        "CORRECTNESS：正确说明HashMap结构和ConcurrentHashMap并发机制。",
+        "DEPTH：说明树化阈值和最小容量条件。",
+        "FAILURE_HANDLING：说明普通HashMap在并发写入下的风险。"
+      ],
+      "expectedScoreRanges": {
+        "CORRECTNESS": {
+          "minimum": 3,
+          "maximum": 4
+        },
+        "DEPTH": {
+          "minimum": 2,
+          "maximum": 3
+        },
+        "FAILURE_HANDLING": {
+          "minimum": 2,
+          "maximum": 3
+        }
+      },
+      "requiredCoveredConcepts": [
+        "数组链表红黑树",
+        "CAS",
+        "synchronized"
+      ],
+      "requiredIssueConcepts": [
+        "TREEIFY_THRESHOLD为8",
+        "MIN_TREEIFY_CAPACITY为64",
+        "HashMap并发写入风险"
+      ],
+      "expectedEvidenceVerdict": "NOT_APPLICABLE",
+      "expectedEvidenceReferenceIds": [],
+      "expectedActionTopics": [
+        "HashMap树化条件",
+        "ConcurrentHashMap并发写入流程"
+      ]
+    },
+    {
+      "caseId": "PROJECT_DEEP_DIVE_001",
+      "questionType": "PROJECT_DEEP_DIVE",
+      "question": "你在项目中如何限制同一用户的并发任务？请说明资源释放、测试证据和多实例边界。",
+      "answer": "项目通过owner级Semaphore把每个用户限制为最多两个并发任务，并在finally中释放许可。成功、异常和取消路径都有测试，而且压测已经证明单机能够稳定承载一万并发请求。",
+      "evidenceByChunkId": {
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "项目记录：owner级Semaphore最大并发数为2，许可在finally中释放；测试覆盖成功、异常和取消路径。当前没有一万并发压测记录。"
+      },
+      "targetSkills": [
+        "并发准入",
+        "资源释放",
+        "可靠性验证"
+      ],
+      "scoreDimensions": [
+        "CORRECTNESS",
+        "DEPTH",
+        "FAILURE_HANDLING"
+      ],
+      "scoringRubric": [
+        "CORRECTNESS：准确说明owner级Semaphore和许可上限。",
+        "DEPTH：说明JVM内限制的多实例边界。",
+        "FAILURE_HANDLING：说明异常、取消和超时路径的资源释放。"
+      ],
+      "expectedScoreRanges": {
+        "CORRECTNESS": {
+          "minimum": 3,
+          "maximum": 4
+        },
+        "DEPTH": {
+          "minimum": 2,
+          "maximum": 3
+        },
+        "FAILURE_HANDLING": {
+          "minimum": 4,
+          "maximum": 5
+        }
+      },
+      "requiredCoveredConcepts": [
+        "owner级Semaphore",
+        "最大并发数为2",
+        "finally释放许可"
+      ],
+      "requiredIssueConcepts": [
+        "缺少多实例全局限制",
+        "一万并发压测没有证据"
+      ],
+      "expectedEvidenceVerdict": "PARTIALLY_SUPPORTED",
+      "expectedEvidenceReferenceIds": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "expectedActionTopics": [
+        "多实例并发控制边界",
+        "补充容量压测证据"
+      ]
+    },
+    {
+      "caseId": "SYSTEM_DESIGN_001",
+      "questionType": "SYSTEM_DESIGN",
+      "question": "请设计模拟面试的状态持久化和SSE通知链路，并说明Redis故障或服务重启后的恢复方式。",
+      "answer": "我会把Redis作为面试状态的最终真相源，问题、回答和报告都先写Redis，MySQL只做异步归档。SSE事件丢失后直接以Redis中的最后一条事件还原全部业务状态。",
+      "evidenceByChunkId": {
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "架构记录：MySQL保存面试、问题、回答、评审和报告业务事实；Checkpoint只保存流程进度；Redis只保存安全SSE事件。Redis清空后必须从MySQL读取准确业务状态。"
+      },
+      "targetSkills": [
+        "MySQL事实源",
+        "Checkpoint恢复",
+        "Redis SSE降级"
+      ],
+      "scoreDimensions": [
+        "CORRECTNESS",
+        "DEPTH",
+        "FAILURE_HANDLING"
+      ],
+      "scoringRubric": [
+        "CORRECTNESS：明确MySQL是业务真相源，Redis不是事实存储。",
+        "DEPTH：区分业务事实、Checkpoint进度和SSE事件。",
+        "FAILURE_HANDLING：说明Redis清空和进程重启后的MySQL恢复。"
+      ],
+      "expectedScoreRanges": {
+        "CORRECTNESS": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "DEPTH": {
+          "minimum": 1,
+          "maximum": 2
+        },
+        "FAILURE_HANDLING": {
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "requiredCoveredConcepts": [
+        "Redis承载SSE事件",
+        "SSE事件续读"
+      ],
+      "requiredIssueConcepts": [
+        "MySQL必须是业务真相源",
+        "Checkpoint只保存流程进度",
+        "Redis丢失后从MySQL恢复"
+      ],
+      "expectedEvidenceVerdict": "CONTRADICTED",
+      "expectedEvidenceReferenceIds": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "expectedActionTopics": [
+        "重新划分MySQL与Redis职责",
+        "补充Redis丢失恢复设计"
+      ]
+    }
+  ]
+}

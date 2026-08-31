@@ -1,0 +1,497 @@
+{
+  "schemaVersion": "interview-architecture-evaluation-v1",
+  "evaluationSetVersion": "careerforge-interview-architecture-eval-v2",
+  "cases": [
+    {
+      "caseId": "TECHNICAL_KNOWLEDGE_001",
+      "questionType": "TECHNICAL_KNOWLEDGE",
+      "question": "请说明Java 8中HashMap的存储结构、树化条件，以及ConcurrentHashMap如何保证并发安全。",
+      "answer": "HashMap由数组、链表和红黑树组成，put时根据哈希定位桶并处理冲突，get时定位桶后比较键。并发场景应使用ConcurrentHashMap，它通过CAS和桶头synchronized控制写入。",
+      "evidenceByChunkId": {},
+      "targetSkills": [
+        "HashMap底层结构",
+        "ConcurrentHashMap并发机制"
+      ],
+      "scoreDimensions": [
+        "CORRECTNESS",
+        "DEPTH",
+        "FAILURE_HANDLING"
+      ],
+      "scoringRubric": [
+        "CORRECTNESS：正确说明HashMap结构和ConcurrentHashMap并发机制。",
+        "DEPTH：说明树化阈值和最小容量条件。",
+        "FAILURE_HANDLING：说明普通HashMap在并发写入下的风险。"
+      ],
+      "expectedScoreRanges": {
+        "CORRECTNESS": {
+          "minimum": 3,
+          "maximum": 4
+        },
+        "DEPTH": {
+          "minimum": 2,
+          "maximum": 3
+        },
+        "FAILURE_HANDLING": {
+          "minimum": 2,
+          "maximum": 3
+        }
+      },
+      "requiredCoveredConcepts": [
+        "数组链表红黑树",
+        "CAS",
+        "synchronized"
+      ],
+      "requiredIssueConcepts": [
+        "TREEIFY_THRESHOLD为8",
+        "MIN_TREEIFY_CAPACITY为64",
+        "HashMap并发写入风险"
+      ],
+      "expectedEvidenceVerdict": "NOT_APPLICABLE",
+      "expectedEvidenceReferenceIds": [],
+      "expectedActionTopics": [
+        "HashMap树化条件",
+        "ConcurrentHashMap并发写入流程"
+      ]
+    },
+    {
+      "caseId": "TECHNICAL_KNOWLEDGE_002",
+      "questionType": "TECHNICAL_KNOWLEDGE",
+      "question": "Java 21虚拟线程是否意味着服务可以无限并发？请说明外部资源限制、载体线程阻塞和准入控制。",
+      "answer": "虚拟线程非常轻量，因此创建多少都没有关系。使用虚拟线程后JDBC连接和大模型调用都可以无限并行，也不再需要Semaphore或Bulkhead。Java 21中的synchronized也完全不会占用载体线程。",
+      "evidenceByChunkId": {},
+      "targetSkills": [
+        "Java虚拟线程",
+        "资源准入控制",
+        "载体线程阻塞"
+      ],
+      "scoreDimensions": [
+        "CORRECTNESS",
+        "DEPTH",
+        "FAILURE_HANDLING"
+      ],
+      "scoringRubric": [
+        "CORRECTNESS：区分虚拟线程轻量化与系统无限吞吐。",
+        "DEPTH：说明Java 21中synchronized等操作可能固定载体线程。",
+        "FAILURE_HANDLING：说明数据库连接、模型调用和下游容量仍需准入控制。"
+      ],
+      "expectedScoreRanges": {
+        "CORRECTNESS": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "DEPTH": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "FAILURE_HANDLING": {
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "requiredCoveredConcepts": [
+        "虚拟线程创建成本较低",
+        "虚拟线程适合阻塞型任务"
+      ],
+      "requiredIssueConcepts": [
+        "虚拟线程不等于无限吞吐",
+        "外部资源仍需Bulkhead",
+        "Java21 synchronized可能固定载体线程"
+      ],
+      "expectedEvidenceVerdict": "NOT_APPLICABLE",
+      "expectedEvidenceReferenceIds": [],
+      "expectedActionTopics": [
+        "虚拟线程与吞吐边界",
+        "外部资源准入控制",
+        "载体线程固定风险"
+      ]
+    },
+    {
+      "caseId": "TECHNICAL_KNOWLEDGE_003",
+      "questionType": "TECHNICAL_KNOWLEDGE",
+      "question": "请说明CompletableFuture超时和取消的语义，以及如何把请求Deadline传递到下游模型调用。",
+      "answer": "orTimeout会让CompletableFuture在超时后异常完成，但底层任务可能仍在继续执行，所以还要把剩余Deadline传给HTTP客户端和模型调用。取消通常是协作式的，任务需要响应中断或定期检查取消状态。",
+      "evidenceByChunkId": {},
+      "targetSkills": [
+        "CompletableFuture超时",
+        "Deadline传播",
+        "协作式取消"
+      ],
+      "scoreDimensions": [
+        "CORRECTNESS",
+        "DEPTH",
+        "FAILURE_HANDLING"
+      ],
+      "scoringRubric": [
+        "CORRECTNESS：正确区分Future异常完成与底层任务终止。",
+        "DEPTH：说明Deadline应向HTTP和模型调用继续传播。",
+        "FAILURE_HANDLING：说明取消是协作式的，并考虑执行器隔离和队列边界。"
+      ],
+      "expectedScoreRanges": {
+        "CORRECTNESS": {
+          "minimum": 4,
+          "maximum": 5
+        },
+        "DEPTH": {
+          "minimum": 3,
+          "maximum": 4
+        },
+        "FAILURE_HANDLING": {
+          "minimum": 3,
+          "maximum": 4
+        }
+      },
+      "requiredCoveredConcepts": [
+        "orTimeout异常完成",
+        "底层任务可能继续执行",
+        "Deadline向下游传播",
+        "取消需要协作"
+      ],
+      "requiredIssueConcepts": [
+        "未说明专用Executor隔离",
+        "未说明有界队列或拒绝策略"
+      ],
+      "expectedEvidenceVerdict": "NOT_APPLICABLE",
+      "expectedEvidenceReferenceIds": [],
+      "expectedActionTopics": [
+        "专用Executor与队列边界",
+        "Deadline向下游传播"
+      ]
+    },
+    {
+      "caseId": "PROJECT_DEEP_DIVE_001",
+      "questionType": "PROJECT_DEEP_DIVE",
+      "question": "你在项目中如何限制同一用户的并发任务？请说明资源释放、测试证据和多实例边界。",
+      "answer": "项目通过owner级Semaphore把每个用户限制为最多两个并发任务，并在finally中释放许可。成功、异常和取消路径都有测试，而且压测已经证明单机能够稳定承载一万并发请求。",
+      "evidenceByChunkId": {
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "项目记录：owner级Semaphore最大并发数为2，许可在finally中释放；测试覆盖成功、异常和取消路径。当前没有一万并发压测记录。"
+      },
+      "targetSkills": [
+        "并发准入",
+        "资源释放",
+        "可靠性验证"
+      ],
+      "scoreDimensions": [
+        "CORRECTNESS",
+        "DEPTH",
+        "FAILURE_HANDLING"
+      ],
+      "scoringRubric": [
+        "CORRECTNESS：准确说明owner级Semaphore和许可上限。",
+        "DEPTH：说明JVM内限制的多实例边界。",
+        "FAILURE_HANDLING：说明异常、取消和超时路径的资源释放。"
+      ],
+      "expectedScoreRanges": {
+        "CORRECTNESS": {
+          "minimum": 3,
+          "maximum": 4
+        },
+        "DEPTH": {
+          "minimum": 2,
+          "maximum": 3
+        },
+        "FAILURE_HANDLING": {
+          "minimum": 4,
+          "maximum": 5
+        }
+      },
+      "requiredCoveredConcepts": [
+        "owner级Semaphore",
+        "最大并发数为2",
+        "finally释放许可"
+      ],
+      "requiredIssueConcepts": [
+        "缺少多实例全局限制",
+        "一万并发压测没有证据"
+      ],
+      "expectedEvidenceVerdict": "PARTIALLY_SUPPORTED",
+      "expectedEvidenceReferenceIds": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "expectedActionTopics": [
+        "多实例并发控制边界",
+        "补充容量压测证据"
+      ]
+    },
+    {
+      "caseId": "PROJECT_DEEP_DIVE_002",
+      "questionType": "PROJECT_DEEP_DIVE",
+      "question": "你的项目如何处理大模型结构化输出失败？请说明校验、修复次数和真实验证结果。",
+      "answer": "模型必须返回固定JSON结构，Java会校验字段、评分范围和引用白名单。第一次输出非法时只允许一次修复，修复仍失败就结束调用，禁止无限重试。固定验证执行了9次，9次都成功且没有触发修复。",
+      "evidenceByChunkId": {
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": "真实验证记录：REPORT_COACH共执行9次，successes=9、failures=0、repaired=0；结构化输出由Java Contract校验，最多允许一次修复。"
+      },
+      "targetSkills": [
+        "结构化输出校验",
+        "有限修复",
+        "真实模型验证"
+      ],
+      "scoreDimensions": [
+        "CORRECTNESS",
+        "DEPTH",
+        "FAILURE_HANDLING"
+      ],
+      "scoringRubric": [
+        "CORRECTNESS：说明固定结构和Java侧业务校验。",
+        "DEPTH：区分首次生成、单次修复和最终失败。",
+        "FAILURE_HANDLING：禁止无限重试，并准确表达真实样本规模。"
+      ],
+      "expectedScoreRanges": {
+        "CORRECTNESS": {
+          "minimum": 4,
+          "maximum": 5
+        },
+        "DEPTH": {
+          "minimum": 3,
+          "maximum": 4
+        },
+        "FAILURE_HANDLING": {
+          "minimum": 4,
+          "maximum": 5
+        }
+      },
+      "requiredCoveredConcepts": [
+        "固定JSON结构",
+        "Java Contract校验",
+        "最多一次修复",
+        "9次验证全部成功"
+      ],
+      "requiredIssueConcepts": [
+        "样本量只有9次",
+        "不能据此推导生产环境零失败"
+      ],
+      "expectedEvidenceVerdict": "SUPPORTED",
+      "expectedEvidenceReferenceIds": [
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "expectedActionTopics": [
+        "扩大真实验证样本",
+        "持续记录修复率和失败率"
+      ]
+    },
+    {
+      "caseId": "PROJECT_DEEP_DIVE_003",
+      "questionType": "PROJECT_DEEP_DIVE",
+      "question": "你的项目如何保证重复请求和进程崩溃后不会产生重复业务事实？请说明Redis、MySQL和跨JVM验证边界。",
+      "answer": "请求到达后把requestId写入Redis并设置5分钟TTL，重复请求直接返回，所以即使进程崩溃或服务重启也绝对不会重复写入。MySQL不需要唯一约束，也不需要跨JVM恢复测试。",
+      "evidenceByChunkId": {
+        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd": "现有记录只验证了同一进程内的重复请求；尚未执行跨JVM崩溃恢复验证，也没有记录证明仅依赖Redis TTL可以阻止MySQL重复业务事实。"
+      },
+      "targetSkills": [
+        "业务幂等",
+        "MySQL唯一约束",
+        "跨JVM恢复"
+      ],
+      "scoreDimensions": [
+        "CORRECTNESS",
+        "DEPTH",
+        "FAILURE_HANDLING"
+      ],
+      "scoringRubric": [
+        "CORRECTNESS：说明Redis请求缓存不能替代MySQL业务幂等。",
+        "DEPTH：说明TTL过期、Redis清空和跨实例竞争边界。",
+        "FAILURE_HANDLING：使用MySQL唯一约束或幂等键并进行跨JVM恢复验证。"
+      ],
+      "expectedScoreRanges": {
+        "CORRECTNESS": {
+          "minimum": 1,
+          "maximum": 2
+        },
+        "DEPTH": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "FAILURE_HANDLING": {
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "requiredCoveredConcepts": [
+        "Redis requestId",
+        "5分钟TTL",
+        "重复请求直接返回"
+      ],
+      "requiredIssueConcepts": [
+        "Redis不是业务真相源",
+        "TTL过期后可能重复",
+        "缺少MySQL唯一约束",
+        "没有跨JVM恢复证据"
+      ],
+      "expectedEvidenceVerdict": "UNSUPPORTED",
+      "expectedEvidenceReferenceIds": [],
+      "expectedActionTopics": [
+        "MySQL业务幂等约束",
+        "Redis丢失边界",
+        "跨JVM崩溃恢复验证"
+      ]
+    },
+    {
+      "caseId": "SYSTEM_DESIGN_001",
+      "questionType": "SYSTEM_DESIGN",
+      "question": "请设计模拟面试的状态持久化和SSE通知链路，并说明Redis故障或服务重启后的恢复方式。",
+      "answer": "我会把Redis作为面试状态的最终真相源，问题、回答和报告都先写Redis，MySQL只做异步归档。SSE事件丢失后直接以Redis中的最后一条事件还原全部业务状态。",
+      "evidenceByChunkId": {
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "架构记录：MySQL保存面试、问题、回答、评审和报告业务事实；Checkpoint只保存流程进度；Redis只保存安全SSE事件。Redis清空后必须从MySQL读取准确业务状态。"
+      },
+      "targetSkills": [
+        "MySQL事实源",
+        "Checkpoint恢复",
+        "Redis SSE降级"
+      ],
+      "scoreDimensions": [
+        "CORRECTNESS",
+        "DEPTH",
+        "FAILURE_HANDLING"
+      ],
+      "scoringRubric": [
+        "CORRECTNESS：明确MySQL是业务真相源，Redis不是事实存储。",
+        "DEPTH：区分业务事实、Checkpoint进度和SSE事件。",
+        "FAILURE_HANDLING：说明Redis清空和进程重启后的MySQL恢复。"
+      ],
+      "expectedScoreRanges": {
+        "CORRECTNESS": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "DEPTH": {
+          "minimum": 1,
+          "maximum": 2
+        },
+        "FAILURE_HANDLING": {
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "requiredCoveredConcepts": [
+        "Redis承载SSE事件",
+        "SSE事件续读"
+      ],
+      "requiredIssueConcepts": [
+        "MySQL必须是业务真相源",
+        "Checkpoint只保存流程进度",
+        "Redis丢失后从MySQL恢复"
+      ],
+      "expectedEvidenceVerdict": "CONTRADICTED",
+      "expectedEvidenceReferenceIds": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "expectedActionTopics": [
+        "重新划分MySQL与Redis职责",
+        "补充Redis丢失恢复设计"
+      ]
+    },
+    {
+      "caseId": "SYSTEM_DESIGN_002",
+      "questionType": "SYSTEM_DESIGN",
+      "question": "模型结果和业务行已经提交，但Checkpoint保存前进程崩溃，应如何恢复并避免重复模型调用？",
+      "answer": "模型结果写入MySQL时使用由interviewId、roundNo和节点类型组成的确定性幂等键。恢复后先查询MySQL，已有结果就跳过模型调用，再根据业务事实继续或重建Checkpoint。MySQL始终是业务真相源。",
+      "evidenceByChunkId": {
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": "架构与验证记录：节点结果使用确定性幂等键保存到MySQL；业务提交成功但Checkpoint未保存时，恢复流程先重读MySQL，命中已有结果后不再调用模型，并继续保存流程进度。"
+      },
+      "targetSkills": [
+        "崩溃窗口恢复",
+        "确定性幂等键",
+        "避免重复模型调用"
+      ],
+      "scoreDimensions": [
+        "CORRECTNESS",
+        "DEPTH",
+        "FAILURE_HANDLING"
+      ],
+      "scoringRubric": [
+        "CORRECTNESS：明确业务提交优先且MySQL是事实源。",
+        "DEPTH：说明确定性幂等键和恢复前重读MySQL。",
+        "FAILURE_HANDLING：已有结果时跳过模型，并考虑状态CAS和SSE事件幂等。"
+      ],
+      "expectedScoreRanges": {
+        "CORRECTNESS": {
+          "minimum": 4,
+          "maximum": 5
+        },
+        "DEPTH": {
+          "minimum": 4,
+          "maximum": 5
+        },
+        "FAILURE_HANDLING": {
+          "minimum": 3,
+          "maximum": 4
+        }
+      },
+      "requiredCoveredConcepts": [
+        "MySQL业务事实优先",
+        "确定性幂等键",
+        "恢复前查询MySQL",
+        "跳过重复模型调用"
+      ],
+      "requiredIssueConcepts": [
+        "未说明状态CAS",
+        "未说明SSE重复事件去重"
+      ],
+      "expectedEvidenceVerdict": "SUPPORTED",
+      "expectedEvidenceReferenceIds": [
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      ],
+      "expectedActionTopics": [
+        "补充状态CAS",
+        "补充SSE事件幂等"
+      ]
+    },
+    {
+      "caseId": "SYSTEM_DESIGN_003",
+      "questionType": "SYSTEM_DESIGN",
+      "question": "模拟面试SSE应发送哪些数据？请说明Redis Stream续读、owner鉴权和敏感信息边界。",
+      "answer": "我会把完整回答、系统Prompt、模型原始输出和异常堆栈都写入Redis Stream，方便前端通过Last-Event-ID恢复。SSE接口会校验owner，所以事件内容即使包含这些信息也没有安全问题。",
+      "evidenceByChunkId": {
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff": "安全设计记录：Redis Stream和SSE只允许保存事件类型、面试状态、版本、失败码、时间等安全元数据；禁止写入简历、回答、Prompt、模型原始输出、Token和内部异常堆栈。SSE订阅必须执行owner鉴权。"
+      },
+      "targetSkills": [
+        "SSE安全事件",
+        "Redis Stream续读",
+        "owner隔离"
+      ],
+      "scoreDimensions": [
+        "CORRECTNESS",
+        "DEPTH",
+        "FAILURE_HANDLING"
+      ],
+      "scoringRubric": [
+        "CORRECTNESS：SSE只发送安全状态元数据。",
+        "DEPTH：同时说明Last-Event-ID续读和owner鉴权。",
+        "FAILURE_HANDLING：禁止泄漏回答、Prompt、模型原始输出和异常堆栈。"
+      ],
+      "expectedScoreRanges": {
+        "CORRECTNESS": {
+          "minimum": 1,
+          "maximum": 2
+        },
+        "DEPTH": {
+          "minimum": 1,
+          "maximum": 2
+        },
+        "FAILURE_HANDLING": {
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "requiredCoveredConcepts": [
+        "Redis Stream续读",
+        "Last-Event-ID",
+        "owner鉴权"
+      ],
+      "requiredIssueConcepts": [
+        "回答内容泄漏",
+        "Prompt和模型原始输出泄漏",
+        "异常堆栈泄漏",
+        "鉴权不能替代最小化事件内容"
+      ],
+      "expectedEvidenceVerdict": "CONTRADICTED",
+      "expectedEvidenceReferenceIds": [
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      ],
+      "expectedActionTopics": [
+        "SSE事件字段白名单",
+        "敏感内容禁止进入Redis",
+        "owner鉴权与最小披露"
+      ]
+    }
+  ]
+}

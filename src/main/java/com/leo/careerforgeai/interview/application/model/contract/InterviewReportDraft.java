@@ -9,9 +9,9 @@ import java.util.List;
 
 /**
  * @program: CareerForge-AI
- * @description: 定义复盘教练角色生成但尚未由用户确认的结构化报告
+ * @description: 定义复盘教练角色生成但尚未由用户确认的有界结构化报告
  * @author: Miao Zheng
- * @date: 2026-08-29
+ * @date: 2026-08-31
  * @param strengths 已由面试事实支持的优势
  * @param technicalGaps 技术能力差距
  * @param evidenceExpressionRisks 证据表达或材料一致性风险
@@ -20,22 +20,11 @@ import java.util.List;
  * @param proposedTrainingPlanAdjustments 待用户确认的结构化训练计划调整
  */
 public record InterviewReportDraft(
-        @NotNull @Size(max = 20)
-        List<@NotBlank @Size(max = 1_000) String> strengths,
-
-        @NotNull @Size(max = 20)
-        List<@NotBlank @Size(max = 1_000) String> technicalGaps,
-
-        @NotNull @Size(max = 20)
-        List<@NotBlank @Size(max = 1_000) String> evidenceExpressionRisks,
-
-        @NotNull @Size(min = 1, max = 20)
-        List<@NotBlank @Size(max = 1_000) String> improvementActions,
-
-        @NotNull @Size(max = 10) @Valid
-        List<InterviewReportSuggestionDraft.MemoryCandidate> proposedMemoryCandidates,
-
-        @NotNull @Size(max = 10) @Valid
-        List<InterviewReportSuggestionDraft.TrainingPlanAdjustment> proposedTrainingPlanAdjustments
+        @NotNull @Size(max = 5) List<@NotBlank @Size(max = 500) String> strengths,
+        @NotNull @Size(max = 5) List<@NotBlank @Size(max = 400) String> technicalGaps,
+        @NotNull @Size(max = 5) List<@NotBlank @Size(max = 400) String> evidenceExpressionRisks,
+        @NotNull @Size(min = 1, max = 5) List<@NotBlank @Size(max = 400) String> improvementActions,
+        @NotNull @Size(max = 2) List<InterviewReportSuggestionDraft.@Valid MemoryCandidate> proposedMemoryCandidates,
+        @NotNull @Size(max = 3) List<InterviewReportSuggestionDraft.@Valid TrainingPlanAdjustment> proposedTrainingPlanAdjustments
 ) {
 }

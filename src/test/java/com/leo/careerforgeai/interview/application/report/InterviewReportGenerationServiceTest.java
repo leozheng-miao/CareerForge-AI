@@ -69,7 +69,10 @@ class InterviewReportGenerationServiceTest {
                 reportContract,
                 modelGateway,
                 persistenceService,
-                new InterviewReportFactory(jsonMapper),
+                new InterviewReportFactory(
+                        jsonMapper,
+                        new InterviewReportMemoryCandidatePolicy()
+                ),
                 jsonMapper,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
@@ -195,10 +198,15 @@ class InterviewReportGenerationServiceTest {
                 List.of(
                         "第1轮：虚拟线程回答基本正确；技术评分78；证据一致性通过。",
                         "第2轮：结构化并发取消传播说明不完整；技术评分62。"
-                )
+                ),
+                List.of("能够解释虚拟线程的适用边界。"),
+                List.of(new InterviewReportInput.AllowedMemoryCandidate(
+                        "Java并发",
+                        "保留Java并发实践作为长期能力证据。"
+                )),
+                true
         );
     }
-
     private InterviewRoleModelGateway.Result<InterviewReportDraft> modelResult() {
         InterviewReportDraft draft = new InterviewReportDraft(
                 List.of("能够解释虚拟线程的适用边界。"),

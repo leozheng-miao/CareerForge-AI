@@ -1,0 +1,582 @@
+{
+  "schemaVersion": "interview-architecture-real-result-v2",
+  "evaluationSetVersion": "careerforge-interview-architecture-eval-v2",
+  "model": "deepseek-v4-flash",
+  "baselinePromptVersion": "cp12-single-review-v1",
+  "technicalPromptVersion": "technical-reviewer-v1",
+  "evidencePromptVersion": "evidence-reviewer-v1",
+  "reportPromptVersion": "report-coach-v4",
+  "limitations": [
+    "该评测使用固定问题和回答，不评测Interviewer的问题规划与出题质量。",
+    "TECHNICAL_KNOWLEDGE_002的Gold覆盖点包含回答未实际表达的虚拟线程适合阻塞型任务，该标签保持冻结但不能作为模型漏检结论。",
+    "PROJECT_DEEP_DIVE_003的UNSUPPORTED与模型CONTRADICTED存在语义边界分歧，本次不修改预注册Gold。",
+    "HITL仅验证MemorySaver进程内answer resume，不代替MySQL Saver跨JVM恢复证据。",
+    "用户确认率、跨owner隔离、状态倒退和重复副作用由其他独立测试负责。",
+    "该次V2 Smoke未模拟正式链路中无证据时由Java生成NOT_APPLICABLE的短路，因此graphCalls和Graph Token包含3次正式运行不会发生的Evidence Reviewer调用。"
+  ],
+  "cases": [
+    {
+      "caseId": "TECHNICAL_KNOWLEDGE_001",
+      "baseline": {
+        "dimensionScores": {
+          "CORRECTNESS": 3,
+          "DEPTH": 2,
+          "FAILURE_HANDLING": 2
+        },
+        "adjudicatedCoveredConcepts": [
+          "数组链表红黑树",
+          "CAS",
+          "synchronized"
+        ],
+        "adjudicatedIssueConcepts": [
+          "TREEIFY_THRESHOLD为8",
+          "MIN_TREEIFY_CAPACITY为64",
+          "HashMap并发写入风险"
+        ],
+        "evidenceVerdict": "NOT_APPLICABLE",
+        "evidenceReferenceIds": [],
+        "adjudicatedActionTopics": [
+          "HashMap树化条件",
+          "ConcurrentHashMap并发写入流程"
+        ],
+        "proposedActionCount": 4,
+        "totalTokens": 1025,
+        "durationMs": 3992,
+        "responseHash": "63714eade5b476cda611cbf2f54e39985a4f23a69da67c50579f99e1ac5f34eb"
+      },
+      "multiRoleGraph": {
+        "dimensionScores": {
+          "CORRECTNESS": 3,
+          "DEPTH": 1,
+          "FAILURE_HANDLING": 0
+        },
+        "adjudicatedCoveredConcepts": [
+          "数组链表红黑树",
+          "CAS",
+          "synchronized"
+        ],
+        "adjudicatedIssueConcepts": [
+          "TREEIFY_THRESHOLD为8",
+          "MIN_TREEIFY_CAPACITY为64",
+          "HashMap并发写入风险"
+        ],
+        "evidenceVerdict": "NOT_APPLICABLE",
+        "evidenceReferenceIds": [],
+        "adjudicatedActionTopics": [
+          "HashMap树化条件",
+          "ConcurrentHashMap并发写入流程"
+        ],
+        "proposedActionCount": 3,
+        "reportStrengthCount": 0,
+        "memoryCandidateCount": 0,
+        "totalTokens": 2986,
+        "durationMs": 6663,
+        "technicalResponseHash": "11c1baa8c74458d9125edaf7aa619ca8621f009f1da30a5ec94e64798dfcaeb4",
+        "evidenceResponseHash": "ffaf7e92b3a488b27ab64095fbd8d8b7ab72dbe8ae9f0448a1b2785f11d99f73",
+        "reportResponseHash": "e661ba701a83ffb0d8846d94b1668a0ca0dc709e58b78a957511f748b6edf7f6"
+      }
+    },
+    {
+      "caseId": "TECHNICAL_KNOWLEDGE_002",
+      "baseline": {
+        "dimensionScores": {
+          "CORRECTNESS": 1,
+          "DEPTH": 1,
+          "FAILURE_HANDLING": 1
+        },
+        "adjudicatedCoveredConcepts": [],
+        "adjudicatedIssueConcepts": [
+          "虚拟线程不等于无限吞吐",
+          "外部资源仍需Bulkhead",
+          "Java21 synchronized可能固定载体线程"
+        ],
+        "evidenceVerdict": "NOT_APPLICABLE",
+        "evidenceReferenceIds": [],
+        "adjudicatedActionTopics": [
+          "虚拟线程与吞吐边界",
+          "外部资源准入控制",
+          "载体线程固定风险"
+        ],
+        "proposedActionCount": 5,
+        "totalTokens": 1003,
+        "durationMs": 3425,
+        "responseHash": "403017c4cd7a3516327c54efecf299700700876f9df3e87edd22da6c2a803d81"
+      },
+      "multiRoleGraph": {
+        "dimensionScores": {
+          "CORRECTNESS": 1,
+          "DEPTH": 1,
+          "FAILURE_HANDLING": 1
+        },
+        "adjudicatedCoveredConcepts": [
+          "虚拟线程创建成本较低"
+        ],
+        "adjudicatedIssueConcepts": [
+          "虚拟线程不等于无限吞吐",
+          "外部资源仍需Bulkhead",
+          "Java21 synchronized可能固定载体线程"
+        ],
+        "evidenceVerdict": "NOT_APPLICABLE",
+        "evidenceReferenceIds": [],
+        "adjudicatedActionTopics": [
+          "虚拟线程与吞吐边界",
+          "外部资源准入控制",
+          "载体线程固定风险"
+        ],
+        "proposedActionCount": 4,
+        "reportStrengthCount": 0,
+        "memoryCandidateCount": 0,
+        "totalTokens": 3026,
+        "durationMs": 6728,
+        "technicalResponseHash": "a629abba4c8868ad11cc677fae099335264c0a5e3748c422b149c8af12ed2b46",
+        "evidenceResponseHash": "75f3c85c06fd71628a6eb78528f40ecf8cfe26d2fe4390df715bc7741482ae67",
+        "reportResponseHash": "9024ac19a014a3ac35f28196a07d62b1de916539eb3f64496daa48450e859442"
+      }
+    },
+    {
+      "caseId": "TECHNICAL_KNOWLEDGE_003",
+      "baseline": {
+        "dimensionScores": {
+          "CORRECTNESS": 4,
+          "DEPTH": 3,
+          "FAILURE_HANDLING": 3
+        },
+        "adjudicatedCoveredConcepts": [
+          "orTimeout异常完成",
+          "底层任务可能继续执行",
+          "Deadline向下游传播",
+          "取消需要协作"
+        ],
+        "adjudicatedIssueConcepts": [
+          "未说明专用Executor隔离",
+          "未说明有界队列或拒绝策略"
+        ],
+        "evidenceVerdict": "NOT_APPLICABLE",
+        "evidenceReferenceIds": [],
+        "adjudicatedActionTopics": [
+          "专用Executor与队列边界",
+          "Deadline向下游传播"
+        ],
+        "proposedActionCount": 3,
+        "totalTokens": 965,
+        "durationMs": 3515,
+        "responseHash": "67a7ba96bd83ef29eb25887fe1f874e70de74e79069f6adf6650353aa18aa14d"
+      },
+      "multiRoleGraph": {
+        "dimensionScores": {
+          "CORRECTNESS": 4,
+          "DEPTH": 3,
+          "FAILURE_HANDLING": 3
+        },
+        "adjudicatedCoveredConcepts": [
+          "orTimeout异常完成",
+          "底层任务可能继续执行",
+          "Deadline向下游传播",
+          "取消需要协作"
+        ],
+        "adjudicatedIssueConcepts": [
+          "未说明专用Executor隔离",
+          "未说明有界队列或拒绝策略"
+        ],
+        "evidenceVerdict": "NOT_APPLICABLE",
+        "evidenceReferenceIds": [],
+        "adjudicatedActionTopics": [
+          "专用Executor与队列边界",
+          "Deadline向下游传播"
+        ],
+        "proposedActionCount": 2,
+        "reportStrengthCount": 4,
+        "memoryCandidateCount": 3,
+        "totalTokens": 3451,
+        "durationMs": 6816,
+        "technicalResponseHash": "042f7d4451a16ddd20848afd0c78a2931ff4f163b6e37645ae0cbdc1fa89dcd7",
+        "evidenceResponseHash": "ffaf7e92b3a488b27ab64095fbd8d8b7ab72dbe8ae9f0448a1b2785f11d99f73",
+        "reportResponseHash": "9846d5030c7e47917f4613ed5cfb24859bf2b7d374da3029d36c2fb6e618d845"
+      }
+    },
+    {
+      "caseId": "PROJECT_DEEP_DIVE_001",
+      "baseline": {
+        "dimensionScores": {
+          "CORRECTNESS": 4,
+          "DEPTH": 2,
+          "FAILURE_HANDLING": 3
+        },
+        "adjudicatedCoveredConcepts": [
+          "owner级Semaphore",
+          "最大并发数为2",
+          "finally释放许可"
+        ],
+        "adjudicatedIssueConcepts": [
+          "缺少多实例全局限制",
+          "一万并发压测没有证据"
+        ],
+        "evidenceVerdict": "PARTIALLY_SUPPORTED",
+        "evidenceReferenceIds": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "adjudicatedActionTopics": [
+          "多实例并发控制边界",
+          "补充容量压测证据"
+        ],
+        "proposedActionCount": 3,
+        "totalTokens": 933,
+        "durationMs": 2842,
+        "responseHash": "3fea92167e403b3d54fa0950f00cd722f512f899aa026349956698dab9694032"
+      },
+      "multiRoleGraph": {
+        "dimensionScores": {
+          "CORRECTNESS": 4,
+          "DEPTH": 2,
+          "FAILURE_HANDLING": 3
+        },
+        "adjudicatedCoveredConcepts": [
+          "owner级Semaphore",
+          "最大并发数为2",
+          "finally释放许可"
+        ],
+        "adjudicatedIssueConcepts": [
+          "缺少多实例全局限制",
+          "一万并发压测没有证据"
+        ],
+        "evidenceVerdict": "PARTIALLY_SUPPORTED",
+        "evidenceReferenceIds": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "adjudicatedActionTopics": [
+          "多实例并发控制边界",
+          "补充容量压测证据"
+        ],
+        "proposedActionCount": 3,
+        "reportStrengthCount": 0,
+        "memoryCandidateCount": 0,
+        "totalTokens": 3031,
+        "durationMs": 6087,
+        "technicalResponseHash": "068f777020b6f21b78c911388ed88af9653384b277bc6e720573049741b6d4fc",
+        "evidenceResponseHash": "e9b63ce5dcb1b1945efa785d4843a65c95a1181972afd677a05826b3a399cad6",
+        "reportResponseHash": "0c9534c10c346c6a8528bd46dcd312ca5a380a2f089ca2d428b588a90cbb0ac5"
+      }
+    },
+    {
+      "caseId": "PROJECT_DEEP_DIVE_002",
+      "baseline": {
+        "dimensionScores": {
+          "CORRECTNESS": 5,
+          "DEPTH": 4,
+          "FAILURE_HANDLING": 5
+        },
+        "adjudicatedCoveredConcepts": [
+          "固定JSON结构",
+          "Java Contract校验",
+          "最多一次修复",
+          "9次验证全部成功"
+        ],
+        "adjudicatedIssueConcepts": [
+          "样本量只有9次"
+        ],
+        "evidenceVerdict": "SUPPORTED",
+        "evidenceReferenceIds": [
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "adjudicatedActionTopics": [
+          "扩大真实验证样本"
+        ],
+        "proposedActionCount": 3,
+        "totalTokens": 1015,
+        "durationMs": 3286,
+        "responseHash": "3e4ab5cd0077e5cc8d09513a2b1697a91e348b884f571d8248d5396787ad1133"
+      },
+      "multiRoleGraph": {
+        "dimensionScores": {
+          "CORRECTNESS": 4,
+          "DEPTH": 4,
+          "FAILURE_HANDLING": 4
+        },
+        "adjudicatedCoveredConcepts": [
+          "固定JSON结构",
+          "Java Contract校验",
+          "最多一次修复",
+          "9次验证全部成功"
+        ],
+        "adjudicatedIssueConcepts": [
+          "样本量只有9次"
+        ],
+        "evidenceVerdict": "SUPPORTED",
+        "evidenceReferenceIds": [
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "adjudicatedActionTopics": [
+          "扩大真实验证样本"
+        ],
+        "proposedActionCount": 3,
+        "reportStrengthCount": 5,
+        "memoryCandidateCount": 3,
+        "totalTokens": 3888,
+        "durationMs": 8132,
+        "technicalResponseHash": "7086cb2085b5e5162dd7ef086534fb6e943982af5007716ef329e7c9265fc1e3",
+        "evidenceResponseHash": "c612405cf106faacce3dd98a5c4a0aa25e3e0834d9a5e692bfa225ed28bc5add",
+        "reportResponseHash": "d73731af50aeb604b58c5d39383eb24808d3a4fa61d2db552f7004c0c156ce80"
+      }
+    },
+    {
+      "caseId": "PROJECT_DEEP_DIVE_003",
+      "baseline": {
+        "dimensionScores": {
+          "CORRECTNESS": 1,
+          "DEPTH": 1,
+          "FAILURE_HANDLING": 1
+        },
+        "adjudicatedCoveredConcepts": [
+          "Redis requestId"
+        ],
+        "adjudicatedIssueConcepts": [
+          "Redis不是业务真相源",
+          "TTL过期后可能重复",
+          "缺少MySQL唯一约束",
+          "没有跨JVM恢复证据"
+        ],
+        "evidenceVerdict": "CONTRADICTED",
+        "evidenceReferenceIds": [
+          "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        ],
+        "adjudicatedActionTopics": [
+          "MySQL业务幂等约束",
+          "Redis丢失边界",
+          "跨JVM崩溃恢复验证"
+        ],
+        "proposedActionCount": 4,
+        "totalTokens": 1065,
+        "durationMs": 3283,
+        "responseHash": "dba334bce690a5de961157709bfe2598961a74bace06780f8c4ed7b26ed977ee"
+      },
+      "multiRoleGraph": {
+        "dimensionScores": {
+          "CORRECTNESS": 1,
+          "DEPTH": 1,
+          "FAILURE_HANDLING": 1
+        },
+        "adjudicatedCoveredConcepts": [
+          "Redis requestId"
+        ],
+        "adjudicatedIssueConcepts": [
+          "Redis不是业务真相源",
+          "TTL过期后可能重复",
+          "缺少MySQL唯一约束",
+          "没有跨JVM恢复证据"
+        ],
+        "evidenceVerdict": "CONTRADICTED",
+        "evidenceReferenceIds": [
+          "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        ],
+        "adjudicatedActionTopics": [
+          "MySQL业务幂等约束",
+          "Redis丢失边界",
+          "跨JVM崩溃恢复验证"
+        ],
+        "proposedActionCount": 3,
+        "reportStrengthCount": 0,
+        "memoryCandidateCount": 0,
+        "totalTokens": 3309,
+        "durationMs": 6888,
+        "technicalResponseHash": "ec15f64034c274ac658244f4314500dfbceb3c90b03c34806e9dd828660f9029",
+        "evidenceResponseHash": "62411ecde0d584561bf422728d68af39fccbc72b767915bcf99f58d79e9bec18",
+        "reportResponseHash": "6cdcdee3f2d04eb4a13b37cd10ebbb064161f6752aee12cadcf6869c67b97269"
+      }
+    },
+    {
+      "caseId": "SYSTEM_DESIGN_001",
+      "baseline": {
+        "dimensionScores": {
+          "CORRECTNESS": 1,
+          "DEPTH": 1,
+          "FAILURE_HANDLING": 1
+        },
+        "adjudicatedCoveredConcepts": [
+          "Redis承载SSE事件",
+          "SSE事件续读"
+        ],
+        "adjudicatedIssueConcepts": [
+          "MySQL必须是业务真相源",
+          "Checkpoint只保存流程进度",
+          "Redis丢失后从MySQL恢复"
+        ],
+        "evidenceVerdict": "CONTRADICTED",
+        "evidenceReferenceIds": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "adjudicatedActionTopics": [
+          "重新划分MySQL与Redis职责",
+          "补充Redis丢失恢复设计"
+        ],
+        "proposedActionCount": 4,
+        "totalTokens": 1054,
+        "durationMs": 3498,
+        "responseHash": "68443dd049dffa818c0ef68ef8de9f598f92eb8bf2ecf8ed3fd75b94f7fe4648"
+      },
+      "multiRoleGraph": {
+        "dimensionScores": {
+          "CORRECTNESS": 1,
+          "DEPTH": 1,
+          "FAILURE_HANDLING": 1
+        },
+        "adjudicatedCoveredConcepts": [
+          "Redis承载SSE事件",
+          "SSE事件续读"
+        ],
+        "adjudicatedIssueConcepts": [
+          "MySQL必须是业务真相源",
+          "Checkpoint只保存流程进度",
+          "Redis丢失后从MySQL恢复"
+        ],
+        "evidenceVerdict": "CONTRADICTED",
+        "evidenceReferenceIds": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "adjudicatedActionTopics": [
+          "重新划分MySQL与Redis职责",
+          "补充Redis丢失恢复设计"
+        ],
+        "proposedActionCount": 4,
+        "reportStrengthCount": 0,
+        "memoryCandidateCount": 0,
+        "totalTokens": 3252,
+        "durationMs": 6989,
+        "technicalResponseHash": "983746e07d5593e6af5e1aa159866e071f0fbd2b884fb70de84ed0e7f22d8945",
+        "evidenceResponseHash": "ab7780f8d6c72ad9b3b1f51d3616ef6cca490a7f97ce64bb040842c456e48715",
+        "reportResponseHash": "81b29bd1ea5e41f7175eed84d54e48333b4a9fa4bd5d990d6abc0cf04c760528"
+      }
+    },
+    {
+      "caseId": "SYSTEM_DESIGN_002",
+      "baseline": {
+        "dimensionScores": {
+          "CORRECTNESS": 4,
+          "DEPTH": 4,
+          "FAILURE_HANDLING": 3
+        },
+        "adjudicatedCoveredConcepts": [
+          "MySQL业务事实优先",
+          "确定性幂等键",
+          "恢复前查询MySQL",
+          "跳过重复模型调用"
+        ],
+        "adjudicatedIssueConcepts": [
+          "未说明状态CAS",
+          "未说明SSE重复事件去重"
+        ],
+        "evidenceVerdict": "SUPPORTED",
+        "evidenceReferenceIds": [
+          "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        ],
+        "adjudicatedActionTopics": [
+          "补充状态CAS",
+          "补充SSE事件幂等"
+        ],
+        "proposedActionCount": 4,
+        "totalTokens": 1047,
+        "durationMs": 3521,
+        "responseHash": "35711864dbf09bb5bd3fc68bc24778f4ea39d88596ae8612374bbb3934c3c657"
+      },
+      "multiRoleGraph": {
+        "dimensionScores": {
+          "CORRECTNESS": 4,
+          "DEPTH": 3,
+          "FAILURE_HANDLING": 3
+        },
+        "adjudicatedCoveredConcepts": [
+          "MySQL业务事实优先",
+          "确定性幂等键",
+          "恢复前查询MySQL"
+        ],
+        "adjudicatedIssueConcepts": [
+          "未说明状态CAS",
+          "未说明SSE重复事件去重"
+        ],
+        "evidenceVerdict": "SUPPORTED",
+        "evidenceReferenceIds": [
+          "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        ],
+        "adjudicatedActionTopics": [
+          "补充状态CAS",
+          "补充SSE事件幂等"
+        ],
+        "proposedActionCount": 2,
+        "reportStrengthCount": 3,
+        "memoryCandidateCount": 3,
+        "totalTokens": 3597,
+        "durationMs": 6486,
+        "technicalResponseHash": "0bcca2f3ba3b6a7c02a00ce9d064b07fc13a4e2242ebc3f41da59f1298efa7b7",
+        "evidenceResponseHash": "08ea1bf57d9d321c7196be58a6ec20911b2e779395023308308555b7f02e285a",
+        "reportResponseHash": "29d9eb348af2e1a5653352efae4e12a8836f3b5ca37da8300ba69d6d857dfd63"
+      }
+    },
+    {
+      "caseId": "SYSTEM_DESIGN_003",
+      "baseline": {
+        "dimensionScores": {
+          "CORRECTNESS": 1,
+          "DEPTH": 1,
+          "FAILURE_HANDLING": 1
+        },
+        "adjudicatedCoveredConcepts": [
+          "Last-Event-ID",
+          "owner鉴权"
+        ],
+        "adjudicatedIssueConcepts": [
+          "回答内容泄漏",
+          "Prompt和模型原始输出泄漏",
+          "异常堆栈泄漏",
+          "鉴权不能替代最小化事件内容"
+        ],
+        "evidenceVerdict": "CONTRADICTED",
+        "evidenceReferenceIds": [
+          "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        ],
+        "adjudicatedActionTopics": [
+          "SSE事件字段白名单",
+          "敏感内容禁止进入Redis",
+          "owner鉴权与最小披露"
+        ],
+        "proposedActionCount": 4,
+        "totalTokens": 1103,
+        "durationMs": 3516,
+        "responseHash": "e5c3431040bd8337faa205ca9d7dfcef416954b8e2ed278559e7a72d2d4e4394"
+      },
+      "multiRoleGraph": {
+        "dimensionScores": {
+          "CORRECTNESS": 1,
+          "DEPTH": 1,
+          "FAILURE_HANDLING": 0
+        },
+        "adjudicatedCoveredConcepts": [
+          "Redis Stream续读",
+          "Last-Event-ID",
+          "owner鉴权"
+        ],
+        "adjudicatedIssueConcepts": [
+          "回答内容泄漏",
+          "Prompt和模型原始输出泄漏",
+          "异常堆栈泄漏",
+          "鉴权不能替代最小化事件内容"
+        ],
+        "evidenceVerdict": "CONTRADICTED",
+        "evidenceReferenceIds": [
+          "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        ],
+        "adjudicatedActionTopics": [
+          "SSE事件字段白名单",
+          "敏感内容禁止进入Redis",
+          "owner鉴权与最小披露"
+        ],
+        "proposedActionCount": 4,
+        "reportStrengthCount": 0,
+        "memoryCandidateCount": 0,
+        "totalTokens": 3503,
+        "durationMs": 8583,
+        "technicalResponseHash": "faf736903014b6ddd1f212ab85bfc48c2525bf62769b531d13e55affd955230c",
+        "evidenceResponseHash": "8df35a4bdc6d2bbe07ad8f268f3a861d865fd02e8e68bb3b50c8e19ab06695ef",
+        "reportResponseHash": "6f2b02be5416a0559df5525bdb235f183d45d27b8be952ddd2f091c9537caf55"
+      }
+    }
+  ]
+}

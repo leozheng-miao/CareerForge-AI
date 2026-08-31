@@ -88,6 +88,10 @@ public class MockInterviewLifecycleApplicationService {
         return mutate(interviewId, expectedVersion, session -> session.interrupt(failureCode, clock.instant()));
     }
 
+    public MockInterviewSession retryReportGeneration(UUID interviewId, long expectedVersion) {
+        return mutate(interviewId, expectedVersion, session -> session.retryReportGeneration(clock.instant()));
+    }
+
     public MockInterviewSession cancel(UUID interviewId, long expectedVersion) {
         Objects.requireNonNull(interviewId, "interviewId不能为空");
         if (expectedVersion < 0) throw new IllegalArgumentException("expectedVersion不能小于0");

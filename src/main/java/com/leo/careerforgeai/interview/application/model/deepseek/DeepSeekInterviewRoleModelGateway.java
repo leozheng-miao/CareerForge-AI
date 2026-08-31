@@ -382,14 +382,25 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
                     evidenceReferenceIds只能引用evidenceByChunkId中的ID，不得伪造或重复。
                     """;
             case REPORT_COACH -> """
+                    roundReviewSummaries严格按回合号升序排列，必须先完成跨轮纵向核对，再生成报告。
+                    每轮errorsOrOmissions只表示当轮结果，不是整场面试的最终缺口。
+                    如果后续回合的回答或coveredPoints已经明确补足前序遗漏，不得再把该遗漏写入technicalGaps。
+                    每项technicalGaps必须基于最新相关回合仍未覆盖的内容，并在文本中注明对应回合。
+                    选择strengths时应覆盖不同回合和不同技能，除非只有一个回合存在Java授权优势。
+                    纯技术知识题或系统设计题未要求个人经历时，不得仅因回答没有项目案例而生成evidenceExpressionRisks。
                     只根据candidate_input_json中的已持久化回合摘要生成待用户确认的复盘报告。
                     不得虚构回合事实，不得声称已经修改Memory或训练计划。
-                    improvementActions至少包含一项，各输出列表内部不得重复。
-                    proposedMemoryCandidates只能描述可验证的技能证据：
-                    skillName填写明确技能名称，content填写得到面试事实支持的能力证据。
-                    不得借Memory建议修改职业目标、学习偏好或时间约束。
-                    proposedTrainingPlanAdjustments只描述下一版训练计划应关注的主题和调整要求。
-                    focusArea填写技能或训练主题，adjustment填写具体调整要求。
+                    strengths只能选择allowedStrengths中的完整字符串，必须原样复制。
+                    allowedStrengths为空时，strengths必须返回空数组。
+                    strengths、technicalGaps、evidenceExpressionRisks和improvementActions均最多返回5项。
+                    technicalGaps、evidenceExpressionRisks和improvementActions每项应简洁，不得复述完整问题或回答。
+                    improvementActions至少包含一项，并且必须可以直接执行。
+                    proposedMemoryCandidates只能选择allowedMemoryCandidates中的完整对象，最多返回2项。
+                    Memory候选的skillName和content必须原样复制，禁止改写、扩展或自行创建。
+                    allowedMemoryCandidates为空时，proposedMemoryCandidates必须返回空数组。
+                    trainingPlanAdjustmentAllowed为false时，proposedTrainingPlanAdjustments必须返回空数组。
+                    trainingPlanAdjustmentAllowed为true时，proposedTrainingPlanAdjustments最多返回3项。
+                    训练计划调整只能描述下一版训练计划应关注的主题和调整要求。
                     所有Memory和训练建议都只是候选，必须等待用户确认。
                     """;
         };
@@ -400,7 +411,7 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
             case INTERVIEWER -> "interviewer-v1";
             case TECHNICAL_REVIEWER -> "technical-reviewer-v1";
             case EVIDENCE_REVIEWER -> "evidence-reviewer-v1";
-            case REPORT_COACH -> "report-coach-v2";
+            case REPORT_COACH -> "report-coach-v7";
         };
     }
 
@@ -408,7 +419,7 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
         return switch (role) {
             case INTERVIEWER, EVIDENCE_REVIEWER -> 1_200;
             case TECHNICAL_REVIEWER -> 1_800;
-            case REPORT_COACH -> 2_500;
+            case REPORT_COACH -> 4_000;
         };
     }
 

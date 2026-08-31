@@ -10,6 +10,7 @@ import com.leo.careerforgeai.interview.application.port.InterviewTrainingPlanSug
 import com.leo.careerforgeai.interview.domain.InterviewReport;
 import com.leo.careerforgeai.interview.domain.InterviewReportConfirmation;
 import com.leo.careerforgeai.interview.domain.MockInterviewInputSnapshot;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +29,7 @@ import java.util.UUID;
  * @author: Miao Zheng
  * @date: 2026-08-30
  */
+@Slf4j
 @Component
 @ConditionalOnBean({
         CareerPlanningRepository.class,
@@ -72,6 +74,12 @@ public class InterviewTrainingPlanSuggestionAdapter
         }
         UUID gapSnapshotId = inputSnapshot.skillGapSnapshotId();
         if (gapSnapshotId == null) {
+            log.warn(
+                    "面试训练计划建议不可应用，reportId={}, inputSnapshotId={}, errorType={}",
+                    report.reportId(),
+                    inputSnapshot.inputSnapshotId(),
+                    TrainingPlanGenerationException.ErrorType.GAP_SNAPSHOT_NOT_FOUND
+            );
             throw new TrainingPlanGenerationException(
                     TrainingPlanGenerationException.ErrorType.GAP_SNAPSHOT_NOT_FOUND,
                     "当前面试没有冻结能力差距快照，不能生成训练计划版本"

@@ -3,6 +3,7 @@ package com.leo.careerforgeai.interview.api.session;
 import com.leo.careerforgeai.interview.api.advice.MockInterviewApiExceptionHandler;
 import com.leo.careerforgeai.interview.api.controller.MockInterviewController;
 import com.leo.careerforgeai.interview.application.execution.MockInterviewAsyncSubmissionApplicationService;
+import com.leo.careerforgeai.interview.application.execution.MockInterviewReportRetryApplicationService;
 import com.leo.careerforgeai.interview.application.session.MockInterviewCancellationConflictException;
 import com.leo.careerforgeai.interview.application.session.MockInterviewCreationApplicationService;
 import com.leo.careerforgeai.interview.application.session.MockInterviewLifecycleApplicationService;
@@ -61,6 +62,9 @@ class MockInterviewControllerTest {
     @Mock
     private MockInterviewLifecycleApplicationService lifecycleService;
 
+    @Mock
+    private MockInterviewReportRetryApplicationService reportRetryService;
+
     private final ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory();
     private MockMvc mockMvc;
 
@@ -74,6 +78,7 @@ class MockInterviewControllerTest {
                 .standaloneSetup(new MockInterviewController(
                         creationService,
                         asyncSubmissionService,
+                        reportRetryService,
                         lifecycleService
                 ))
                 .setControllerAdvice(

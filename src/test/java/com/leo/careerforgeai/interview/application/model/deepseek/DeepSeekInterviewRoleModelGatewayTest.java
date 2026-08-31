@@ -125,6 +125,56 @@ class InterviewRoleModelStabilitySmoke {
         );
     }
 
+    @Test
+    void shouldNotKeepTechnicalGapResolvedByLaterRound() {
+        InterviewReportInput input = new InterviewReportInput(
+                id("cp12-report-cross-round-resolution"),
+                "Java后端工程师，重点考察Java集合与并发实现。",
+                List.of(
+                        """
+                        回合：1
+                        目标技能：HashMap、ConcurrentHashMap
+                        回答：能够说明HashMap数组、链表和红黑树结构，但没有说明树化阈值原因和并发扩容。
+                        已覆盖要点：HashMap基本结构
+                        错误或遗漏：未说明树化阈值8的设计原因；未说明ConcurrentHashMap协助扩容
+                        """,
+                        """
+                        回合：2
+                        是否追问：true
+                        目标技能：HashMap、ConcurrentHashMap
+                        回答：树化阈值8来自哈希均匀条件下的泊松分布低概率设计；ConcurrentHashMap扩容时线程通过CAS认领区间，遇到ForwardingNode可以协助迁移，并使用synchronized锁桶头保证桶迁移安全。
+                        已覆盖要点：树化阈值8及泊松分布原因；CAS认领迁移区间；ForwardingNode协助迁移；synchronized锁桶头
+                        错误或遗漏：无
+                        """
+                ),
+                List.of("能够说明树化阈值8及其概率设计依据"),
+                List.of(),
+                false
+        );
+
+        InterviewRoleModelGateway.Result<InterviewReportDraft> result =
+                modelGateway.generate(reportContract, input, CALL_TIMEOUT);
+
+        assertThat(result.promptVersion()).isEqualTo("report-coach-v7");
+        assertThat(result.output().technicalGaps())
+                .noneMatch(gap -> gap.contains("树化阈值8")
+                        || gap.contains("泊松分布")
+                        || gap.contains("协助扩容")
+                        || gap.contains("ForwardingNode"));
+        assertThat(result.output().proposedTrainingPlanAdjustments()).isEmpty();
+
+        System.out.printf(
+                Locale.ROOT,
+                "caseId=CP12-REPORT-CROSS-ROUND, status=SUCCEEDED, promptVersion=%s, "
+                        + "modelCallCount=%d, totalTokens=%d, durationMs=%d, responseHash=%s%n",
+                result.promptVersion(),
+                result.modelCallCount(),
+                result.usage().totalTokens(),
+                result.durationMs(),
+                result.responseHash()
+        );
+    }
+
     private <I, O> int runRole(
             String casePrefix,
             InterviewRoleContract<I, O> contract,

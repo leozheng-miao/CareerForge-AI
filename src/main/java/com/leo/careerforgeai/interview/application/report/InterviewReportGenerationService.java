@@ -89,6 +89,7 @@ public class InterviewReportGenerationService {
                     interviewId,
                     execution.ownerId(),
                     inputHash,
+                    input,
                     result,
                     clock.instant()
             );

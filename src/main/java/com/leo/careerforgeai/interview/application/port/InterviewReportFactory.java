@@ -22,6 +22,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import com.leo.careerforgeai.interview.application.model.contract.InterviewReportInput;
+import com.leo.careerforgeai.interview.application.report.InterviewReportMemoryCandidatePolicy;
 
 /**
  * @program: CareerForge-AI
@@ -33,9 +35,14 @@ import java.util.UUID;
 public class InterviewReportFactory {
 
     private final JsonMapper jsonMapper;
+    private final InterviewReportMemoryCandidatePolicy memoryCandidatePolicy;
 
-    public InterviewReportFactory(JsonMapper jsonMapper) {
+    public InterviewReportFactory(
+            JsonMapper jsonMapper,
+            InterviewReportMemoryCandidatePolicy memoryCandidatePolicy
+    ) {
         this.jsonMapper = Objects.requireNonNull(jsonMapper, "jsonMapper不能为空");
+        this.memoryCandidatePolicy = Objects.requireNonNull(memoryCandidatePolicy, "memoryCandidatePolicy不能为空");
     }
 
     public InterviewReport create(
@@ -43,6 +50,7 @@ public class InterviewReportFactory {
             UUID interviewId,
             ActorId ownerId,
             String inputHash,
+            InterviewReportInput input,
             InterviewRoleModelGateway.Result<InterviewReportDraft> result,
             Instant createdAt
     ) {
@@ -51,8 +59,9 @@ public class InterviewReportFactory {
         Objects.requireNonNull(ownerId, "ownerId不能为空");
         Objects.requireNonNull(result, "result不能为空");
         Objects.requireNonNull(createdAt, "createdAt不能为空");
+        Objects.requireNonNull(input, "input不能为空");
 
-        InterviewReportDraft draft = result.output();
+        InterviewReportDraft draft = memoryCandidatePolicy.filter(input, result.output());
         List<String> strengths = normalizeItems(draft.strengths(), "strengths");
         List<String> technicalGaps = normalizeItems(draft.technicalGaps(), "technicalGaps");
         List<String> evidenceRisks = normalizeItems(

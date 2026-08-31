@@ -168,7 +168,7 @@ class InterviewReportControllerTest {
         String requestJson = """
                 {
                   "requestId":"81000000-0000-0000-0000-000000000005",
-                  "expectedReportVersion":0,
+                  "expectedVersion":0,
                   "decisions":[
                     {
                       "suggestionId":"81000000-0000-0000-0000-000000000003",
@@ -197,12 +197,14 @@ class InterviewReportControllerTest {
                         .value("APPLIED"))
                 .andExpect(jsonPath("$.data.decisions[0].outputReferenceId")
                         .value(MEMORY_ID.toString()))
+                .andExpect(jsonPath("$.data.expectedVersion").value(0))
                 .andExpect(jsonPath("$.data.decisions[1].applicationStatus")
                         .value("APPLIED"))
                 .andExpect(jsonPath("$.data.decisions[1].outputReferenceId")
                         .value(PLAN_ID.toString()))
                 .andExpect(content().string(not(containsString("ownerId"))))
-                .andExpect(content().string(not(containsString("requestFingerprint"))));
+                .andExpect(content().string(not(containsString("requestFingerprint"))))
+                .andExpect(content().string(not(containsString("expectedReportVersion"))));
 
         verify(confirmationFacade).confirm(
                 eq(INTERVIEW_ID),
@@ -261,7 +263,7 @@ class InterviewReportControllerTest {
                         .content("""
                                 {
                                   "requestId":"81000000-0000-0000-0000-000000000005",
-                                  "expectedReportVersion":0,
+                                  "expectedVersion":0,
                                   "ownerId":"other-owner",
                                   "status":"APPLIED",
                                   "decisions":[]

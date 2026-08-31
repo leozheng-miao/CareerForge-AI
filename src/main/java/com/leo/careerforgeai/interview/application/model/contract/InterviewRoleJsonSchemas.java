@@ -67,45 +67,45 @@ public class InterviewRoleJsonSchemas {
             """;
 
     private static final String INTERVIEW_REPORT = """
-            {
-              "$schema":"https://json-schema.org/draft/2020-12/schema",
-              "type":"object",
-              "additionalProperties":false,
-              "properties":{
-                "strengths":{"type":"array","maxItems":20,"items":{"type":"string","minLength":1,"maxLength":1000}},
-                "technicalGaps":{"type":"array","maxItems":20,"items":{"type":"string","minLength":1,"maxLength":1000}},
-                "evidenceExpressionRisks":{"type":"array","maxItems":20,"items":{"type":"string","minLength":1,"maxLength":1000}},
-                "improvementActions":{"type":"array","minItems":1,"maxItems":20,"items":{"type":"string","minLength":1,"maxLength":1000}},
-                "proposedMemoryCandidates":{
-                  "type":"array",
-                  "maxItems":10,
-                  "items":{
-                    "type":"object",
-                    "additionalProperties":false,
-                    "properties":{
-                      "skillName":{"type":"string","minLength":1,"maxLength":128},
-                      "content":{"type":"string","minLength":1,"maxLength":1000}
-                    },
-                    "required":["skillName","content"]
-                  }
+        {
+          "$schema":"https://json-schema.org/draft/2020-12/schema",
+          "type":"object",
+          "additionalProperties":false,
+          "properties":{
+            "strengths":{"type":"array","maxItems":5,"items":{"type":"string","minLength":1,"maxLength":500}},
+            "technicalGaps":{"type":"array","maxItems":5,"items":{"type":"string","minLength":1,"maxLength":400}},
+            "evidenceExpressionRisks":{"type":"array","maxItems":5,"items":{"type":"string","minLength":1,"maxLength":400}},
+            "improvementActions":{"type":"array","minItems":1,"maxItems":5,"items":{"type":"string","minLength":1,"maxLength":400}},
+            "proposedMemoryCandidates":{
+              "type":"array",
+              "maxItems":2,
+              "items":{
+                "type":"object",
+                "additionalProperties":false,
+                "properties":{
+                  "skillName":{"type":"string","minLength":1,"maxLength":128},
+                  "content":{"type":"string","minLength":1,"maxLength":1000}
                 },
-                "proposedTrainingPlanAdjustments":{
-                  "type":"array",
-                  "maxItems":10,
-                  "items":{
-                    "type":"object",
-                    "additionalProperties":false,
-                    "properties":{
-                      "focusArea":{"type":"string","minLength":1,"maxLength":128},
-                      "adjustment":{"type":"string","minLength":1,"maxLength":1000}
-                    },
-                    "required":["focusArea","adjustment"]
-                  }
-                }
-              },
-              "required":["strengths","technicalGaps","evidenceExpressionRisks","improvementActions","proposedMemoryCandidates","proposedTrainingPlanAdjustments"]
+                "required":["skillName","content"]
+              }
+            },
+            "proposedTrainingPlanAdjustments":{
+              "type":"array",
+              "maxItems":3,
+              "items":{
+                "type":"object",
+                "additionalProperties":false,
+                "properties":{
+                  "focusArea":{"type":"string","minLength":1,"maxLength":128},
+                  "adjustment":{"type":"string","minLength":1,"maxLength":1000}
+                },
+                "required":["focusArea","adjustment"]
+              }
             }
-            """;
+          },
+          "required":["strengths","technicalGaps","evidenceExpressionRisks","improvementActions","proposedMemoryCandidates","proposedTrainingPlanAdjustments"]
+        }
+        """;
 
     private InterviewRoleJsonSchemas() {
     }

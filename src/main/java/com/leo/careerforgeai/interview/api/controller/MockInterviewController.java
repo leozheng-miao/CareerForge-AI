@@ -1,14 +1,19 @@
 package com.leo.careerforgeai.interview.api.controller;
 
+import com.leo.careerforgeai.interview.api.dto.session.CancelMockInterviewRequest;
 import com.leo.careerforgeai.interview.api.dto.session.CreateMockInterviewRequest;
 import com.leo.careerforgeai.interview.api.dto.session.MockInterviewSessionResponse;
+import com.leo.careerforgeai.interview.api.dto.session.RetryInterruptedMockInterviewRequest;
 import com.leo.careerforgeai.interview.api.dto.session.StartMockInterviewRequest;
 import com.leo.careerforgeai.interview.application.execution.MockInterviewAsyncSubmissionApplicationService;
+import com.leo.careerforgeai.interview.application.execution.MockInterviewReportRetryApplicationService;
 import com.leo.careerforgeai.interview.application.session.MockInterviewCreationApplicationService;
 import com.leo.careerforgeai.interview.application.session.MockInterviewLifecycleApplicationService;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -16,16 +21,13 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Objects;
 import java.util.UUID;
-import com.leo.careerforgeai.interview.api.dto.session.CancelMockInterviewRequest;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
 /**
  * @program: CareerForge-AI
- * @description: 提供当前用户模拟面试的创建、异步启动和状态查询API
+ * @description: 提供当前用户模拟面试的创建、异步执行、报告恢复和状态查询API
  * @author: Miao Zheng
- * @date: 2026-08-30
- **/
+ * @date: 2026-08-31
+ */
 @RestController
 @RequestMapping("/api/mock-interviews")
 @Tag(name = "Mock Interview")
@@ -34,13 +36,18 @@ public class MockInterviewController {
 
     private final MockInterviewCreationApplicationService creationService;
     private final MockInterviewAsyncSubmissionApplicationService asyncSubmissionService;
+    private final MockInterviewReportRetryApplicationService reportRetryService;
     private final MockInterviewLifecycleApplicationService lifecycleService;
 
-    public MockInterviewController(MockInterviewCreationApplicationService creationService,
-                                   MockInterviewAsyncSubmissionApplicationService asyncSubmissionService,
-                                   MockInterviewLifecycleApplicationService lifecycleService) {
+    public MockInterviewController(
+            MockInterviewCreationApplicationService creationService,
+            MockInterviewAsyncSubmissionApplicationService asyncSubmissionService,
+            MockInterviewReportRetryApplicationService reportRetryService,
+            MockInterviewLifecycleApplicationService lifecycleService
+    ) {
         this.creationService = Objects.requireNonNull(creationService, "creationService不能为空");
         this.asyncSubmissionService = Objects.requireNonNull(asyncSubmissionService, "asyncSubmissionService不能为空");
+        this.reportRetryService = Objects.requireNonNull(reportRetryService, "reportRetryService不能为空");
         this.lifecycleService = Objects.requireNonNull(lifecycleService, "lifecycleService不能为空");
     }
 
@@ -62,6 +69,24 @@ public class MockInterviewController {
     ) {
         return ResultUtils.success(MockInterviewSessionResponse.from(
                 asyncSubmissionService.submitStart(interviewId, request.expectedVersion())
+        ));
+    }
+
+    @PostMapping("/{interviewId}/report/retry")
+    @Operation(summary = "从安全Checkpoint重新执行当前用户中断的报告生成节点")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "恢复请求已接受或返回已经恢复的幂等结果"),
+            @ApiResponse(responseCode = "400", description = "请求参数不合法"),
+            @ApiResponse(responseCode = "404", description = "模拟面试不存在或不属于当前用户"),
+            @ApiResponse(responseCode = "409", description = "版本或面试状态冲突"),
+            @ApiResponse(responseCode = "429", description = "当前异步执行容量已满")
+    })
+    public BaseResponse<MockInterviewSessionResponse> retryReport(
+            @PathVariable UUID interviewId,
+            @Valid @RequestBody RetryInterruptedMockInterviewRequest request
+    ) {
+        return ResultUtils.success(MockInterviewSessionResponse.from(
+                reportRetryService.submit(interviewId, request.expectedVersion())
         ));
     }
 

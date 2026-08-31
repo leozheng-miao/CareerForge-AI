@@ -10,12 +10,12 @@ import java.util.UUID;
  * @program: CareerForge-AI
  * @description: 返回报告逐项决定及其Memory或训练计划应用结果
  * @author: Miao Zheng
- * @date: 2026-08-30
+ * @date: 2026-08-31
  * @param confirmationId 确认单UUID
  * @param reportId 报告UUID
  * @param interviewId 面试UUID
  * @param requestId 客户端幂等请求UUID
- * @param expectedReportVersion 确认时使用的报告版本
+ * @param expectedVersion 确认时使用的报告乐观锁版本
  * @param status 整张确认单应用状态
  * @param decisions 逐项应用结果
  * @param failureCode 聚合失败码
@@ -29,7 +29,7 @@ public record InterviewReportConfirmationResponse(
         UUID reportId,
         UUID interviewId,
         UUID requestId,
-        long expectedReportVersion,
+        long expectedVersion,
         InterviewReportConfirmation.Status status,
         List<DecisionResponse> decisions,
         String failureCode,

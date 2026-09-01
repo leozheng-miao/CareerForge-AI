@@ -61,6 +61,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachStructuredOutputRepairer;
 
 /**
  * @program: CareerForge-AI
@@ -279,7 +280,9 @@ class CareerCoachCrossModuleSafetyTest {
                         jsonMapper,
                         validatorFactory.getValidator()
                 ),
-                scopeProvider()
+                scopeProvider(),
+                mock(CareerCoachStructuredOutputRepairer.class),
+                clock
         );
     }
 

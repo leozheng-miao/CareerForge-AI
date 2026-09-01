@@ -9,5 +9,6 @@ package com.leo.careerforgeai.agent.domain.loop;
 public enum AgentModelOutcome {
     FINAL_ANSWER,
     TOOL_CALLS,
+    STRUCTURED_REPAIR,
     FAILURE
 }

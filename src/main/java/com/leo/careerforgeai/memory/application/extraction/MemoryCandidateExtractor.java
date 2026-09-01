@@ -146,8 +146,7 @@ public final class MemoryCandidateExtractor {
                 accumulatedUsage = mergeUsage(accumulatedUsage, exception.getModelUsage());
                 accumulatedDurationMs = saturatedAdd(accumulatedDurationMs, exception.getModelDurationMs());
 
-                if (exception.getErrorType() != MemoryExtractionErrorType.MODEL_OUTPUT_INVALID
-                        || attempt == MAX_MODEL_CALLS) {
+                if (!isRepairableOutputFailure(exception) || attempt == MAX_MODEL_CALLS) {
                     throw exception.withModelMetrics(accumulatedUsage, accumulatedDurationMs, attempt);
                 }
             }
@@ -223,6 +222,14 @@ public final class MemoryCandidateExtractor {
         }
 
         return List.copyOf(turns);
+    }
+
+    private static boolean isRepairableOutputFailure(MemoryExtractionException exception) {
+        if (exception.getErrorType() != MemoryExtractionErrorType.MODEL_OUTPUT_INVALID) return false;
+        return switch (exception.getFailureStage()) {
+            case JSON_PARSING, OUTPUT_STRUCTURE_VALIDATION -> true;
+            default -> false;
+        };
     }
 
     private String serializeTurns(List<MemoryExtractionTurnInput> turns) {

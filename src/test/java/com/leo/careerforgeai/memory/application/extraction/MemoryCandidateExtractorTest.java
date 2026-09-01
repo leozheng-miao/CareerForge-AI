@@ -17,6 +17,7 @@ import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
@@ -116,29 +117,30 @@ class MemoryCandidateExtractorTest {
 
     @ParameterizedTest
     @MethodSource("invalidModelOutputs")
-    void shouldRetryOnceAndRejectStillInvalidModelOutput(String output) {
+    void shouldClassifyFailureAndRepairOnlyStructuralOutput(
+            String output,
+            MemoryExtractionFailureStage expectedStage,
+            int expectedModelCalls
+    ) {
         when(modelGateway.chat(any())).thenReturn(response(output));
 
         assertThatThrownBy(() -> extractor.extract(validTurns()))
-                .isInstanceOfSatisfying(
-                        MemoryExtractionException.class,
-                        exception -> {
-                            assertThat(exception.getErrorType())
-                                    .isEqualTo(MemoryExtractionErrorType.MODEL_OUTPUT_INVALID);
-                            assertThat(exception.getFailureStage()).isNotNull();
-                            assertThat(exception.getModelRequestId())
-                                    .isEqualTo("memory-request-1");
-                            assertThat(exception.getModelUsage())
-                                    .isEqualTo(new ModelUsage(200, 60, 260));
-                            assertThat(exception.getModelDurationMs())
-                                    .isGreaterThanOrEqualTo(0);
-                            assertThat(exception.getModelCallCount()).isEqualTo(2);
-                        }
-                );
+                .isInstanceOfSatisfying(MemoryExtractionException.class, exception -> {
+                    assertThat(exception.getErrorType())
+                            .isEqualTo(MemoryExtractionErrorType.MODEL_OUTPUT_INVALID);
+                    assertThat(exception.getFailureStage()).isEqualTo(expectedStage);
+                    assertThat(exception.getModelRequestId()).isEqualTo("memory-request-1");
+                    assertThat(exception.getModelUsage()).isEqualTo(new ModelUsage(
+                            100L * expectedModelCalls,
+                            30L * expectedModelCalls,
+                            130L * expectedModelCalls
+                    ));
+                    assertThat(exception.getModelDurationMs()).isNotNegative();
+                    assertThat(exception.getModelCallCount()).isEqualTo(expectedModelCalls);
+                });
 
-        verify(modelGateway, times(2)).chat(any());
+        verify(modelGateway, times(expectedModelCalls)).chat(any());
     }
-
     @Test
     void shouldRetryInvalidOutputOnceAndAggregateSuccessfulMetrics() {
         when(modelGateway.chat(any())).thenReturn(
@@ -230,45 +232,69 @@ class MemoryCandidateExtractorTest {
         verify(modelGateway).chat(any());
     }
 
-    private static Stream<String> invalidModelOutputs() {
+    private static Stream<Arguments> invalidModelOutputs() {
+        String missingSourceTurnId = candidateJson(
+                "TIME_CONSTRAINT", "weekly_hours", "候选内容",
+                TURN_ID, "[\"" + TURN_ID + "\"]"
+        ).replace("\"sourceTurnId\": \"" + TURN_ID + "\",", "");
+
         return Stream.of(
-                "not-json",
-                "{\"candidates\":[]} trailing",
-                "{\"candidates\":[],\"status\":\"CONFIRMED\"}",
-                candidateJson(
-                        "UNKNOWN",
-                        "primary",
-                        "候选内容",
-                        TURN_ID,
-                        "[\"" + TURN_ID + "\"]"
+                Arguments.of("not-json", MemoryExtractionFailureStage.JSON_PARSING, 2),
+                Arguments.of(
+                        "{\"candidates\":[]} trailing",
+                        MemoryExtractionFailureStage.JSON_PARSING,
+                        2
                 ),
-                candidateJson(
-                        "CAREER_GOAL",
-                        "weekly_hours",
-                        "候选内容",
-                        TURN_ID,
-                        "[\"" + TURN_ID + "\"]"
+                Arguments.of(
+                        "{\"candidates\":[],\"status\":\"CONFIRMED\"}",
+                        MemoryExtractionFailureStage.JSON_PARSING,
+                        2
                 ),
-                candidateJson(
-                        "TIME_CONSTRAINT",
-                        "weekly_hours",
-                        "候选内容",
-                        OUTSIDE_TURN_ID,
-                        "[\"" + OUTSIDE_TURN_ID + "\"]"
+                Arguments.of(
+                        candidateJson(
+                                "UNKNOWN", "primary", "候选内容",
+                                TURN_ID, "[\"" + TURN_ID + "\"]"
+                        ),
+                        MemoryExtractionFailureStage.JSON_PARSING,
+                        2
                 ),
-                candidateJson(
-                        "TIME_CONSTRAINT",
-                        "weekly_hours",
-                        "候选内容",
-                        TURN_ID,
-                        "[\"" + TURN_ID + "\",\"" + TURN_ID + "\"]"
+                Arguments.of(
+                        missingSourceTurnId,
+                        MemoryExtractionFailureStage.OUTPUT_STRUCTURE_VALIDATION,
+                        2
                 ),
-                candidateJson(
-                        "LEARNING_PREFERENCE",
-                        "content_format",
-                        "api_key=secret-value-123456",
-                        TURN_ID,
-                        "[\"" + TURN_ID + "\"]"
+                Arguments.of(
+                        candidateJson(
+                                "CAREER_GOAL", "weekly_hours", "候选内容",
+                                TURN_ID, "[\"" + TURN_ID + "\"]"
+                        ),
+                        MemoryExtractionFailureStage.CANDIDATE_BUSINESS_VALIDATION,
+                        1
+                ),
+                Arguments.of(
+                        candidateJson(
+                                "TIME_CONSTRAINT", "weekly_hours", "候选内容",
+                                OUTSIDE_TURN_ID, "[\"" + OUTSIDE_TURN_ID + "\"]"
+                        ),
+                        MemoryExtractionFailureStage.SOURCE_REFERENCE_VALIDATION,
+                        1
+                ),
+                Arguments.of(
+                        candidateJson(
+                                "TIME_CONSTRAINT", "weekly_hours", "候选内容",
+                                TURN_ID, "[\"" + TURN_ID + "\",\"" + TURN_ID + "\"]"
+                        ),
+                        MemoryExtractionFailureStage.SOURCE_REFERENCE_VALIDATION,
+                        1
+                ),
+                Arguments.of(
+                        candidateJson(
+                                "LEARNING_PREFERENCE", "content_format",
+                                "api_key=secret-value-123456",
+                                TURN_ID, "[\"" + TURN_ID + "\"]"
+                        ),
+                        MemoryExtractionFailureStage.SENSITIVE_CONTENT_VALIDATION,
+                        1
                 )
         );
     }

@@ -62,6 +62,7 @@ public final class AgentLoop {
     private final ToolCallFingerprintService fingerprintService;
     private final AgentLoopPolicy policy;
     private final Clock clock;
+    private static final double STRUCTURED_OUTPUT_TEMPERATURE = 0.2;
 
     public AgentLoop(
             ToolCallingGateway modelGateway,
@@ -127,6 +128,7 @@ public final class AgentLoop {
                     ToolChoiceMode.AUTO,
                     request.outputFormat(),
                     policy.maxOutputTokensPerModelCall(),
+                    STRUCTURED_OUTPUT_TEMPERATURE,
                     state.modelCallTimeout(clock.instant())
             );
 

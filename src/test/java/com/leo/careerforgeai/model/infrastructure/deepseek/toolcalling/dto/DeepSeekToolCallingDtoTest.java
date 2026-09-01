@@ -68,6 +68,7 @@ class DeepSeekToolCallingDtoTest {
                 "auto",
                 new DeepSeekToolCallingRequest.Thinking("disabled"),
                 512,
+                1.0,
                 false,
                 new DeepSeekToolCallingRequest.ResponseFormat("json_object")
         );
@@ -78,6 +79,7 @@ class DeepSeekToolCallingDtoTest {
         assertThat(root.get("thinking").get("type").asText()).isEqualTo("disabled");
         assertThat(root.get("response_format").get("type").asText()).isEqualTo("json_object");
         assertThat(root.get("max_tokens").asInt()).isEqualTo(512);
+        assertThat(root.get("temperature").asDouble()).isEqualTo(1.0);
         assertThat(root.get("messages").get(2).get("tool_calls").get(0).get("id").asText()).isEqualTo("call-1");
         assertThat(root.get("messages").get(3).get("tool_call_id").asText()).isEqualTo("call-1");
         assertThat(root.get("messages").get(0).get("tool_calls")).isNull();

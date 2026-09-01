@@ -16,6 +16,8 @@ import com.leo.careerforgeai.model.domain.toolcalling.ToolDefinition;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolResultMessage;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
+import com.leo.careerforgeai.model.exception.completion.ModelCompletionException;
+import com.leo.careerforgeai.model.exception.completion.ModelCompletionStatus;
 import com.leo.careerforgeai.model.infrastructure.deepseek.toolcalling.dto.DeepSeekToolCallingRequest;
 import com.leo.careerforgeai.model.infrastructure.deepseek.toolcalling.dto.DeepSeekToolCallingResponse;
 import com.leo.careerforgeai.shared.exception.BusinessException;
@@ -77,11 +79,11 @@ public class DeepSeekToolCallingClient implements ToolCallingGateway {
         if (request == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "Tool Calling 请求不能为空");
 
         long startNanos = System.nanoTime();
+        DeepSeekToolCallingRequest providerRequest = toProviderRequest(request);
         try {
-            DeepSeekToolCallingRequest providerRequest = toProviderRequest(request);
             DeepSeekToolCallingResponse providerResponse = execute(providerRequest, request.timeout());
-            ToolCallingModelResult result = toDomainResult(providerResponse);
             long durationMs = Duration.ofNanos(System.nanoTime() - startNanos).toMillis();
+            ToolCallingModelResult result = toDomainResult(providerResponse, durationMs);
 
             log.info("DeepSeek Tool Calling 完成，requestId={}, model={}, resultType={}, durationMs={}, totalTokens={}",
                     result.requestId(), result.model(), result.getClass().getSimpleName(), durationMs, result.usage().totalTokens());
@@ -107,6 +109,7 @@ public class DeepSeekToolCallingClient implements ToolCallingGateway {
                 request.toolChoiceMode().name().toLowerCase(Locale.ROOT),
                 new DeepSeekToolCallingRequest.Thinking("disabled"),
                 request.maxOutputTokens(),
+                request.temperature(),
                 false,
                 new DeepSeekToolCallingRequest.ResponseFormat(
                         request.outputFormat() == ModelOutputFormat.JSON_OBJECT ? "json_object" : "text"
@@ -234,19 +237,114 @@ public class DeepSeekToolCallingClient implements ToolCallingGateway {
         return new IOException("Tool Calling模型异步调用失败", cause);
     }
 
-    private ToolCallingModelResult toDomainResult(DeepSeekToolCallingResponse response) {
+    private ToolCallingModelResult toDomainResult(
+            DeepSeekToolCallingResponse response,
+            long durationMs
+    ) {
         validateEnvelope(response);
 
-        DeepSeekToolCallingResponse.Choice choice = response.choices().getFirst();
-        DeepSeekToolCallingResponse.Message message = choice.message();
+        DeepSeekToolCallingResponse.Choice choice =
+                response.choices().getFirst();
+        DeepSeekToolCallingResponse.Message message =
+                choice.message();
         ModelUsage usage = toModelUsage(response.usage());
 
         return switch (choice.finishReason()) {
-            case "stop" -> toFinalAnswer(response, message, usage);
-            case "tool_calls" -> toToolCallsResult(response, message, usage);
-            default -> throw new ModelException(ModelErrorType.INVALID_RESPONSE,
-                    "Tool Calling 响应未正常完成，finishReason=" + choice.finishReason());
+            case "stop" ->
+                    toFinalAnswer(response, message, usage);
+            case "tool_calls" ->
+                    toToolCallsResult(response, message, usage);
+            case "length" ->
+                    throw incompleteResponse(
+                            response,
+                            message,
+                            usage,
+                            durationMs,
+                            ModelCompletionStatus.OUTPUT_TOKEN_LIMIT_REACHED
+                    );
+            case "content_filter" ->
+                    throw incompleteResponse(
+                            response,
+                            message,
+                            usage,
+                            durationMs,
+                            ModelCompletionStatus.CONTENT_FILTERED
+                    );
+            case "insufficient_system_resource" ->
+                    throw incompleteResponse(
+                            response,
+                            message,
+                            usage,
+                            durationMs,
+                            ModelCompletionStatus.PROVIDER_RESOURCE_INTERRUPTED
+                    );
+            default ->
+                    throw incompleteResponse(
+                            response,
+                            message,
+                            usage,
+                            durationMs,
+                            ModelCompletionStatus.UNKNOWN_INCOMPLETE
+                    );
         };
+    }
+
+    private ModelCompletionException incompleteResponse(
+            DeepSeekToolCallingResponse response,
+            DeepSeekToolCallingResponse.Message message,
+            ModelUsage usage,
+            long durationMs,
+            ModelCompletionStatus completionStatus
+    ) {
+        String finishReason =
+                response.choices().getFirst().finishReason();
+        ModelCompletionException exception =
+                new ModelCompletionException(
+                        completionStatus,
+                        finishReason,
+                        response.id(),
+                        response.model(),
+                        usage,
+                        durationMs,
+                        partialOutput(message)
+                );
+
+        log.warn(
+                "DeepSeek Tool Calling未完整完成，providerRequestId={}, model={}, completionStatus={}, finishReason={}, durationMs={}, outputChars={}, outputSha256={}, totalTokens={}",
+                exception.providerRequestId(),
+                exception.model(),
+                exception.completionStatus(),
+                exception.providerFinishReason(),
+                exception.durationMs(),
+                exception.outputChars(),
+                exception.outputSha256(),
+                usage.totalTokens()
+        );
+        return exception;
+    }
+
+    private String partialOutput(
+            DeepSeekToolCallingResponse.Message message
+    ) {
+        StringBuilder output = new StringBuilder();
+
+        if (message.content() != null) {
+            output.append(message.content());
+        }
+
+        if (message.toolCalls() != null) {
+            for (DeepSeekToolCallingResponse.ToolCall toolCall
+                    : message.toolCalls()) {
+                if (toolCall != null
+                        && toolCall.function() != null
+                        && toolCall.function().arguments() != null) {
+                    if (output.length() > 0) output.append('\n');
+                    output.append(toolCall.function().arguments());
+                }
+            }
+        }
+
+        return output.toString();
     }
 
     private void validateEnvelope(DeepSeekToolCallingResponse response) {

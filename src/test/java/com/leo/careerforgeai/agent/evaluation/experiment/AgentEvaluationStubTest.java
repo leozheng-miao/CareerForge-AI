@@ -71,6 +71,7 @@ import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachStructuredOutputRepairer;
 
 /**
  * @program: CareerForge-AI
@@ -789,7 +790,9 @@ class AgentEvaluationStubTest {
                         jsonMapper,
                         validatorFactory.getValidator()
                 ),
-                new CareerCoachScopeProvider(sourceProperties())
+                new CareerCoachScopeProvider(sourceProperties()),
+                mock(CareerCoachStructuredOutputRepairer.class),
+                clock
         );
     }
 

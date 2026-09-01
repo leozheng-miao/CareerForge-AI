@@ -2,6 +2,7 @@ package com.leo.careerforgeai.agent.application.coach;
 
 import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerException;
 import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerValidator;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachStructuredOutputRepairer;
 import com.leo.careerforgeai.agent.application.loop.AgentLoop;
 import com.leo.careerforgeai.agent.application.loop.AgentLoopObserver;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswer;
@@ -20,6 +21,15 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachStructuredOutputRepairer;
+import com.leo.careerforgeai.agent.domain.loop.AgentModelOutcome;
+import com.leo.careerforgeai.agent.domain.loop.trace.AgentModelCallTrace;
+import com.leo.careerforgeai.agent.domain.loop.trace.AgentRunTrace;
+import com.leo.careerforgeai.model.domain.ModelResponse;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
 
 /**
  * @program: CareerForge-AI
@@ -36,15 +46,21 @@ public final class CareerCoachService {
     private final AgentLoop agentLoop;
     private final CareerCoachFinalAnswerValidator finalAnswerValidator;
     private final RetrievalScope serverRetrievalScope;
+    private final CareerCoachStructuredOutputRepairer outputRepairer;
+    private final Clock clock;
 
     public CareerCoachService(
             AgentLoop agentLoop,
             CareerCoachFinalAnswerValidator finalAnswerValidator,
-            CareerCoachScopeProvider scopeProvider
+            CareerCoachScopeProvider scopeProvider,
+            CareerCoachStructuredOutputRepairer outputRepairer,
+            Clock clock
     ) {
         this.agentLoop = Objects.requireNonNull(agentLoop, "agentLoop不能为空");
         this.finalAnswerValidator = Objects.requireNonNull(finalAnswerValidator, "finalAnswerValidator不能为空");
         this.serverRetrievalScope = Objects.requireNonNull(scopeProvider, "scopeProvider不能为空").scope();
+        this.outputRepairer = Objects.requireNonNull(outputRepairer, "outputRepairer不能为空");
+        this.clock = Objects.requireNonNull(clock, "clock不能为空");
     }
 
     public CareerCoachResult coach(String message) {
@@ -128,34 +144,104 @@ public final class CareerCoachService {
 
     private CareerCoachResult finish(AgentLoopResult loopResult) {
         if (loopResult.status() != AgentRunStatus.COMPLETED) {
-            log.warn(
-                    "Career Coach未完成，runId={}, status={}, terminationReason={}",
-                    loopResult.trace().runId(),
-                    loopResult.status(),
-                    loopResult.terminationReason()
-            );
+            log.warn("Career Coach未完成，runId={}, status={}, terminationReason={}",
+                    loopResult.trace().runId(), loopResult.status(), loopResult.terminationReason());
             throw new CareerCoachExecutionException(loopResult);
         }
 
         try {
             CareerCoachAnswer answer = finalAnswerValidator.validate(loopResult);
-            log.info(
-                    "Career Coach完成，runId={}, answerStatus={}, modelCalls={}, toolCalls={}, totalTokens={}",
-                    loopResult.trace().runId(),
-                    answer.status(),
-                    loopResult.trace().modelCalls().size(),
-                    loopResult.trace().toolCalls().size(),
-                    loopResult.trace().totalUsage().totalTokens()
-            );
+            logCompleted(loopResult.trace(), answer, false);
             return new CareerCoachResult(answer, loopResult.trace());
         } catch (CareerCoachFinalAnswerException exception) {
-            log.warn(
-                    "Career Coach最终回答校验失败，runId={}, errorType={}",
-                    loopResult.trace().runId(),
-                    exception.getErrorType()
-            );
-            throw exception.withTrace(loopResult.trace());
+            logValidationFailure(loopResult.trace().runId(), exception, false);
+            if (!outputRepairer.supports(exception)) throw exception.withTrace(loopResult.trace());
+            return repairOnce(loopResult, exception);
         }
+    }
+
+    private CareerCoachResult repairOnce(
+            AgentLoopResult loopResult,
+            CareerCoachFinalAnswerException originalFailure
+    ) {
+        long startedAt = System.nanoTime();
+        ModelResponse response;
+        try {
+            response = outputRepairer.repair(loopResult.finalContent(), originalFailure);
+        } catch (RuntimeException exception) {
+            log.warn("Career Coach结构修复调用失败，runId={}, originalStage={}, repairAttempt=1, failureType={}",
+                    loopResult.trace().runId(), originalFailure.getFailureStage(),
+                    exception.getClass().getSimpleName());
+            throw originalFailure.withTrace(loopResult.trace());
+        }
+
+        long durationMs = Math.max(0, (System.nanoTime() - startedAt) / 1_000_000);
+        AgentRunTrace repairedTrace = appendRepairTrace(
+                loopResult.trace(), response, durationMs, loopResult.finalContent()
+        );
+
+        try {
+            CareerCoachAnswer answer = finalAnswerValidator.validate(
+                    response.content(), loopResult.toolResults()
+            );
+            log.info("Career Coach结构修复成功，runId={}, repairRequestId={}, repairAttempt=1, repairTokens={}, repairDurationMs={}",
+                    repairedTrace.runId(), response.requestId(), response.usage().totalTokens(), durationMs);
+            logCompleted(repairedTrace, answer, true);
+            return new CareerCoachResult(answer, repairedTrace);
+        } catch (CareerCoachFinalAnswerException exception) {
+            logValidationFailure(repairedTrace.runId(), exception, true);
+            throw exception.withTrace(repairedTrace);
+        }
+    }
+
+    private AgentRunTrace appendRepairTrace(
+            AgentRunTrace original,
+            ModelResponse response,
+            long durationMs,
+            String invalidOutput
+    ) {
+        List<AgentModelCallTrace> modelCalls = new ArrayList<>(original.modelCalls());
+        int iteration = modelCalls.stream().mapToInt(AgentModelCallTrace::iteration).max().orElse(0) + 1;
+        long estimatedInputTokens = Math.max(1, (invalidOutput.length() + 1L) / 2L);
+        modelCalls.add(new AgentModelCallTrace(
+                iteration,
+                response.requestId(),
+                response.model(),
+                AgentModelOutcome.STRUCTURED_REPAIR,
+                durationMs,
+                estimatedInputTokens,
+                response.usage(),
+                null
+        ));
+
+        Instant finishedAt = clock.instant();
+        if (finishedAt.isBefore(original.finishedAt())) finishedAt = original.finishedAt();
+        return new AgentRunTrace(
+                original.runId(),
+                original.startedAt(),
+                finishedAt,
+                original.status(),
+                original.terminationReason(),
+                modelCalls,
+                original.toolCalls()
+        );
+    }
+
+    private void logCompleted(AgentRunTrace trace, CareerCoachAnswer answer, boolean repaired) {
+        log.info("Career Coach完成，runId={}, answerStatus={}, modelCalls={}, toolCalls={}, repaired={}, totalTokens={}",
+                trace.runId(), answer.status(), trace.modelCalls().size(),
+                trace.toolCalls().size(), repaired, trace.totalUsage().totalTokens());
+    }
+
+    private void logValidationFailure(
+            String runId,
+            CareerCoachFinalAnswerException exception,
+            boolean repairAttempt
+    ) {
+        log.warn("Career Coach最终回答校验失败，runId={}, errorType={}, failureStage={}, failureReason={}, fieldPath={}, repairAttempt={}, outputChars={}, outputSha256={}",
+                runId, exception.getErrorType(), exception.getFailureStage(),
+                exception.getFailureReason(), exception.getFieldPath(), repairAttempt ? 1 : 0,
+                exception.getOutputChars(), exception.getOutputSha256());
     }
 
     private String normalizeUserMessage(String message) {

@@ -164,4 +164,26 @@ class ToolCallingRequestTest {
                         "乐观锁通常通过版本号检测并发更新"
                 ));
     }
+
+    @Test
+    void shouldCarryAndValidateServerControlledTemperature() {
+        List<ToolCallingMessage> messages = List.of(
+                new ToolCallingTextMessage(ModelRole.SYSTEM, "系统规则"),
+                new ToolCallingTextMessage(ModelRole.USER, "解析岗位")
+        );
+
+        ToolCallingRequest request = new ToolCallingRequest(
+                messages, List.of(SEARCH_TOOL), ToolChoiceMode.AUTO,
+                ModelOutputFormat.JSON_OBJECT, 512, 0.2, java.time.Duration.ofSeconds(5)
+        );
+
+        assertThat(request.temperature()).isEqualTo(0.2);
+        for (double invalid : List.of(-0.1, 2.1, Double.NaN, Double.POSITIVE_INFINITY)) {
+            assertThatThrownBy(() -> new ToolCallingRequest(
+                    messages, List.of(SEARCH_TOOL), ToolChoiceMode.AUTO,
+                    ModelOutputFormat.JSON_OBJECT, 512, invalid, java.time.Duration.ofSeconds(5)
+            )).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("temperature");
+        }
+    }
 }

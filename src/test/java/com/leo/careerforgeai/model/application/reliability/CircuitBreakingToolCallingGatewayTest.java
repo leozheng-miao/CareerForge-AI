@@ -14,6 +14,8 @@ import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -43,8 +45,14 @@ class CircuitBreakingToolCallingGatewayTest {
             new ModelUsage(10, 5, 15)
     );
 
-    @Test
-    void shouldOpenBlockAndCloseAfterSuccessfulHalfOpenProbes() {
+    @ParameterizedTest
+    @EnumSource(
+            value = ModelErrorType.class,
+            names = {"PROVIDER_ERROR", "PROVIDER_UNAVAILABLE"}
+    )
+    void shouldOpenBlockAndCloseAfterSuccessfulHalfOpenProbes(
+            ModelErrorType recordedFailureType
+    ) {
         AdjustableClock clock = new AdjustableClock(
                 Instant.parse("2026-08-24T00:00:00Z")
         );
@@ -60,7 +68,7 @@ class CircuitBreakingToolCallingGatewayTest {
             attempts.incrementAndGet();
             if (failing.get()) {
                 throw new ModelException(
-                        ModelErrorType.PROVIDER_ERROR,
+                        recordedFailureType,
                         "供应商服务异常"
                 );
             }

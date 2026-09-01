@@ -82,6 +82,7 @@ public class ModelCircuitBreaker {
                  TIMEOUT,
                  NETWORK_ERROR,
                  PROVIDER_ERROR,
+                 PROVIDER_UNAVAILABLE,
                  INVALID_RESPONSE,
                  STRUCTURED_OUTPUT_INVALID -> true;
             default -> false;

@@ -19,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
+import com.leo.careerforgeai.model.exception.completion.ModelCompletionException;
+import com.leo.careerforgeai.model.exception.completion.ModelCompletionStatus;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -101,8 +103,21 @@ public class DeepSeekChatClient implements ModelGateway {
         try {
             executeStream(providerRequest, request.timeout(), chunk ->
                     handleStreamChunk(chunk, requestID, eventConsumer, state));
-            if (!"stop".equals(state.finishReason)) {
-                throw new ModelException(ModelErrorType.INVALID_RESPONSE, "大模型流式响应未正常完成，finishReason=" + state.finishReason);
+            ModelCompletionStatus completionStatus =
+                    mapCompletionStatus(state.finishReason);
+            if (completionStatus != ModelCompletionStatus.COMPLETED) {
+                long durationMs = Duration.ofNanos(
+                        System.nanoTime() - state.startNanos
+                ).toMillis();
+                throw new ModelCompletionException(
+                        completionStatus,
+                        state.finishReason,
+                        state.providerRequestId,
+                        state.model,
+                        state.usage,
+                        durationMs,
+                        state.output.toString()
+                );
             }
 
             eventConsumer.accept(new ModelStreamEvent(
@@ -155,74 +170,134 @@ public class DeepSeekChatClient implements ModelGateway {
     }
 
     /**
-     * non-stream 请求
-     * @param deepSeekChatRequest
-     * @return
-     * @throws IOException
-     * @throws InterruptedException
+     * 执行非流式模型请求。
+     *
+     * @param deepSeekChatRequest DeepSeek请求
+     * @param timeout             本次调用总超时
+     * @return 已正常完成的供应商响应
+     * @throws IOException          网络调用失败
+     * @throws InterruptedException 调用线程被中断
      */
-    private DeepSeekChatResponse execute(DeepSeekChatRequest deepSeekChatRequest, Duration timeout)
-            throws IOException, InterruptedException {
+    private DeepSeekChatResponse execute(
+            DeepSeekChatRequest deepSeekChatRequest,
+            Duration timeout
+    ) throws IOException, InterruptedException {
         long startNanos = System.nanoTime();
-        //3. 序列化 请求
         String jsonBody = serializeRequest(deepSeekChatRequest);
-        //4. 构造请求
+
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(properties.getBaseUrl().resolve("/chat/completions"))
                 .timeout(timeout)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
-                .header("Authorization", "Bearer " + properties.getApiKey())
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
+                .header(
+                        "Authorization",
+                        "Bearer " + properties.getApiKey()
+                )
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        jsonBody,
+                        StandardCharsets.UTF_8
+                ))
                 .build();
-        //5. 同步发送
-        HttpResponse<String> response = sendWithinDeadline(request, timeout);
-        //6. 检查http 状态
+
+        HttpResponse<String> response =
+                sendWithinDeadline(request, timeout);
+
         int statusCode = response.statusCode();
         if (statusCode < 200 || statusCode > 299) {
             throw mapHttpError(statusCode);
         }
-        //7. 反序列化
+
         DeepSeekChatResponse deepSeekChatResponse;
         try {
             deepSeekChatResponse = jsonMapper.readValue(
                     response.body(),
-                    DeepSeekChatResponse.class);
-        } catch (JacksonException e) {
-            throw new ModelException(ModelErrorType.INVALID_RESPONSE, "模型响应不是合法JSON", e);
+                    DeepSeekChatResponse.class
+            );
+        } catch (JacksonException exception) {
+            throw new ModelException(
+                    ModelErrorType.INVALID_RESPONSE,
+                    "模型响应不是合法JSON",
+                    exception
+            );
         }
-        //8. 校验
+
         if (deepSeekChatResponse == null) {
-            throw new ModelException(ModelErrorType.INVALID_RESPONSE, "大模型响应为空");
+            throw new ModelException(
+                    ModelErrorType.INVALID_RESPONSE,
+                    "大模型响应为空"
+            );
         }
-        List<DeepSeekChatResponse.Choice> choices = deepSeekChatResponse.choices();
-        if (choices == null || choices.isEmpty() || choices.getFirst() == null) {
-            throw new ModelException(ModelErrorType.INVALID_RESPONSE, "大模型返回消息为空");
+
+        List<DeepSeekChatResponse.Choice> choices =
+                deepSeekChatResponse.choices();
+        if (choices == null
+                || choices.isEmpty()
+                || choices.getFirst() == null) {
+            throw new ModelException(
+                    ModelErrorType.INVALID_RESPONSE,
+                    "大模型返回消息为空"
+            );
         }
+
         DeepSeekChatResponse.Choice choice = choices.getFirst();
-        if (choice.message() == null
-                || choice.message().content() == null
-                || choice.message().content().isBlank()) {
-            throw new ModelException(ModelErrorType.INVALID_RESPONSE, "大模型返回消息为空");
-        }
-        //9. 检查 finishReason
         String finishReason = choice.finishReason();
-        if (!"stop".equals(finishReason)) {
-            throw new ModelException(ModelErrorType.INVALID_RESPONSE, "大模型响应未正常完成， finishReason = " + finishReason);
+        String content = choice.message() == null
+                ? null
+                : choice.message().content();
+        long durationMs = Duration.ofNanos(
+                System.nanoTime() - startNanos
+        ).toMillis();
+        ModelUsage usage = toModelUsage(
+                deepSeekChatResponse.usage()
+        );
+        ModelCompletionStatus completionStatus =
+                mapCompletionStatus(finishReason);
+
+        if (completionStatus != ModelCompletionStatus.COMPLETED) {
+            ModelCompletionException exception =
+                    new ModelCompletionException(
+                            completionStatus,
+                            finishReason,
+                            deepSeekChatResponse.id(),
+                            deepSeekChatResponse.model(),
+                            usage,
+                            durationMs,
+                            content
+                    );
+
+            log.warn(
+                    "DeepSeek调用未完整完成，providerRequestId={}, model={}, completionStatus={}, finishReason={}, durationMs={}, outputChars={}, outputSha256={}, totalTokens={}",
+                    exception.providerRequestId(),
+                    exception.model(),
+                    exception.completionStatus(),
+                    exception.providerFinishReason(),
+                    exception.durationMs(),
+                    exception.outputChars(),
+                    exception.outputSha256(),
+                    usage == null ? null : usage.totalTokens()
+            );
+
+            throw exception;
         }
-        //9. 计算耗时
-        long durationMs = Duration.ofNanos(System.nanoTime() - startNanos).toMillis();
-        Long totalTokens = deepSeekChatResponse.usage() == null ? null : deepSeekChatResponse.usage().totalTokens();
+
+        if (content == null || content.isBlank()) {
+            throw new ModelException(
+                    ModelErrorType.INVALID_RESPONSE,
+                    "大模型返回消息为空"
+            );
+        }
+
         log.info(
                 "DeepSeek调用完成，requestId={}, model={}, durationMs={}, totalTokens={}",
                 deepSeekChatResponse.id(),
                 deepSeekChatResponse.model(),
                 durationMs,
-                totalTokens
+                usage == null ? null : usage.totalTokens()
         );
+
         return deepSeekChatResponse;
     }
-
     /** 在调用Deadline内等待完整非流式响应。 */
     private HttpResponse<String> sendWithinDeadline(HttpRequest request, Duration timeout)
             throws IOException, InterruptedException {
@@ -342,24 +417,45 @@ public class DeepSeekChatClient implements ModelGateway {
      * @return
      */
     private ModelResponse toModelResponse(DeepSeekChatResponse response) {
-        DeepSeekChatResponse.Usage providerUsage = response.usage();
+        return new ModelResponse(
+                response.id(),
+                response.model(),
+                response.choices().getFirst().message().content(),
+                toModelUsage(response.usage())
+        );
+    }
 
-        ModelUsage usage = providerUsage == null
+    private ModelUsage toModelUsage(
+            DeepSeekChatResponse.Usage providerUsage
+    ) {
+        return providerUsage == null
                 ? null
                 : new ModelUsage(
                 providerUsage.promptTokens(),
                 providerUsage.completionTokens(),
                 providerUsage.totalTokens()
         );
-
-        return new ModelResponse(
-                response.id(),
-                response.model(),
-                response.choices().getFirst().message().content(),
-                usage
-        );
     }
 
+    private ModelCompletionStatus mapCompletionStatus(
+            String finishReason
+    ) {
+        if (finishReason == null || finishReason.isBlank()) {
+            return ModelCompletionStatus.UNKNOWN_INCOMPLETE;
+        }
+        return switch (finishReason.trim().toLowerCase(Locale.ROOT)) {
+            case "stop" -> ModelCompletionStatus.COMPLETED;
+            case "length" ->
+                    ModelCompletionStatus.OUTPUT_TOKEN_LIMIT_REACHED;
+            case "content_filter" ->
+                    ModelCompletionStatus.CONTENT_FILTERED;
+            case "tool_calls" ->
+                    ModelCompletionStatus.TOOL_CALLS_REQUESTED;
+            case "insufficient_system_resource" ->
+                    ModelCompletionStatus.PROVIDER_RESOURCE_INTERRUPTED;
+            default -> ModelCompletionStatus.UNKNOWN_INCOMPLETE;
+        };
+    }
     /**
      * 转换方法，将收到的流式 chunk 加入 eventConsumer 中, 并确认finish状态 和 获取 usage
      * @param chunk
@@ -406,6 +502,8 @@ public class DeepSeekChatClient implements ModelGateway {
             return;
         }
 
+        state.output.append(content);
+
         eventConsumer.accept(new ModelStreamEvent(
                 ModelStreamEventType.DELTA,
                 requestId,
@@ -448,12 +546,45 @@ public class DeepSeekChatClient implements ModelGateway {
             Consumer<ModelStreamEvent> eventConsumer,
             StreamState state
     ) {
-        long durationMs = Duration.ofNanos(System.nanoTime() - state.startNanos).toMillis();
+        long durationMs = Duration.ofNanos(
+                System.nanoTime() - state.startNanos
+        ).toMillis();
 
-        log.error("DeepSeek流式调用失败，requestId={}, providerRequestId={}, model={}, durationMs={}, errorType={}, message={}",
-                requestId, state.providerRequestId, state.model, durationMs,
-                exception.getErrorType(), exception.getMessage(), exception);
-        emitErrorEvent(requestId, exception.getErrorType(), exception.getMessage(), eventConsumer);
+        if (exception instanceof ModelCompletionException completionException) {
+            Long totalTokens = completionException.usage() == null
+                    ? null
+                    : completionException.usage().totalTokens();
+            log.warn(
+                    "DeepSeek流式调用未完整完成，requestId={}, providerRequestId={}, model={}, completionStatus={}, finishReason={}, durationMs={}, outputChars={}, outputSha256={}, totalTokens={}",
+                    requestId,
+                    completionException.providerRequestId(),
+                    completionException.model(),
+                    completionException.completionStatus(),
+                    completionException.providerFinishReason(),
+                    completionException.durationMs(),
+                    completionException.outputChars(),
+                    completionException.outputSha256(),
+                    totalTokens
+            );
+        } else {
+            log.error(
+                    "DeepSeek流式调用失败，requestId={}, providerRequestId={}, model={}, durationMs={}, errorType={}, message={}",
+                    requestId,
+                    state.providerRequestId,
+                    state.model,
+                    durationMs,
+                    exception.getErrorType(),
+                    exception.getMessage(),
+                    exception
+            );
+        }
+
+        emitErrorEvent(
+                requestId,
+                exception.getErrorType(),
+                exception.getMessage(),
+                eventConsumer
+        );
     }
 
     /**
@@ -491,7 +622,9 @@ public class DeepSeekChatClient implements ModelGateway {
     }
 
     private static final class StreamState {
+
         private final long startNanos = System.nanoTime();
+        private final StringBuilder output = new StringBuilder();
         private String providerRequestId;
         private String model;
         private String finishReason;

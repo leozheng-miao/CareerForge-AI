@@ -3,6 +3,7 @@ package com.leo.careerforgeai.model.infrastructure.deepseek.toolcalling;
 import com.leo.careerforgeai.model.config.ModelProperties;
 import com.leo.careerforgeai.model.domain.ModelOutputFormat;
 import com.leo.careerforgeai.model.domain.ModelRole;
+import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.model.domain.toolcalling.AssistantToolCallsMessage;
 import com.leo.careerforgeai.model.domain.toolcalling.FinalAnswerResult;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolCall;
@@ -15,6 +16,8 @@ import com.leo.careerforgeai.model.domain.toolcalling.ToolDefinition;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolResultMessage;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
+import com.leo.careerforgeai.model.exception.completion.ModelCompletionException;
+import com.leo.careerforgeai.model.exception.completion.ModelCompletionStatus;
 import com.leo.careerforgeai.model.infrastructure.deepseek.toolcalling.dto.DeepSeekToolCallingRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -126,6 +129,7 @@ class DeepSeekToolCallingClientTest {
         assertThat(providerRequest.thinking().type()).isEqualTo("disabled");
         assertThat(providerRequest.responseFormat().type()).isEqualTo("json_object");
         assertThat(providerRequest.maxTokens()).isEqualTo(512);
+        assertThat(providerRequest.temperature()).isEqualTo(1.0);
         assertThat(providerRequest.stream()).isFalse();
 
         assertThat(providerRequest.messages()).hasSize(2);
@@ -372,6 +376,56 @@ class DeepSeekToolCallingClientTest {
         assertRetryAfter("invalid", null);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "length, OUTPUT_TOKEN_LIMIT_REACHED, PROVIDER_INCOMPLETE",
+            "content_filter, CONTENT_FILTERED, PROVIDER_INCOMPLETE",
+            "insufficient_system_resource, PROVIDER_RESOURCE_INTERRUPTED, PROVIDER_UNAVAILABLE",
+            "unexpected_reason, UNKNOWN_INCOMPLETE, PROVIDER_INCOMPLETE"
+    })
+    @DisplayName("将Tool Calling非正常完成原因映射为安全完成异常")
+    void shouldClassifyIncompleteFinishReason(
+            String finishReason,
+            ModelCompletionStatus expectedStatus,
+            ModelErrorType expectedErrorType
+    ) throws Exception {
+        stubResponse(
+                200,
+                response(
+                        "\"未完成\"",
+                        "null",
+                        finishReason,
+                        VALID_USAGE
+                )
+        );
+
+        assertThatThrownBy(() ->
+                client.call(initialRequest(VALID_SCHEMA))
+        ).isInstanceOfSatisfying(
+                ModelCompletionException.class,
+                exception -> {
+                    assertThat(exception.getErrorType())
+                            .isEqualTo(expectedErrorType);
+                    assertThat(exception.completionStatus())
+                            .isEqualTo(expectedStatus);
+                    assertThat(exception.providerFinishReason())
+                            .isEqualTo(finishReason);
+                    assertThat(exception.providerRequestId())
+                            .isEqualTo("request-1");
+                    assertThat(exception.model())
+                            .isEqualTo("deepseek-v4-flash");
+                    assertThat(exception.usage())
+                            .isEqualTo(new ModelUsage(100, 20, 120));
+                    assertThat(exception.outputChars())
+                            .isEqualTo("未完成".length());
+                    assertThat(exception.outputSha256())
+                            .matches("[0-9a-f]{64}");
+                    assertThat(exception.getMessage())
+                            .doesNotContain("未完成");
+                }
+        );
+    }
+
     private void assertRetryAfter(String header, Duration expectedRetryAfter) throws Exception {
         stubResponse(429, "", Map.of("Retry-After", List.of(header)));
 
@@ -450,7 +504,6 @@ class DeepSeekToolCallingClientTest {
                 response("\"\"", "null", "tool_calls", VALID_USAGE),
                 response("\"不应同时出现的内容\"", ONE_TOOL_CALL, "tool_calls", VALID_USAGE),
                 response("\"\"", duplicateCalls, "tool_calls", VALID_USAGE),
-                response("\"未完成\"", "null", "length", VALID_USAGE),
                 response("\"最终回答\"", "null", "stop", mismatchedUsage),
                 response("\"最终回答\"", "null", "stop", "null"),
                 response("\"\"", oversizedToolCall, "tool_calls", VALID_USAGE)

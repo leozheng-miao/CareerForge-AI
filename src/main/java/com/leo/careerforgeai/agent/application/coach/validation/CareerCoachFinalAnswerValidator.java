@@ -20,6 +20,14 @@ import tools.jackson.databind.json.JsonMapper;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputException;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputFailureReason;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputFailureStage;
+import com.leo.careerforgeai.model.infrastructure.json.JacksonStructuredOutputFailureClassifier;
+import jakarta.validation.ConstraintViolation;
+import tools.jackson.core.JsonParser;
+
+import java.util.Comparator;
 
 /**
  * @program: CareerForge-AI
@@ -53,41 +61,140 @@ public final class CareerCoachFinalAnswerValidator {
         if (toolResults == null || toolResults.stream().anyMatch(java.util.Objects::isNull)) {
             throw failure(CareerCoachFinalAnswerErrorType.TOOL_RESULT_INVALID, "Agent工具结果集合不合法");
         }
+
         CareerCoachModelOutput modelOutput = parseModelOutput(finalContent);
         Set<String> allowedChunkIds = collectAllowedChunkIds(toolResults);
-
         for (String citedChunkId : modelOutput.citedChunkIds()) {
             if (!allowedChunkIds.contains(citedChunkId)) {
-                throw failure(CareerCoachFinalAnswerErrorType.CITATION_NOT_ALLOWED, "最终回答包含未经本轮证据工具授权的引用");
+                StructuredOutputException structured = new StructuredOutputException(
+                        StructuredOutputFailureStage.REFERENCE_VALIDATION,
+                        StructuredOutputFailureReason.REFERENCE_NOT_ALLOWED,
+                        "$.citedChunkIds",
+                        "最终回答包含未经本轮证据工具授权的引用",
+                        null
+                );
+                throw structuredFailure(CareerCoachFinalAnswerErrorType.CITATION_NOT_ALLOWED,
+                        structured, finalContent);
             }
         }
 
         try {
-            return new CareerCoachAnswer(modelOutput.status(), modelOutput.answer().strip(), modelOutput.citedChunkIds());
+            return new CareerCoachAnswer(modelOutput.status(), modelOutput.answer().strip(),
+                    modelOutput.citedChunkIds());
         } catch (RuntimeException exception) {
-            throw failure(CareerCoachFinalAnswerErrorType.MODEL_OUTPUT_INVALID, "最终回答业务约束校验失败", exception);
+            StructuredOutputException structured = new StructuredOutputException(
+                    StructuredOutputFailureStage.BUSINESS_CONTRACT_VALIDATION,
+                    StructuredOutputFailureReason.BUSINESS_INVARIANT_VIOLATION,
+                    null,
+                    "最终回答违反业务约束",
+                    exception
+            );
+            throw structuredFailure(CareerCoachFinalAnswerErrorType.MODEL_OUTPUT_INVALID,
+                    structured, finalContent);
         }
     }
 
     /** 严格解析并校验不可信的模型最终JSON。 */
     private CareerCoachModelOutput parseModelOutput(String finalContent) {
+        try {
+            return parseModelOutputStrict(finalContent);
+        } catch (StructuredOutputException exception) {
+            throw structuredFailure(CareerCoachFinalAnswerErrorType.MODEL_OUTPUT_INVALID,
+                    exception, finalContent);
+        }
+    }
+
+    private CareerCoachModelOutput parseModelOutputStrict(String finalContent) {
         if (finalContent == null || finalContent.isBlank() || finalContent.length() > MAX_FINAL_CONTENT_CHARS) {
-            throw failure(CareerCoachFinalAnswerErrorType.MODEL_OUTPUT_INVALID, "模型最终输出为空或超过长度限制");
+            throw new StructuredOutputException(
+                    StructuredOutputFailureStage.CONTENT_BOUNDARY_VALIDATION,
+                    StructuredOutputFailureReason.EMPTY_OR_OVERSIZED_CONTENT,
+                    null,
+                    "模型最终输出为空或超过长度限制",
+                    null
+            );
         }
 
+        String content = finalContent.strip();
+        try (JsonParser parser = jsonMapper.createParser(content)) {
+            if (parser.nextToken() == null) {
+                throw new StructuredOutputException(
+                        StructuredOutputFailureStage.CONTENT_BOUNDARY_VALIDATION,
+                        StructuredOutputFailureReason.EMPTY_OR_OVERSIZED_CONTENT,
+                        null,
+                        "模型最终输出为空",
+                        null
+                );
+            }
+            parser.skipChildren();
+            if (parser.nextToken() != null) {
+                throw new StructuredOutputException(
+                        StructuredOutputFailureStage.JSON_PARSING,
+                        StructuredOutputFailureReason.TRAILING_TOKEN,
+                        "$",
+                        "模型最终输出包含尾随JSON内容",
+                        null
+                );
+            }
+        } catch (StructuredOutputException exception) {
+            throw exception;
+        } catch (JacksonException exception) {
+            throw JacksonStructuredOutputFailureClassifier.parsing(exception,
+                    "模型最终输出不是合法JSON");
+        }
+
+        JsonNode root;
         try {
-            CareerCoachModelOutput output = jsonMapper.readerFor(CareerCoachModelOutput.class)
+            root = jsonMapper.readTree(content);
+        } catch (JacksonException exception) {
+            throw JacksonStructuredOutputFailureClassifier.parsing(exception,
+                    "模型最终输出不是合法JSON");
+        }
+        if (root == null || !root.isObject()) {
+            throw new StructuredOutputException(
+                    StructuredOutputFailureStage.JSON_PARSING,
+                    StructuredOutputFailureReason.ROOT_NOT_OBJECT,
+                    "$",
+                    "模型最终输出顶层必须是JSON对象",
+                    null
+            );
+        }
+
+        CareerCoachModelOutput output;
+        try {
+            output = jsonMapper.readerFor(CareerCoachModelOutput.class)
                     .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                     .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-                    .readValue(finalContent);
-
-            if (output == null || !validator.validate(output).isEmpty()) {
-                throw failure(CareerCoachFinalAnswerErrorType.MODEL_OUTPUT_INVALID, "模型最终输出结构校验失败");
-            }
-            return output;
+                    .readValue(root.toString());
         } catch (JacksonException exception) {
-            throw failure(CareerCoachFinalAnswerErrorType.MODEL_OUTPUT_INVALID, "模型最终输出不是合法JSON", exception);
+            throw JacksonStructuredOutputFailureClassifier.deserialization(exception,
+                    "模型最终输出无法反序列化为目标结构");
         }
+
+        Set<ConstraintViolation<CareerCoachModelOutput>> violations = validator.validate(output);
+        if (!violations.isEmpty()) {
+            String fieldPath = violations.stream()
+                    .map(violation -> "$." + violation.getPropertyPath())
+                    .min(Comparator.naturalOrder())
+                    .orElse(null);
+            throw new StructuredOutputException(
+                    StructuredOutputFailureStage.OUTPUT_STRUCTURE_VALIDATION,
+                    StructuredOutputFailureReason.OUTPUT_CONSTRAINT_VIOLATION,
+                    fieldPath,
+                    "模型最终输出未通过字段约束",
+                    null
+            );
+        }
+        return output;
+    }
+
+    private CareerCoachFinalAnswerException structuredFailure(
+            CareerCoachFinalAnswerErrorType errorType,
+            StructuredOutputException exception,
+            String rawOutput
+    ) {
+        return new CareerCoachFinalAnswerException(errorType, exception.getMessage(),
+                exception, rawOutput);
     }
 
     /** 只从本轮成功的search_career_materials结果中收集合法Chunk ID。 */

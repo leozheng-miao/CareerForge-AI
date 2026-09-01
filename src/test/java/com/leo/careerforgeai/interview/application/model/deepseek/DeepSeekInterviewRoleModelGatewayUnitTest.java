@@ -19,6 +19,8 @@ import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
+import com.leo.careerforgeai.model.exception.completion.ModelCompletionException;
+import com.leo.careerforgeai.model.exception.completion.ModelCompletionStatus;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.AfterEach;
@@ -40,6 +42,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputException;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputFailureReason;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputFailureStage;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.stream.Stream;
 
 /**
  * @program: CareerForge-AI
@@ -174,12 +184,17 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
                 input(),
                 Duration.ofSeconds(5)
         )).isInstanceOfSatisfying(
-                ModelException.class,
-                exception -> assertThat(exception.getErrorType())
-                        .isEqualTo(
-                                ModelErrorType.STRUCTURED_OUTPUT_INVALID
-                        )
-        ).hasMessage("面试角色输出不是合法目标结构");
+                StructuredOutputException.class,
+                exception -> {
+                    assertThat(exception.getErrorType())
+                            .isEqualTo(ModelErrorType.STRUCTURED_OUTPUT_INVALID);
+                    assertThat(exception.failureStage())
+                            .isEqualTo(StructuredOutputFailureStage.JSON_PARSING);
+                    assertThat(exception.failureReason())
+                            .isEqualTo(StructuredOutputFailureReason.MALFORMED_JSON);
+                    assertThat(exception.fieldPath()).isNull();
+                }
+        );
 
         verify(modelGateway, times(2)).chat(any(ModelRequest.class));
         assertThat(metrics.snapshot().logicalCalls()).isEqualTo(2);
@@ -202,16 +217,156 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
                 input(),
                 Duration.ofSeconds(5)
         )).isInstanceOfSatisfying(
-                ModelException.class,
-                exception -> assertThat(exception.getErrorType())
-                        .isEqualTo(
-                                ModelErrorType.STRUCTURED_OUTPUT_INVALID
-                        )
-        ).hasMessage("面试角色输出违反服务端业务契约");
+                StructuredOutputException.class,
+                exception -> {
+                    assertThat(exception.getErrorType())
+                            .isEqualTo(ModelErrorType.STRUCTURED_OUTPUT_INVALID);
+                    assertThat(exception.failureStage())
+                            .isEqualTo(
+                                    StructuredOutputFailureStage.BUSINESS_CONTRACT_VALIDATION
+                            );
+                    assertThat(exception.failureReason())
+                            .isEqualTo(
+                                    StructuredOutputFailureReason.BUSINESS_INVARIANT_VIOLATION
+                            );
+                    assertThat(exception.fieldPath()).isNull();
+                }
+        );
 
         verify(modelGateway).chat(any(ModelRequest.class));
         assertThat(metrics.snapshot().logicalCalls()).isEqualTo(1);
         assertThat(metrics.snapshot().retryAttempts()).isZero();
+    }
+
+    /** 验证供应商输出截断不会被误当作JSON结构错误执行修复。 */
+    @Test
+    void shouldNotRepairProviderIncompleteOutput() {
+        ModelCompletionException failure =
+                new ModelCompletionException(
+                        ModelCompletionStatus.OUTPUT_TOKEN_LIMIT_REACHED,
+                        "length",
+                        "request-incomplete",
+                        "deepseek-v4-flash",
+                        new ModelUsage(20, 10, 30),
+                        100,
+                        "{\"question\":\"未完成"
+                );
+        when(modelGateway.chat(any())).thenThrow(failure);
+
+        assertThatThrownBy(() -> gateway.generate(
+                contract,
+                input(),
+                Duration.ofSeconds(5)
+        )).isSameAs(failure);
+
+        verify(modelGateway).chat(any(ModelRequest.class));
+        assertThat(metrics.snapshot().logicalCalls()).isEqualTo(1);
+        assertThat(metrics.snapshot().retryAttempts()).isZero();
+    }
+
+    /** 验证历史结构化失败样本能够定位到最早失败阶段且最多修复一次。 */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidStructuredOutputs")
+    void shouldClassifyHistoricalStructuredOutputFailures(
+            String caseId,
+            String invalidOutput,
+            StructuredOutputFailureStage expectedStage,
+            StructuredOutputFailureReason expectedReason,
+            String expectedFieldPath
+    ) {
+        when(modelGateway.chat(any())).thenReturn(
+                response(
+                        "request-initial-" + caseId,
+                        invalidOutput,
+                        new ModelUsage(20, 5, 25)
+                ),
+                response(
+                        "request-repair-" + caseId,
+                        invalidOutput,
+                        new ModelUsage(30, 10, 40)
+                )
+        );
+
+        assertThatThrownBy(() -> gateway.generate(
+                contract,
+                input(),
+                Duration.ofSeconds(5)
+        )).isInstanceOfSatisfying(
+                StructuredOutputException.class,
+                exception -> {
+                    assertThat(exception.failureStage()).isEqualTo(expectedStage);
+                    assertThat(exception.failureReason()).isEqualTo(expectedReason);
+                    assertThat(exception.fieldPath()).isEqualTo(expectedFieldPath);
+                }
+        );
+
+        verify(modelGateway, times(2)).chat(any(ModelRequest.class));
+        assertThat(metrics.snapshot().logicalCalls()).isEqualTo(2);
+        assertThat(metrics.snapshot().retryAttempts()).isZero();
+    }
+
+    private static Stream<Arguments> invalidStructuredOutputs() {
+        String valid = output(2);
+
+        return Stream.of(
+                Arguments.of(
+                        "unescaped-quote",
+                        valid.replace(
+                                "线程池复用线程时为什么需要清理ThreadLocal？",
+                                "他说\"必须加锁\""
+                        ),
+                        StructuredOutputFailureStage.JSON_PARSING,
+                        StructuredOutputFailureReason.MALFORMED_JSON,
+                        null
+                ),
+                Arguments.of(
+                        "trailing-json",
+                        valid + "{}",
+                        StructuredOutputFailureStage.JSON_PARSING,
+                        StructuredOutputFailureReason.TRAILING_TOKEN,
+                        "$"
+                ),
+                Arguments.of(
+                        "unknown-field",
+                        valid.replace(
+                                "\n}",
+                                ",\n  \"unexpectedField\":true\n}"
+                        ),
+                        StructuredOutputFailureStage.DTO_DESERIALIZATION,
+                        StructuredOutputFailureReason.UNKNOWN_FIELD,
+                        "$.unexpectedField"
+                ),
+                Arguments.of(
+                        "field-type",
+                        valid.replace(
+                                "\"difficulty\":2",
+                                "\"difficulty\":{\"value\":2}"
+                        ),
+                        StructuredOutputFailureStage.DTO_DESERIALIZATION,
+                        StructuredOutputFailureReason.FIELD_TYPE_MISMATCH,
+                        "$.difficulty"
+                ),
+                Arguments.of(
+                        "invalid-enum",
+                        valid.replace(
+                                "\"questionType\":\"TECHNICAL_KNOWLEDGE\"",
+                                "\"questionType\":\"UNKNOWN_TYPE\""
+                        ),
+                        StructuredOutputFailureStage.DTO_DESERIALIZATION,
+                        StructuredOutputFailureReason.INVALID_ENUM_VALUE,
+                        "$.questionType"
+                ),
+                Arguments.of(
+                        "missing-required-field",
+                        valid.replace(
+                                "\"targetSkills\":[\"JAVA_CONCURRENCY\"],",
+                                ""
+                        ),
+                        StructuredOutputFailureStage.OUTPUT_STRUCTURE_VALIDATION,
+                        StructuredOutputFailureReason.OUTPUT_CONSTRAINT_VIOLATION,
+                        null
+                )
+        );
     }
 
     private InterviewQuestionInput input() {
@@ -244,17 +399,16 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
         );
     }
 
-    private String output(int difficulty) {
+    private static String output(int difficulty) {
         return """
-                {
-                  "questionType":"TECHNICAL_KNOWLEDGE",
-                  "question":"线程池复用线程时为什么需要清理ThreadLocal？",
-                  "targetSkills":["JAVA_CONCURRENCY"],
-                  "difficulty":%d,
-                  "evaluationPoints":["说明线程复用和残留数据风险"],
-                  "followUpAllowed":true,
-                  "evidenceReferenceIds":[]
-                }
-                """.formatted(difficulty);
-    }
-}
+            {
+              "questionType":"TECHNICAL_KNOWLEDGE",
+              "question":"线程池复用线程时为什么需要清理ThreadLocal？",
+              "targetSkills":["JAVA_CONCURRENCY"],
+              "difficulty":%d,
+              "evaluationPoints":["说明线程复用和残留数据风险"],
+              "followUpAllowed":true,
+              "evidenceReferenceIds":[]
+            }
+            """.formatted(difficulty);
+    }}

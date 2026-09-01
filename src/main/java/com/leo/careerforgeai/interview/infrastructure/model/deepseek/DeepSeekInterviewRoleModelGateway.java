@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.interview.infrastructure.model.deepseek;
 
 import com.leo.careerforgeai.interview.application.model.common.InterviewRoleContract;
+import com.leo.careerforgeai.interview.application.model.common.InterviewRoleContractErrorType;
 import com.leo.careerforgeai.interview.application.model.common.InterviewRoleContractException;
 import com.leo.careerforgeai.interview.application.port.InterviewRoleModelGateway;
 import com.leo.careerforgeai.interview.domain.execution.InterviewRole;
@@ -21,7 +22,14 @@ import com.leo.careerforgeai.model.exception.ModelException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
 import tools.jackson.databind.json.JsonMapper;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputException;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputFailureReason;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputFailureStage;
+import com.leo.careerforgeai.model.infrastructure.json.JacksonStructuredOutputFailureClassifier;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JsonNode;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -46,6 +54,7 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
     private final ModelCircuitBreaker circuitBreaker;
     private final ModelCallBulkhead bulkhead;
     private final ModelRetryExecutor retryExecutor;
+    private static final int MAX_STRUCTURED_OUTPUT_CHARS = 100_000;
 
     public DeepSeekInterviewRoleModelGateway(
             ModelGateway modelGateway,
@@ -105,7 +114,7 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
                 remainingTimeout(deadlineNanos)
         );
         ModelResponse initialResponse = executeModelCall(initialRequest, deadlineNanos);
-        String initialRaw = requireText(initialResponse.content(), "模型响应正文", Integer.MAX_VALUE);
+        String initialRaw = initialResponse.content();
         ModelUsage initialUsage = requireUsage(initialResponse.usage());
         requireText(initialResponse.requestId(), "模型requestId", 128);
         requireText(initialResponse.model(), "模型名称", 128);
@@ -113,11 +122,11 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
         O output;
         try {
             output = parseAndValidateStructure(contract, initialRaw);
-        } catch (ModelException exception) {
+        } catch (StructuredOutputException exception) {
             logRejectedOutput(
                     contract.role(),
                     promptVersion,
-                    "INITIAL_STRUCTURE_INVALID",
+                    "INITIAL",
                     initialResponse,
                     initialRaw,
                     startedNanos,
@@ -141,7 +150,7 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
             logRejectedOutput(
                     contract.role(),
                     promptVersion,
-                    "INITIAL_BUSINESS_INVALID",
+                    "INITIAL",
                     initialResponse,
                     initialRaw,
                     startedNanos,
@@ -171,7 +180,7 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
                 remainingTimeout(deadlineNanos)
         );
         ModelResponse repairResponse = executeModelCall(repairRequest, deadlineNanos);
-        String repairedRaw = requireText(repairResponse.content(), "修复响应正文", Integer.MAX_VALUE);
+        String repairedRaw = repairResponse.content();
         ModelUsage repairedUsage = requireUsage(repairResponse.usage());
         requireText(repairResponse.requestId(), "修复requestId", 128);
         requireText(repairResponse.model(), "修复模型名称", 128);
@@ -180,11 +189,11 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
         try {
             output = parseAndValidateStructure(contract, repairedRaw);
             output = validateBusinessContract(contract, input, output);
-        } catch (ModelException exception) {
+        } catch (StructuredOutputException exception) {
             logRejectedOutput(
                     contract.role(),
                     promptVersion,
-                    "REPAIR_REJECTED",
+                    "REPAIR",
                     repairResponse,
                     repairedRaw,
                     startedNanos,
@@ -230,15 +239,73 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
         return response;
     }
 
-    private <O> O parseAndValidateStructure(InterviewRoleContract<?, O> contract, String rawContent) {
+    private <O> O parseAndValidateStructure(
+            InterviewRoleContract<?, O> contract,
+            String rawContent
+    ) {
+        String content = requireOutputContent(rawContent);
+        JsonNode root;
+
+        try (JsonParser parser = jsonMapper.createParser(content)) {
+            if (parser.nextToken() == null) {
+                throw new StructuredOutputException(
+                        StructuredOutputFailureStage.CONTENT_BOUNDARY_VALIDATION,
+                        StructuredOutputFailureReason.EMPTY_OR_OVERSIZED_CONTENT,
+                        null,
+                        "面试角色输出为空",
+                        null
+                );
+            }
+
+            parser.skipChildren();
+
+            if (parser.nextToken() != null) {
+                throw new StructuredOutputException(
+                        StructuredOutputFailureStage.JSON_PARSING,
+                        StructuredOutputFailureReason.TRAILING_TOKEN,
+                        "$",
+                        "面试角色输出包含尾随JSON内容",
+                        null
+                );
+            }
+        } catch (StructuredOutputException exception) {
+            throw exception;
+        } catch (JacksonException exception) {
+            throw JacksonStructuredOutputFailureClassifier.parsing(
+                    exception,
+                    "面试角色输出不是合法JSON对象"
+            );
+        }
+
+        try {
+            root = jsonMapper.readTree(content);
+        } catch (JacksonException exception) {
+            throw JacksonStructuredOutputFailureClassifier.parsing(
+                    exception,
+                    "面试角色输出不是合法JSON对象"
+            );
+        }
+
+        if (root == null || !root.isObject()) {
+            throw new StructuredOutputException(
+                    StructuredOutputFailureStage.JSON_PARSING,
+                    StructuredOutputFailureReason.ROOT_NOT_OBJECT,
+                    "$",
+                    "面试角色输出顶层必须是JSON对象",
+                    null
+            );
+        }
+
         O output;
         try {
-            output = jsonMapper.readValue(rawContent, contract.outputType());
+            output = jsonMapper.readerFor(contract.outputType())
+                    .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                    .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .readValue(root.toString());
         } catch (JacksonException exception) {
-            throw new ModelException(
-                    ModelErrorType.STRUCTURED_OUTPUT_INVALID,
-                    "面试角色输出不是合法目标结构",
-                    exception
+            throw JacksonStructuredOutputFailureClassifier.deserialization(
+                    exception,
+                    "面试角色输出无法反序列化为目标结构"
             );
         }
 
@@ -246,8 +313,10 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
             contract.validateOutputStructure(output);
             return output;
         } catch (InterviewRoleContractException exception) {
-            throw new ModelException(
-                    ModelErrorType.STRUCTURED_OUTPUT_INVALID,
+            throw new StructuredOutputException(
+                    StructuredOutputFailureStage.OUTPUT_STRUCTURE_VALIDATION,
+                    StructuredOutputFailureReason.OUTPUT_CONSTRAINT_VIOLATION,
+                    null,
                     "面试角色输出未通过结构校验",
                     exception
             );
@@ -262,12 +331,34 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
         try {
             return contract.validateOutput(input, output);
         } catch (InterviewRoleContractException exception) {
-            throw new ModelException(
-                    ModelErrorType.STRUCTURED_OUTPUT_INVALID,
+            boolean referenceFailure =
+                    exception.errorType() == InterviewRoleContractErrorType.REFERENCE_NOT_ALLOWED;
+            throw new StructuredOutputException(
+                    referenceFailure
+                            ? StructuredOutputFailureStage.REFERENCE_VALIDATION
+                            : StructuredOutputFailureStage.BUSINESS_CONTRACT_VALIDATION,
+                    referenceFailure
+                            ? StructuredOutputFailureReason.REFERENCE_NOT_ALLOWED
+                            : StructuredOutputFailureReason.BUSINESS_INVARIANT_VIOLATION,
+                    null,
                     "面试角色输出违反服务端业务契约",
                     exception
             );
         }
+    }
+
+    private String requireOutputContent(String content) {
+        if (content == null || content.isBlank()
+                || content.length() > MAX_STRUCTURED_OUTPUT_CHARS) {
+            throw new StructuredOutputException(
+                    StructuredOutputFailureStage.CONTENT_BOUNDARY_VALIDATION,
+                    StructuredOutputFailureReason.EMPTY_OR_OVERSIZED_CONTENT,
+                    null,
+                    "面试角色输出为空或超过长度限制",
+                    null
+            );
+        }
+        return content.strip();
     }
 
     private <O> Result<O> result(
@@ -338,24 +429,33 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
     private void logRejectedOutput(
             InterviewRole role,
             String promptVersion,
-            String validationStage,
+            String attempt,
             ModelResponse response,
             String rawContent,
             long startedNanos,
             ModelException exception
     ) {
         long durationMs = Duration.ofNanos(System.nanoTime() - startedNanos).toMillis();
+        StructuredOutputException structured = exception instanceof StructuredOutputException value
+                ? value : null;
+
         log.warn(
-                "面试角色输出被Java拒绝，role={}, promptVersion={}, validationStage={}, model={}, requestId={}, durationMs={}, totalTokens={}, errorType={}, responseHash={}",
+                "面试角色输出被Java拒绝，role={}, promptVersion={}, attempt={}, "
+                        + "failureStage={}, failureReason={}, fieldPath={}, model={}, "
+                        + "requestId={}, durationMs={}, totalTokens={}, outputChars={}, responseHash={}",
                 role,
                 promptVersion,
-                validationStage,
+                attempt,
+                structured == null ? "UNCLASSIFIED" : structured.failureStage(),
+                structured == null ? "UNCLASSIFIED" : structured.failureReason(),
+                structured == null || structured.fieldPath() == null
+                        ? "UNKNOWN" : structured.fieldPath(),
                 response.model(),
                 response.requestId(),
                 Math.max(0, durationMs),
                 response.usage().totalTokens(),
-                exception.getErrorType(),
-                sha256(rawContent)
+                rawContent == null ? 0 : rawContent.length(),
+                rawContent == null ? "UNKNOWN" : sha256(rawContent)
         );
     }
 

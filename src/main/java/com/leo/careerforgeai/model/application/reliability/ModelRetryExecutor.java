@@ -79,7 +79,11 @@ public class ModelRetryExecutor {
             return false;
         }
         return switch (exception.getErrorType()) {
-            case RATE_LIMITED, TIMEOUT, NETWORK_ERROR, PROVIDER_ERROR -> true;
+            case RATE_LIMITED,
+                 TIMEOUT,
+                 NETWORK_ERROR,
+                 PROVIDER_ERROR,
+                 PROVIDER_UNAVAILABLE -> true;
             default -> false;
         };
     }

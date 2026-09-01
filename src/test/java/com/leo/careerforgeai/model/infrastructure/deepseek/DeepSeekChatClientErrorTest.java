@@ -4,9 +4,13 @@ import com.leo.careerforgeai.model.config.ModelProperties;
 import com.leo.careerforgeai.model.domain.ModelMessage;
 import com.leo.careerforgeai.model.domain.ModelOutputFormat;
 import com.leo.careerforgeai.model.domain.ModelRequest;
+import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelRole;
+import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
+import com.leo.careerforgeai.model.exception.completion.ModelCompletionException;
+import com.leo.careerforgeai.model.exception.completion.ModelCompletionStatus;
 import com.leo.careerforgeai.model.infrastructure.deepseek.stream.DeepSeekSseParser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -191,6 +195,66 @@ class DeepSeekChatClientErrorTest {
         }
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "length, OUTPUT_TOKEN_LIMIT_REACHED, PROVIDER_INCOMPLETE",
+            "content_filter, CONTENT_FILTERED, PROVIDER_INCOMPLETE",
+            "tool_calls, TOOL_CALLS_REQUESTED, PROVIDER_INCOMPLETE",
+            "insufficient_system_resource, PROVIDER_RESOURCE_INTERRUPTED, PROVIDER_UNAVAILABLE",
+            "unexpected_reason, UNKNOWN_INCOMPLETE, PROVIDER_INCOMPLETE"
+    })
+    @DisplayName("将DeepSeek非正常完成原因映射为稳定完成状态")
+    void shouldClassifyIncompleteFinishReason(
+            String finishReason,
+            ModelCompletionStatus expectedStatus,
+            ModelErrorType expectedErrorType
+    ) {
+        stubStringResponse(200, providerResponse(finishReason));
+
+        assertThatThrownBy(() ->
+                createClient(jsonMapper).chat(createRequest())
+        ).isInstanceOfSatisfying(
+                ModelCompletionException.class,
+                exception -> {
+                    assertThat(exception.getErrorType())
+                            .isEqualTo(expectedErrorType);
+                    assertThat(exception.completionStatus())
+                            .isEqualTo(expectedStatus);
+                    assertThat(exception.providerFinishReason())
+                            .isEqualTo(finishReason);
+                    assertThat(exception.providerRequestId())
+                            .isEqualTo("provider-request-1");
+                    assertThat(exception.model())
+                            .isEqualTo("deepseek-v4-flash");
+                    assertThat(exception.usage())
+                            .isEqualTo(new ModelUsage(10, 6, 16));
+                    assertThat(exception.outputChars())
+                            .isEqualTo("部分敏感输出".length());
+                    assertThat(exception.outputSha256())
+                            .matches("[0-9a-f]{64}");
+                    assertThat(exception.durationMs()).isNotNegative();
+                    assertThat(exception.getMessage())
+                            .doesNotContain("部分敏感输出");
+                }
+        );
+    }
+
+    @Test
+    @DisplayName("finishReason为stop时返回正常模型响应")
+    void shouldReturnCompletedResponse() {
+        stubStringResponse(200, providerResponse("stop"));
+
+        ModelResponse response =
+                createClient(jsonMapper).chat(createRequest());
+
+        assertThat(response.requestId())
+                .isEqualTo("provider-request-1");
+        assertThat(response.content())
+                .isEqualTo("部分敏感输出");
+        assertThat(response.usage())
+                .isEqualTo(new ModelUsage(10, 6, 16));
+    }
+
     /** 模拟普通非流式HTTP响应。 */
     /** 模拟普通非流式HTTP响应。 */
     private void stubStringResponse(int statusCode, String body) {
@@ -220,6 +284,29 @@ class DeepSeekChatClientErrorTest {
 
         return new DeepSeekChatClient(
                 properties, mapper, new DeepSeekSseParser(mapper), httpClient);
+    }
+
+    /** 创建带指定完成原因的脱敏供应商响应。 */
+    private String providerResponse(String finishReason) {
+        return """
+        {
+          "id":"provider-request-1",
+          "model":"deepseek-v4-flash",
+          "choices":[{
+            "index":0,
+            "message":{
+              "role":"assistant",
+              "content":"部分敏感输出"
+            },
+            "finish_reason":"%s"
+          }],
+          "usage":{
+            "prompt_tokens":10,
+            "completion_tokens":6,
+            "total_tokens":16
+          }
+        }
+        """.formatted(finishReason);
     }
 
     /** 创建最小合法模型请求。 */

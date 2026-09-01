@@ -3,11 +3,13 @@ package com.leo.careerforgeai.agent.application.coach;
 import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerErrorType;
 import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerException;
 import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachFinalAnswerValidator;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachStructuredOutputRepairer;
 import com.leo.careerforgeai.agent.application.loop.AgentLoop;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswer;
 import com.leo.careerforgeai.agent.domain.coach.CareerCoachAnswerStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopRequest;
 import com.leo.careerforgeai.agent.domain.loop.AgentLoopResult;
+import com.leo.careerforgeai.agent.domain.loop.AgentModelOutcome;
 import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
 import com.leo.careerforgeai.agent.domain.loop.trace.AgentRunTrace;
 import com.leo.careerforgeai.agent.domain.loop.AgentTerminationReason;
@@ -17,6 +19,10 @@ import com.leo.careerforgeai.memory.application.context.ConfirmedMemoryContextFo
 import com.leo.careerforgeai.memory.domain.profile.MemorySourceType;
 import com.leo.careerforgeai.model.domain.ModelOutputFormat;
 import com.leo.careerforgeai.model.domain.ModelRole;
+import com.leo.careerforgeai.model.domain.ModelUsage;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputException;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputFailureReason;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputFailureStage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,7 +32,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,6 +50,16 @@ import com.leo.careerforgeai.memory.domain.profile.MemoryNormalizedKey;
 import com.leo.careerforgeai.memory.domain.profile.MemoryType;
 
 import java.util.UUID;
+import com.leo.careerforgeai.agent.application.coach.validation.CareerCoachStructuredOutputRepairer;
+import com.leo.careerforgeai.agent.domain.loop.AgentModelOutcome;
+import com.leo.careerforgeai.model.domain.ModelResponse;
+import com.leo.careerforgeai.model.domain.ModelUsage;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputException;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputFailureReason;
+import com.leo.careerforgeai.model.exception.structured.StructuredOutputFailureStage;
+
+import java.time.Clock;
+import java.time.ZoneOffset;
 
 /**
  * @program: CareerForge-AI
@@ -61,6 +79,11 @@ class CareerCoachServiceTest {
     private CareerCoachFinalAnswerValidator finalAnswerValidator;
 
     private CareerCoachService service;
+
+    @Mock
+    private CareerCoachStructuredOutputRepairer outputRepairer;
+
+    private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
     /** 使用固定服务端文档白名单创建被测服务。 */
     @BeforeEach
@@ -84,7 +107,13 @@ class CareerCoachServiceTest {
                 )
         );
         CareerCoachScopeProvider scopeProvider = new CareerCoachScopeProvider(sourceProperties);
-        service = new CareerCoachService(agentLoop, finalAnswerValidator, scopeProvider);
+        service = new CareerCoachService(
+                agentLoop,
+                finalAnswerValidator,
+                scopeProvider,
+                outputRepairer,
+                clock
+        );
     }
 
     @Test
@@ -298,6 +327,56 @@ class CareerCoachServiceTest {
         assertThat(request.initialMessages().get(4).content())
                 .isEqualTo(currentMessage)
                 .doesNotContain(memoryContent);
+    }
+
+    @Test
+    @DisplayName("仅对可修复结构错误执行一次修复并将额外成本加入Trace")
+    void shouldRepairMalformedFinalAnswerOnce() {
+        AgentLoopResult loopResult = completedLoopResult();
+        StructuredOutputException structuredFailure = new StructuredOutputException(
+                StructuredOutputFailureStage.JSON_PARSING,
+                StructuredOutputFailureReason.MALFORMED_JSON,
+                null,
+                "模型最终输出不是合法JSON",
+                null
+        );
+        CareerCoachFinalAnswerException originalFailure = new CareerCoachFinalAnswerException(
+                CareerCoachFinalAnswerErrorType.MODEL_OUTPUT_INVALID,
+                structuredFailure.getMessage(),
+                structuredFailure,
+                loopResult.finalContent()
+        );
+        ModelResponse repairedResponse = new ModelResponse(
+                "repair-request-1",
+                "deepseek-v4-flash",
+                """
+                {"status":"ANSWERED","answer":"修复后的回答","citedChunkIds":[]}
+                """,
+                new ModelUsage(100, 40, 140)
+        );
+        CareerCoachAnswer repairedAnswer = new CareerCoachAnswer(
+                CareerCoachAnswerStatus.ANSWERED,
+                "修复后的回答",
+                List.of()
+        );
+
+        when(agentLoop.run(any(AgentLoopRequest.class))).thenReturn(loopResult);
+        when(finalAnswerValidator.validate(loopResult)).thenThrow(originalFailure);
+        when(outputRepairer.supports(originalFailure)).thenReturn(true);
+        when(outputRepairer.repair(loopResult.finalContent(), originalFailure)).thenReturn(repairedResponse);
+        when(finalAnswerValidator.validate(repairedResponse.content(), loopResult.toolResults()))
+                .thenReturn(repairedAnswer);
+
+        CareerCoachResult result = service.coach("分析岗位");
+
+        assertThat(result.answer()).isSameAs(repairedAnswer);
+        assertThat(result.trace().modelCalls()).singleElement().satisfies(call -> {
+            assertThat(call.outcome()).isEqualTo(AgentModelOutcome.STRUCTURED_REPAIR);
+            assertThat(call.modelRequestId()).isEqualTo("repair-request-1");
+            assertThat(call.usage().totalTokens()).isEqualTo(140);
+        });
+        assertThat(result.trace().totalUsage().totalTokens()).isEqualTo(140);
+        verify(outputRepairer).repair(loopResult.finalContent(), originalFailure);
     }
 
     /**

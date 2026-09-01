@@ -131,6 +131,45 @@ class DeepSeekChatClientStreamTest {
         assertThat(events.getLast().errorType()).isEqualTo(ModelErrorType.NETWORK_ERROR);
     }
 
+    @Test
+    void shouldEmitIncompleteErrorWhenStreamReachesTokenLimit()
+            throws Exception {
+        String responseBody = """
+            data: {"id":"provider-length","model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"role":"assistant","content":"部分输出"},"finish_reason":null}]}
+
+            data: {"id":"provider-length","model":"deepseek-v4-flash","choices":[{"index":0,"delta":{"role":null,"content":""},"finish_reason":"length"}]}
+
+            data: {"id":"provider-length","model":"deepseek-v4-flash","choices":[],"usage":{"prompt_tokens":10,"completion_tokens":3,"total_tokens":13}}
+
+            data: [DONE]
+
+            """;
+
+        startServer(responseBody);
+
+        DeepSeekChatClient client = createClient();
+        List<ModelStreamEvent> events = new ArrayList<>();
+
+        client.stream(createRequest(), events::add);
+
+        assertThat(events)
+                .extracting(ModelStreamEvent::type)
+                .containsExactly(
+                        ModelStreamEventType.START,
+                        ModelStreamEventType.DELTA,
+                        ModelStreamEventType.ERROR
+                );
+        assertThat(events.get(1).content()).isEqualTo("部分输出");
+        assertThat(events.getLast().errorType())
+                .isEqualTo(ModelErrorType.PROVIDER_INCOMPLETE);
+        assertThat(events.getLast().content())
+                .isEqualTo("模型供应商输出未完整结束");
+        assertThat(events)
+                .noneMatch(event ->
+                        event.type() == ModelStreamEventType.COMPLETED
+                );
+    }
+
     private void startServer(String responseBody)
             throws IOException {
         server = HttpServer.create(

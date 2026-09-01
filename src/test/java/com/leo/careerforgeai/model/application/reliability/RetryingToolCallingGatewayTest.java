@@ -39,32 +39,54 @@ class RetryingToolCallingGatewayTest {
             new ModelUsage(10, 5, 15)
     );
 
-    @Test
-    void shouldRetryTransientFailureAndReduceAttemptTimeout() {
+    @ParameterizedTest
+    @EnumSource(
+            value = ModelErrorType.class,
+            names = {"NETWORK_ERROR", "PROVIDER_UNAVAILABLE"}
+    )
+    void shouldRetryTransientFailureAndReduceAttemptTimeout(
+            ModelErrorType transientErrorType
+    ) {
         AtomicInteger attempts = new AtomicInteger();
         List<Duration> attemptTimeouts = new ArrayList<>();
         ToolCallingGateway delegate = request -> {
             attemptTimeouts.add(request.timeout());
             if (attempts.incrementAndGet() == 1) {
-                throw new ModelException(ModelErrorType.NETWORK_ERROR, "连接失败");
+                throw new ModelException(
+                        transientErrorType,
+                        "供应商暂时不可用"
+                );
             }
             return SUCCESS;
         };
         ModelReliabilityMetrics metrics = new ModelReliabilityMetrics();
-        RetryingToolCallingGateway gateway = new RetryingToolCallingGateway(
-                delegate,
-                properties(3, Duration.ofMillis(1), Duration.ofMillis(4), Duration.ofMillis(10)),
-                metrics
-        );
+        RetryingToolCallingGateway gateway =
+                new RetryingToolCallingGateway(
+                        delegate,
+                        properties(
+                                3,
+                                Duration.ofMillis(1),
+                                Duration.ofMillis(4),
+                                Duration.ofMillis(10)
+                        ),
+                        metrics
+                );
 
-        assertThat(gateway.call(request(Duration.ofSeconds(1)))).isSameAs(SUCCESS);
+        assertThat(gateway.call(request(Duration.ofSeconds(1))))
+                .isSameAs(SUCCESS);
         assertThat(attempts).hasValue(2);
-        assertThat(attemptTimeouts.get(1)).isLessThan(attemptTimeouts.get(0));
+        assertThat(attemptTimeouts.get(1))
+                .isLessThan(attemptTimeouts.get(0));
         assertThat(metrics.snapshot()).isEqualTo(
-                new ModelReliabilityMetricsSnapshot(1, 1, 1, 0, 0)
+                new ModelReliabilityMetricsSnapshot(
+                        1,
+                        1,
+                        1,
+                        0,
+                        0
+                )
         );
     }
-
     @Test
     void shouldKeepLastTransientFailureAfterMaximumAttempts() {
         AtomicInteger attempts = new AtomicInteger();
@@ -96,6 +118,7 @@ class RetryingToolCallingGatewayTest {
                     "PERMISSION_ERROR",
                     "MODEL_NOT_FOUND",
                     "CAPACITY_REJECTED",
+                    "PROVIDER_INCOMPLETE",
                     "PROVIDER_REQUEST_REJECTED",
                     "INVALID_RESPONSE",
                     "STRUCTURED_OUTPUT_INVALID"

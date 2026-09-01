@@ -29,6 +29,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import com.sun.net.httpserver.HttpServer;
+
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 
 /** 验证 DeepSeek HTTP、超时、网络和响应解析错误的统一分类。 */
 class DeepSeekChatClientErrorTest {
@@ -112,21 +118,99 @@ class DeepSeekChatClientErrorTest {
                                 .isEqualTo(ModelErrorType.INVALID_RESPONSE));
     }
 
+    @Test
+    @DisplayName("响应头已到达但响应体超过Deadline时仍终止调用")
+    void shouldTimeoutWhileReadingResponseBody() throws Exception {
+        byte[] responseBody = """
+            {
+              "id": "request-local-timeout",
+              "model": "deepseek-v4-flash",
+              "choices": [
+                {
+                  "index": 0,
+                  "message": {
+                    "role": "assistant",
+                    "content": "最终回答"
+                  },
+                  "finish_reason": "stop"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 1,
+                "completion_tokens": 1,
+                "total_tokens": 2
+              }
+            }
+            """.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/chat/completions", exchange -> {
+            try {
+                exchange.getRequestBody().readAllBytes();
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, responseBody.length);
+
+                try {
+                    Thread.sleep(1_000);
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                }
+
+                try (OutputStream output = exchange.getResponseBody()) {
+                    output.write(responseBody);
+                }
+            } finally {
+                exchange.close();
+            }
+        });
+        server.start();
+
+        try {
+            ModelProperties properties = new ModelProperties(
+                    URI.create("http://127.0.0.1:" + server.getAddress().getPort()),
+                    "test-api-key",
+                    "deepseek-v4-flash"
+            );
+            DeepSeekChatClient localClient = new DeepSeekChatClient(
+                    properties,
+                    JsonMapper.builder().build(),
+                    new DeepSeekSseParser(JsonMapper.builder().build()),
+                    HttpClient.newHttpClient()
+            );
+            ModelRequest request = new ModelRequest(
+                    List.of(new ModelMessage(ModelRole.USER, "测试消息")),
+                    ModelOutputFormat.TEXT,
+                    Duration.ofMillis(200)
+            );
+
+            assertThatThrownBy(() -> localClient.chat(request))
+                    .isInstanceOfSatisfying(ModelException.class, exception ->
+                            assertThat(exception.getErrorType()).isEqualTo(ModelErrorType.TIMEOUT));
+        } finally {
+            server.stop(0);
+        }
+    }
+
     /** 模拟普通非流式HTTP响应。 */
-    private void stubStringResponse(int statusCode, String body) throws Exception {
+    /** 模拟普通非流式HTTP响应。 */
+    private void stubStringResponse(int statusCode, String body) {
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(statusCode);
         when(response.body()).thenReturn(body);
-        when(httpClient.send(any(HttpRequest.class),
-                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
-                .thenReturn(response);
+        when(httpClient.sendAsync(
+                any(HttpRequest.class),
+                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()
+        )).thenReturn(CompletableFuture.completedFuture(response));
     }
 
-    /** 模拟HTTP客户端在发送请求时抛出异常。 */
-    private void stubSendFailure(IOException exception) throws Exception {
-        when(httpClient.send(any(HttpRequest.class),
-                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
-                .thenThrow(exception);
+    /** 模拟HTTP客户端异步调用失败。 */
+    private void stubSendFailure(IOException exception) {
+        CompletableFuture<HttpResponse<String>> responseFuture = new CompletableFuture<>();
+        responseFuture.completeExceptionally(exception);
+        when(httpClient.sendAsync(
+                any(HttpRequest.class),
+                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()
+        )).thenReturn(responseFuture);
     }
 
     /** 创建使用可控HTTP客户端的DeepSeek适配器。 */

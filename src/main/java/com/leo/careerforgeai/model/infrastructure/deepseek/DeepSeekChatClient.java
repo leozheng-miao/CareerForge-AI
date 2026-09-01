@@ -1,6 +1,5 @@
 package com.leo.careerforgeai.model.infrastructure.deepseek;
 
-import ch.qos.logback.core.model.Model;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
 import com.leo.careerforgeai.model.infrastructure.deepseek.dto.DeepSeekChatRequest;
@@ -33,7 +32,12 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.concurrent.TimeoutException;
 
 /**
  * @program: CareerForge-AI
@@ -172,10 +176,7 @@ public class DeepSeekChatClient implements ModelGateway {
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
                 .build();
         //5. 同步发送
-        HttpResponse<String> response = httpClient.send(
-                request,
-                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
-        );
+        HttpResponse<String> response = sendWithinDeadline(request, timeout);
         //6. 检查http 状态
         int statusCode = response.statusCode();
         if (statusCode < 200 || statusCode > 299) {
@@ -220,6 +221,42 @@ public class DeepSeekChatClient implements ModelGateway {
                 totalTokens
         );
         return deepSeekChatResponse;
+    }
+
+    /** 在调用Deadline内等待完整非流式响应。 */
+    private HttpResponse<String> sendWithinDeadline(HttpRequest request, Duration timeout)
+            throws IOException, InterruptedException {
+        CompletableFuture<HttpResponse<String>> responseFuture = httpClient.sendAsync(
+                request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+        );
+
+        try {
+            return responseFuture.get(timeout.toNanos(), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException exception) {
+            responseFuture.cancel(true);
+            HttpTimeoutException timeoutException =
+                    new HttpTimeoutException("等待模型供应商完整响应超时");
+            timeoutException.initCause(exception);
+            throw timeoutException;
+        } catch (InterruptedException exception) {
+            responseFuture.cancel(true);
+            throw exception;
+        } catch (ExecutionException exception) {
+            throw unwrapAsyncFailure(exception);
+        }
+    }
+
+    /** 解包异步传输异常并保留可分类的IO根因。 */
+    private IOException unwrapAsyncFailure(ExecutionException exception) {
+        Throwable cause = exception.getCause();
+        while (cause instanceof CompletionException && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        if (cause instanceof IOException ioException) return ioException;
+        if (cause instanceof RuntimeException runtimeException) throw runtimeException;
+        if (cause instanceof Error error) throw error;
+        return new IOException("模型异步调用失败", cause);
     }
 
     /**

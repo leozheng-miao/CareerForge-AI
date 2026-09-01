@@ -1,8 +1,8 @@
 package com.leo.careerforgeai.interview.infrastructure.persistence.adapter;
 
 import com.leo.careerforgeai.interview.application.port.InterviewReviewRepository;
-import com.leo.careerforgeai.interview.domain.EvidenceReview;
-import com.leo.careerforgeai.interview.domain.TechnicalReview;
+import com.leo.careerforgeai.interview.domain.review.EvidenceReview;
+import com.leo.careerforgeai.interview.domain.review.TechnicalReview;
 import com.leo.careerforgeai.interview.infrastructure.persistence.converter.InterviewReviewPersistenceConverter;
 import com.leo.careerforgeai.interview.infrastructure.persistence.mapper.InterviewReviewFactMapper;
 import com.leo.careerforgeai.shared.actor.ActorId;

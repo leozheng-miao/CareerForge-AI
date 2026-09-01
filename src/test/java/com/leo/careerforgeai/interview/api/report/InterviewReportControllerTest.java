@@ -2,11 +2,11 @@ package com.leo.careerforgeai.interview.api.report;
 
 import com.leo.careerforgeai.interview.api.advice.InterviewReportApiExceptionHandler;
 import com.leo.careerforgeai.interview.api.controller.InterviewReportController;
-import com.leo.careerforgeai.interview.application.report.InterviewReportConfirmationFacade;
-import com.leo.careerforgeai.interview.application.report.InterviewReportConfirmationFactory;
+import com.leo.careerforgeai.interview.application.report.confirmation.InterviewReportConfirmationFacade;
+import com.leo.careerforgeai.interview.application.report.confirmation.InterviewReportConfirmationFactory;
 import com.leo.careerforgeai.interview.application.report.InterviewReportQueryApplicationService;
-import com.leo.careerforgeai.interview.domain.InterviewReport;
-import com.leo.careerforgeai.interview.domain.InterviewReportConfirmation;
+import com.leo.careerforgeai.interview.domain.report.InterviewReport;
+import com.leo.careerforgeai.interview.domain.report.InterviewReportConfirmation;
 import com.leo.careerforgeai.shared.web.GlobalExceptionHandler;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;

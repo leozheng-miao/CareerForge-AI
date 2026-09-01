@@ -1,8 +1,8 @@
 package com.leo.careerforgeai.interview.application.graph;
 
-import com.leo.careerforgeai.interview.domain.InterviewMode;
-import com.leo.careerforgeai.interview.domain.InterviewReviewPlan;
-import com.leo.careerforgeai.interview.domain.InterviewWaitReason;
+import com.leo.careerforgeai.interview.domain.session.InterviewMode;
+import com.leo.careerforgeai.interview.domain.review.InterviewReviewPlan;
+import com.leo.careerforgeai.interview.domain.session.InterviewWaitReason;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 

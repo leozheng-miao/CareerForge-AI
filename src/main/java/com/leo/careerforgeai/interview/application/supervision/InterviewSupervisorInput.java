@@ -1,9 +1,9 @@
 package com.leo.careerforgeai.interview.application.supervision;
 
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
-import com.leo.careerforgeai.interview.domain.InterviewReviewPlan;
-import com.leo.careerforgeai.interview.domain.InterviewStatus;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.review.InterviewReviewPlan;
+import com.leo.careerforgeai.interview.domain.session.InterviewStatus;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 
 import java.util.Objects;
 import java.util.UUID;

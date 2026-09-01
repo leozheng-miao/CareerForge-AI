@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.interview.api.dto.report;
 
-import com.leo.careerforgeai.interview.domain.InterviewReportConfirmation;
+import com.leo.careerforgeai.interview.domain.report.InterviewReportConfirmation;
 
 import java.time.Instant;
 import java.util.List;

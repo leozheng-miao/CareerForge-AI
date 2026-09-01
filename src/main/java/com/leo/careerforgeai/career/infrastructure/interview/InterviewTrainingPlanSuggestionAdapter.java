@@ -7,9 +7,9 @@ import com.leo.careerforgeai.career.application.training.TrainingPlanGenerationI
 import com.leo.careerforgeai.career.application.training.TrainingPlanGenerator;
 import com.leo.careerforgeai.career.domain.TrainingPlan;
 import com.leo.careerforgeai.interview.application.port.InterviewTrainingPlanSuggestionApplicationPort;
-import com.leo.careerforgeai.interview.domain.InterviewReport;
-import com.leo.careerforgeai.interview.domain.InterviewReportConfirmation;
-import com.leo.careerforgeai.interview.domain.MockInterviewInputSnapshot;
+import com.leo.careerforgeai.interview.domain.report.InterviewReport;
+import com.leo.careerforgeai.interview.domain.report.InterviewReportConfirmation;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewInputSnapshot;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;

@@ -4,8 +4,8 @@ import com.leo.careerforgeai.agent.application.run.execution.RunExecutionContext
 import com.leo.careerforgeai.interview.application.graph.InterviewGraphExecutionService;
 import com.leo.careerforgeai.interview.application.session.MockInterviewLifecycleApplicationService;
 import com.leo.careerforgeai.interview.application.session.MockInterviewVersionConflictException;
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;

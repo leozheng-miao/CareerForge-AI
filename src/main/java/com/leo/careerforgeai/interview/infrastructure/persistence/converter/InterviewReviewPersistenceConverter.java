@@ -1,9 +1,9 @@
 package com.leo.careerforgeai.interview.infrastructure.persistence.converter;
 
-import com.leo.careerforgeai.interview.domain.EvidenceConsistencyVerdict;
-import com.leo.careerforgeai.interview.domain.EvidenceReview;
-import com.leo.careerforgeai.interview.domain.EvidenceReviewSource;
-import com.leo.careerforgeai.interview.domain.TechnicalReview;
+import com.leo.careerforgeai.interview.domain.review.EvidenceConsistencyVerdict;
+import com.leo.careerforgeai.interview.domain.review.EvidenceReview;
+import com.leo.careerforgeai.interview.domain.review.EvidenceReviewSource;
+import com.leo.careerforgeai.interview.domain.review.TechnicalReview;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.EvidenceReviewEntity;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.TechnicalReviewEntity;
 import com.leo.careerforgeai.shared.actor.ActorId;

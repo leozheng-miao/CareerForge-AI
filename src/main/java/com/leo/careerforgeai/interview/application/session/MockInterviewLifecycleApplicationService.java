@@ -1,9 +1,9 @@
 package com.leo.careerforgeai.interview.application.session;
 
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
-import com.leo.careerforgeai.interview.domain.InterviewStatus;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.session.InterviewStatus;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
 

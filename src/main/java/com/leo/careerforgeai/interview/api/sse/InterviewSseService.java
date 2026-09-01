@@ -6,7 +6,7 @@ import com.leo.careerforgeai.interview.api.dto.event.InterviewSseEventResponse;
 import com.leo.careerforgeai.interview.application.event.InterviewEventObservation;
 import com.leo.careerforgeai.interview.application.event.InterviewEventQueryApplicationService;
 import com.leo.careerforgeai.interview.application.event.StoredInterviewEvent;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;

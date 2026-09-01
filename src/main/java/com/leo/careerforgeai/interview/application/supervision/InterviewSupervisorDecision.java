@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.interview.application.supervision;
 
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
-import com.leo.careerforgeai.interview.domain.InterviewRouteDecision;
+import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.execution.InterviewRouteDecision;
 
 import java.util.Objects;
 

@@ -1,8 +1,8 @@
 package com.leo.careerforgeai.interview.api.dto.evidence;
 
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceArtifact;
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceStatus;
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceType;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceArtifact;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceStatus;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceType;
 
 import java.time.Instant;
 import java.util.List;

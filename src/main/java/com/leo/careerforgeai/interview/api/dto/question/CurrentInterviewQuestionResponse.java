@@ -1,10 +1,10 @@
 package com.leo.careerforgeai.interview.api.dto.question;
 
 import com.leo.careerforgeai.interview.application.question.CurrentInterviewQuestionQueryApplicationService;
-import com.leo.careerforgeai.interview.domain.InterviewQuestion;
-import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
-import com.leo.careerforgeai.interview.domain.InterviewRound;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestion;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestionType;
+import com.leo.careerforgeai.interview.domain.round.InterviewRound;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 
 import java.time.Instant;
 import java.util.UUID;

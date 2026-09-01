@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.interview.application.supervision;
 
-import com.leo.careerforgeai.interview.domain.InterviewBudgetPolicy;
+import com.leo.careerforgeai.interview.domain.session.InterviewBudgetPolicy;
 
 import java.util.Objects;
 

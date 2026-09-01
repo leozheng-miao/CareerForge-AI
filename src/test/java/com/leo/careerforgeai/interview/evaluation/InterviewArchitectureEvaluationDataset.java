@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.interview.evaluation;
 
-import com.leo.careerforgeai.interview.domain.EvidenceConsistencyVerdict;
-import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
+import com.leo.careerforgeai.interview.domain.review.EvidenceConsistencyVerdict;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestionType;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;

@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.interview.application.port;
 
-import com.leo.careerforgeai.interview.application.model.contract.InterviewRoleContract;
+import com.leo.careerforgeai.interview.application.model.common.InterviewRoleContract;
 import com.leo.careerforgeai.model.domain.ModelUsage;
 
 import java.time.Duration;

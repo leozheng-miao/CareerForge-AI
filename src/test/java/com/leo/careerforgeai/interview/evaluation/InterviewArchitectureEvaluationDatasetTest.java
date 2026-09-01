@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.interview.evaluation;
 
-import com.leo.careerforgeai.interview.domain.EvidenceConsistencyVerdict;
-import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
+import com.leo.careerforgeai.interview.domain.review.EvidenceConsistencyVerdict;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestionType;
 import org.junit.jupiter.api.Test;
 
 import java.util.EnumSet;

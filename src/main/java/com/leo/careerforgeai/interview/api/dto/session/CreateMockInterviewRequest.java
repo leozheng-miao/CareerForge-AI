@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.interview.api.dto.session;
 
 import com.leo.careerforgeai.interview.application.snapshot.MockInterviewInputSelection;
-import com.leo.careerforgeai.interview.domain.InterviewMode;
+import com.leo.careerforgeai.interview.domain.session.InterviewMode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;

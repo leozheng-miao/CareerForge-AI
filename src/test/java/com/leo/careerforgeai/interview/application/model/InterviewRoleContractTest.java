@@ -1,23 +1,24 @@
 package com.leo.careerforgeai.interview.application.model;
 
-import com.leo.careerforgeai.interview.application.model.contract.EvidenceReviewDraft;
-import com.leo.careerforgeai.interview.application.model.contract.EvidenceReviewInput;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionDraft;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionInput;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewReportDraft;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewReportInput;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewRoleContract;
-import com.leo.careerforgeai.interview.application.model.contract.TechnicalReviewDraft;
-import com.leo.careerforgeai.interview.application.model.contract.TechnicalReviewInput;
-import com.leo.careerforgeai.interview.application.model.validation.EvidenceReviewRoleContract;
-import com.leo.careerforgeai.interview.application.model.validation.InterviewQuestionRoleContract;
-import com.leo.careerforgeai.interview.application.model.validation.InterviewReportRoleContract;
-import com.leo.careerforgeai.interview.application.model.validation.InterviewRoleContractErrorType;
-import com.leo.careerforgeai.interview.application.model.validation.InterviewRoleContractException;
-import com.leo.careerforgeai.interview.application.model.validation.TechnicalReviewRoleContract;
-import com.leo.careerforgeai.interview.domain.EvidenceConsistencyVerdict;
-import com.leo.careerforgeai.interview.domain.InterviewMode;
-import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
+import com.leo.careerforgeai.interview.application.model.review.EvidenceReviewDraft;
+import com.leo.careerforgeai.interview.application.model.review.EvidenceReviewInput;
+import com.leo.careerforgeai.interview.application.model.question.InterviewQuestionDraft;
+import com.leo.careerforgeai.interview.application.model.question.InterviewQuestionInput;
+import com.leo.careerforgeai.interview.application.model.report.InterviewReportDraft;
+import com.leo.careerforgeai.interview.application.model.report.InterviewReportInput;
+import com.leo.careerforgeai.interview.application.model.common.InterviewRoleContract;
+import com.leo.careerforgeai.interview.application.model.review.TechnicalReviewDraft;
+import com.leo.careerforgeai.interview.application.model.review.TechnicalReviewInput;
+import com.leo.careerforgeai.interview.application.model.review.EvidenceReviewRoleContract;
+import com.leo.careerforgeai.interview.application.model.question.InterviewQuestionRoleContract;
+import com.leo.careerforgeai.interview.application.model.report.InterviewReportRoleContract;
+import com.leo.careerforgeai.interview.application.model.common.InterviewRoleContractErrorType;
+import com.leo.careerforgeai.interview.application.model.common.InterviewRoleContractException;
+import com.leo.careerforgeai.interview.application.model.review.TechnicalReviewRoleContract;
+import com.leo.careerforgeai.interview.domain.execution.InterviewRole;
+import com.leo.careerforgeai.interview.domain.review.EvidenceConsistencyVerdict;
+import com.leo.careerforgeai.interview.domain.session.InterviewMode;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestionType;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
@@ -32,7 +33,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewReportSuggestionDraft;
+import com.leo.careerforgeai.interview.application.model.report.InterviewReportSuggestionDraft;
 
 /**
  * @program: CareerForge-AI
@@ -61,6 +62,12 @@ class InterviewRoleContractTest {
     @Test
     void shouldGenerateClosedJsonSchemaForEveryRole() throws Exception {
         JsonMapper jsonMapper = JsonMapper.builder().build();
+        Map<InterviewRole, Class<?>> expectedOutputTypes = Map.of(
+                InterviewRole.INTERVIEWER, InterviewQuestionDraft.class,
+                InterviewRole.TECHNICAL_REVIEWER, TechnicalReviewDraft.class,
+                InterviewRole.EVIDENCE_REVIEWER, EvidenceReviewDraft.class,
+                InterviewRole.REPORT_COACH, InterviewReportDraft.class
+        );
 
         for (InterviewRoleContract<?, ?> contract : List.of(
                 questionContract,
@@ -68,13 +75,13 @@ class InterviewRoleContractTest {
                 evidenceContract,
                 reportContract
         )) {
+            assertThat(contract.outputType()).isEqualTo(expectedOutputTypes.get(contract.role()));
             var schema = jsonMapper.readTree(contract.outputJsonSchema());
             assertThat(schema.path("type").asText()).isEqualTo("object");
             assertThat(schema.path("additionalProperties").asBoolean(true)).isFalse();
             assertThat(schema.path("properties").isObject()).isTrue();
         }
     }
-
     @Test
     void shouldRejectQuestionThatChangesBlueprintOrUsesUnauthorizedEvidence() {
         InterviewQuestionInput input = questionInput();

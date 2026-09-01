@@ -1,10 +1,10 @@
 package com.leo.careerforgeai.interview.infrastructure.persistence.converter;
 
-import com.leo.careerforgeai.interview.domain.InterviewAnswer;
-import com.leo.careerforgeai.interview.domain.InterviewQuestion;
-import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
-import com.leo.careerforgeai.interview.domain.InterviewRound;
-import com.leo.careerforgeai.interview.domain.InterviewRoundStatus;
+import com.leo.careerforgeai.interview.domain.round.InterviewAnswer;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestion;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestionType;
+import com.leo.careerforgeai.interview.domain.round.InterviewRound;
+import com.leo.careerforgeai.interview.domain.round.InterviewRoundStatus;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.InterviewAnswerEntity;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.InterviewQuestionEntity;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.InterviewRoundEntity;

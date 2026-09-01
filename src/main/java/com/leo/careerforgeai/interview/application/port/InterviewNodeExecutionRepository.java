@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.interview.application.port;
 
-import com.leo.careerforgeai.interview.domain.InterviewNodeExecution;
+import com.leo.careerforgeai.interview.domain.execution.InterviewNodeExecution;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
 import java.util.Optional;

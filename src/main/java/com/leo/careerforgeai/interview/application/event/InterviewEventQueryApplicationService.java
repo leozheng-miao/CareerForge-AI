@@ -4,7 +4,7 @@ import com.leo.careerforgeai.agent.infrastructure.redis.RedisInfrastructureExcep
 import com.leo.careerforgeai.interview.application.port.InterviewEventStore;
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
 import com.leo.careerforgeai.interview.application.session.MockInterviewNotFoundException;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

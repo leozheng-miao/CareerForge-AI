@@ -2,7 +2,7 @@ package com.leo.careerforgeai.interview.infrastructure.persistence.adapter;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.leo.careerforgeai.interview.application.port.MockInterviewInputSnapshotRepository;
-import com.leo.careerforgeai.interview.domain.MockInterviewInputSnapshot;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewInputSnapshot;
 import com.leo.careerforgeai.interview.infrastructure.persistence.converter.MockInterviewInputSnapshotPersistenceConverter;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.MockInterviewInputArtifactEntity;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.MockInterviewInputSnapshotEntity;

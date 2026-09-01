@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.interview.application.event;
 
 import com.leo.careerforgeai.agent.infrastructure.redis.RedisInfrastructureErrorType;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 
 import java.util.List;
 import java.util.Objects;

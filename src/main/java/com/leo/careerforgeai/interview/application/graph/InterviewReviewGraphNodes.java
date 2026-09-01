@@ -1,15 +1,15 @@
 package com.leo.careerforgeai.interview.application.graph;
 
-import com.leo.careerforgeai.interview.application.model.contract.EvidenceReviewInput;
-import com.leo.careerforgeai.interview.application.model.contract.TechnicalReviewInput;
+import com.leo.careerforgeai.interview.application.model.review.EvidenceReviewInput;
+import com.leo.careerforgeai.interview.application.model.review.TechnicalReviewInput;
 import com.leo.careerforgeai.interview.application.port.InterviewReviewRepository;
 import com.leo.careerforgeai.interview.application.review.InterviewReviewApplicationService;
 import com.leo.careerforgeai.interview.application.review.InterviewReviewPreparationService;
-import com.leo.careerforgeai.interview.domain.EvidenceConsistencyVerdict;
-import com.leo.careerforgeai.interview.domain.EvidenceReview;
-import com.leo.careerforgeai.interview.domain.EvidenceReviewSource;
-import com.leo.careerforgeai.interview.domain.InterviewReviewPlan;
-import com.leo.careerforgeai.interview.domain.TechnicalReview;
+import com.leo.careerforgeai.interview.domain.review.EvidenceConsistencyVerdict;
+import com.leo.careerforgeai.interview.domain.review.EvidenceReview;
+import com.leo.careerforgeai.interview.domain.review.EvidenceReviewSource;
+import com.leo.careerforgeai.interview.domain.review.InterviewReviewPlan;
+import com.leo.careerforgeai.interview.domain.review.TechnicalReview;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
 import org.springframework.beans.factory.annotation.Value;

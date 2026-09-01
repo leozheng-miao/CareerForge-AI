@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.interview.application.port;
 
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
 import java.time.Instant;

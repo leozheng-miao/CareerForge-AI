@@ -1,11 +1,12 @@
 package com.leo.careerforgeai.interview.application.model.deepseek;
 
-import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionDraft;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionInput;
-import com.leo.careerforgeai.interview.application.model.validation.InterviewQuestionRoleContract;
+import com.leo.careerforgeai.interview.application.model.question.InterviewQuestionDraft;
+import com.leo.careerforgeai.interview.application.model.question.InterviewQuestionInput;
+import com.leo.careerforgeai.interview.application.model.question.InterviewQuestionRoleContract;
 import com.leo.careerforgeai.interview.application.port.InterviewRoleModelGateway;
-import com.leo.careerforgeai.interview.domain.InterviewMode;
-import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
+import com.leo.careerforgeai.interview.domain.session.InterviewMode;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestionType;
+import com.leo.careerforgeai.interview.infrastructure.model.deepseek.DeepSeekInterviewRoleModelGateway;
 import com.leo.careerforgeai.model.application.ModelGateway;
 import com.leo.careerforgeai.model.application.reliability.ModelCallBulkhead;
 import com.leo.careerforgeai.model.application.reliability.ModelCircuitBreaker;

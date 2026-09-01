@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.interview.api.dto.report;
 
-import com.leo.careerforgeai.interview.domain.InterviewReportConfirmation;
+import com.leo.careerforgeai.interview.domain.report.InterviewReportConfirmation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;

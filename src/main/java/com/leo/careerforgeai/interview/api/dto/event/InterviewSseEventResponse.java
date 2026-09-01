@@ -2,9 +2,9 @@ package com.leo.careerforgeai.interview.api.dto.event;
 
 import com.leo.careerforgeai.interview.application.event.InterviewEventType;
 import com.leo.careerforgeai.interview.application.event.StoredInterviewEvent;
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
-import com.leo.careerforgeai.interview.domain.InterviewStatus;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.session.InterviewStatus;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 
 import java.time.Instant;
 import java.util.Objects;

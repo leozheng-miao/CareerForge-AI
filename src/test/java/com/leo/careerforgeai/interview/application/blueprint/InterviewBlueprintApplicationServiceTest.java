@@ -10,14 +10,14 @@ import com.leo.careerforgeai.interview.application.port.MockInterviewInputSnapsh
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
 import com.leo.careerforgeai.interview.application.port.PersonalEvidenceArtifactRepository;
 import com.leo.careerforgeai.interview.application.snapshot.MockInterviewInputConflictException;
-import com.leo.careerforgeai.interview.domain.InterviewBlueprint;
-import com.leo.careerforgeai.interview.domain.InterviewBudgetPolicy;
-import com.leo.careerforgeai.interview.domain.InterviewMode;
-import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
-import com.leo.careerforgeai.interview.domain.MockInterviewInputSnapshot;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceArtifact;
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceType;
+import com.leo.careerforgeai.interview.domain.round.InterviewBlueprint;
+import com.leo.careerforgeai.interview.domain.session.InterviewBudgetPolicy;
+import com.leo.careerforgeai.interview.domain.session.InterviewMode;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestionType;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewInputSnapshot;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceArtifact;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceType;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionInput;
+import com.leo.careerforgeai.interview.application.model.question.InterviewQuestionInput;
 
 /**
  * @program: CareerForge-AI

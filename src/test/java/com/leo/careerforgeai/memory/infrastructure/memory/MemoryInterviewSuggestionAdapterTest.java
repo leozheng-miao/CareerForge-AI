@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.memory.infrastructure.memory;
 
-import com.leo.careerforgeai.interview.domain.InterviewReport;
-import com.leo.careerforgeai.interview.domain.InterviewReportConfirmation;
+import com.leo.careerforgeai.interview.domain.report.InterviewReport;
+import com.leo.careerforgeai.interview.domain.report.InterviewReportConfirmation;
 import com.leo.careerforgeai.memory.application.port.profile.MemoryRepository;
 import com.leo.careerforgeai.memory.domain.profile.MemoryItem;
 import com.leo.careerforgeai.memory.domain.profile.MemorySourceType;

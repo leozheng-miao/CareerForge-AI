@@ -3,8 +3,8 @@ package com.leo.careerforgeai.interview.application.execution;
 import com.leo.careerforgeai.agent.application.run.execution.RunExecutionContext;
 import com.leo.careerforgeai.interview.application.graph.InterviewGraphExecutionService;
 import com.leo.careerforgeai.interview.application.session.MockInterviewLifecycleApplicationService;
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.junit.jupiter.api.Test;
 

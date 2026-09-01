@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.interview.api.dto.evidence;
 
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceType;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;

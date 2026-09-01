@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.interview.application.port;
 
-import com.leo.careerforgeai.interview.domain.InterviewReportConfirmation;
+import com.leo.careerforgeai.interview.domain.report.InterviewReportConfirmation;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
 import java.util.Optional;

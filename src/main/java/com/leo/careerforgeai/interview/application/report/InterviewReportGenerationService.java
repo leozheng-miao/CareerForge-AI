@@ -1,14 +1,13 @@
 package com.leo.careerforgeai.interview.application.report;
 
-import com.leo.careerforgeai.interview.application.model.contract.InterviewReportDraft;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewReportInput;
-import com.leo.careerforgeai.interview.application.model.validation.InterviewReportRoleContract;
-import com.leo.careerforgeai.interview.application.model.validation.InterviewRoleContractException;
-import com.leo.careerforgeai.interview.application.port.InterviewReportFactory;
+import com.leo.careerforgeai.interview.application.model.report.InterviewReportDraft;
+import com.leo.careerforgeai.interview.application.model.report.InterviewReportInput;
+import com.leo.careerforgeai.interview.application.model.report.InterviewReportRoleContract;
+import com.leo.careerforgeai.interview.application.model.common.InterviewRoleContractException;
 import com.leo.careerforgeai.interview.application.port.InterviewRoleModelGateway;
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
-import com.leo.careerforgeai.interview.domain.InterviewNodeExecution;
-import com.leo.careerforgeai.interview.domain.InterviewReport;
+import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.execution.InterviewNodeExecution;
+import com.leo.careerforgeai.interview.domain.report.InterviewReport;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;

@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.interview.application.supervision;
 
-import com.leo.careerforgeai.interview.domain.InterviewBudgetPolicy;
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.session.InterviewBudgetPolicy;
+import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
 import org.springframework.stereotype.Component;
 
 import java.util.Objects;

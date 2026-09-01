@@ -9,11 +9,11 @@ import com.leo.careerforgeai.interview.application.graph.InterviewGraphExecution
 import com.leo.careerforgeai.interview.application.port.InterviewRoundRepository;
 import com.leo.careerforgeai.interview.application.session.MockInterviewLifecycleApplicationService;
 import com.leo.careerforgeai.interview.application.session.MockInterviewVersionConflictException;
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
-import com.leo.careerforgeai.interview.domain.InterviewRound;
-import com.leo.careerforgeai.interview.domain.InterviewRoundStatus;
-import com.leo.careerforgeai.interview.domain.InterviewStatus;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.round.InterviewRound;
+import com.leo.careerforgeai.interview.domain.round.InterviewRoundStatus;
+import com.leo.careerforgeai.interview.domain.session.InterviewStatus;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

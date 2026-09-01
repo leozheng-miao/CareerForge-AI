@@ -1,16 +1,16 @@
 package com.leo.careerforgeai.interview.application.graph;
 
 import com.leo.careerforgeai.CareerForgeAiApplication;
-import com.leo.careerforgeai.interview.application.model.contract.EvidenceReviewDraft;
-import com.leo.careerforgeai.interview.application.model.contract.EvidenceReviewInput;
-import com.leo.careerforgeai.interview.application.model.contract.TechnicalReviewDraft;
-import com.leo.careerforgeai.interview.application.model.contract.TechnicalReviewInput;
-import com.leo.careerforgeai.interview.application.model.validation.EvidenceReviewRoleContract;
-import com.leo.careerforgeai.interview.application.model.validation.TechnicalReviewRoleContract;
+import com.leo.careerforgeai.interview.application.model.review.EvidenceReviewDraft;
+import com.leo.careerforgeai.interview.application.model.review.EvidenceReviewInput;
+import com.leo.careerforgeai.interview.application.model.review.TechnicalReviewDraft;
+import com.leo.careerforgeai.interview.application.model.review.TechnicalReviewInput;
+import com.leo.careerforgeai.interview.application.model.review.EvidenceReviewRoleContract;
+import com.leo.careerforgeai.interview.application.model.review.TechnicalReviewRoleContract;
 import com.leo.careerforgeai.interview.application.port.InterviewRoleModelGateway;
-import com.leo.careerforgeai.interview.domain.InterviewMode;
-import com.leo.careerforgeai.interview.domain.InterviewReviewPlan;
-import com.leo.careerforgeai.interview.domain.InterviewRouteDecision;
+import com.leo.careerforgeai.interview.domain.session.InterviewMode;
+import com.leo.careerforgeai.interview.domain.review.InterviewReviewPlan;
+import com.leo.careerforgeai.interview.domain.execution.InterviewRouteDecision;
 import org.bsc.langgraph4j.GraphInput;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.checkpoint.MemorySaver;

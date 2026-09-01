@@ -1,8 +1,8 @@
 package com.leo.careerforgeai.interview.application.evidence;
 
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceArtifact;
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceStatus;
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceType;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceArtifact;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceStatus;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceType;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.springframework.stereotype.Component;
 

@@ -2,8 +2,9 @@ package com.leo.careerforgeai.interview.application.report;
 
 import com.leo.careerforgeai.interview.application.port.InterviewReportConfirmationRepository;
 import com.leo.careerforgeai.interview.application.port.InterviewReportRepository;
-import com.leo.careerforgeai.interview.domain.InterviewReport;
-import com.leo.careerforgeai.interview.domain.InterviewReportConfirmation;
+import com.leo.careerforgeai.interview.application.report.confirmation.InterviewReportConfirmationException;
+import com.leo.careerforgeai.interview.domain.report.InterviewReport;
+import com.leo.careerforgeai.interview.domain.report.InterviewReportConfirmation;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;

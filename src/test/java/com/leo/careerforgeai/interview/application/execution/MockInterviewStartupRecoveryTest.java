@@ -4,7 +4,7 @@ import com.leo.careerforgeai.agent.application.run.execution.CoachingRunAsyncDis
 import com.leo.careerforgeai.agent.application.run.execution.RunExecutionContext;
 import com.leo.careerforgeai.agent.config.CoachingRunExecutionProperties;
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.junit.jupiter.api.Test;
 

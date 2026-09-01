@@ -10,14 +10,14 @@ import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepo
 import com.leo.careerforgeai.interview.application.port.PersonalEvidenceArtifactRepository;
 import com.leo.careerforgeai.interview.application.session.MockInterviewNotFoundException;
 import com.leo.careerforgeai.interview.application.snapshot.MockInterviewInputConflictException;
-import com.leo.careerforgeai.interview.domain.InterviewBlueprint;
-import com.leo.careerforgeai.interview.domain.InterviewMode;
-import com.leo.careerforgeai.interview.domain.InterviewStatus;
-import com.leo.careerforgeai.interview.domain.MockInterviewInputSnapshot;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceArtifact;
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceStatus;
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceType;
+import com.leo.careerforgeai.interview.domain.round.InterviewBlueprint;
+import com.leo.careerforgeai.interview.domain.session.InterviewMode;
+import com.leo.careerforgeai.interview.domain.session.InterviewStatus;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewInputSnapshot;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceArtifact;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceStatus;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceType;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -31,18 +31,18 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionInput;
+import com.leo.careerforgeai.interview.application.model.question.InterviewQuestionInput;
 
 import java.util.Collections;
 import com.leo.careerforgeai.interview.application.port.InterviewReviewRepository;
 import com.leo.careerforgeai.interview.application.port.InterviewRoundRepository;
-import com.leo.careerforgeai.interview.domain.InterviewAnswer;
-import com.leo.careerforgeai.interview.domain.InterviewQuestion;
-import com.leo.careerforgeai.interview.domain.InterviewRouteDecision;
-import com.leo.careerforgeai.interview.domain.InterviewRound;
-import com.leo.careerforgeai.interview.domain.InterviewRoundStatus;
-import com.leo.careerforgeai.interview.domain.TechnicalReview;
-import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
+import com.leo.careerforgeai.interview.domain.round.InterviewAnswer;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestion;
+import com.leo.careerforgeai.interview.domain.execution.InterviewRouteDecision;
+import com.leo.careerforgeai.interview.domain.round.InterviewRound;
+import com.leo.careerforgeai.interview.domain.round.InterviewRoundStatus;
+import com.leo.careerforgeai.interview.domain.review.TechnicalReview;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestionType;
 
 /**
  * @program: CareerForge-AI

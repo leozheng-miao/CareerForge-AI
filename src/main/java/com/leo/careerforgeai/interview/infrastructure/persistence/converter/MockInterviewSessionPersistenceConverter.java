@@ -1,10 +1,10 @@
 package com.leo.careerforgeai.interview.infrastructure.persistence.converter;
 
-import com.leo.careerforgeai.interview.domain.InterviewBudgetPolicy;
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
-import com.leo.careerforgeai.interview.domain.InterviewMode;
-import com.leo.careerforgeai.interview.domain.InterviewStatus;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.InterviewBudgetPolicy;
+import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.session.InterviewMode;
+import com.leo.careerforgeai.interview.domain.session.InterviewStatus;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.MockInterviewSessionEntity;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.springframework.stereotype.Component;

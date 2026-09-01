@@ -8,7 +8,7 @@ import com.leo.careerforgeai.interview.application.event.InterviewEvent;
 import com.leo.careerforgeai.interview.application.event.InterviewEventType;
 import com.leo.careerforgeai.interview.application.event.StoredInterviewEvent;
 import com.leo.careerforgeai.interview.application.port.InterviewEventStore;
-import com.leo.careerforgeai.interview.domain.InterviewStatus;
+import com.leo.careerforgeai.interview.domain.session.InterviewStatus;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.QueryTimeoutException;

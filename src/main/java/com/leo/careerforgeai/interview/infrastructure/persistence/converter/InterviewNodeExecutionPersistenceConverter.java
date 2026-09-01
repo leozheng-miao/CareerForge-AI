@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.interview.infrastructure.persistence.converter;
 
-import com.leo.careerforgeai.interview.domain.InterviewNodeExecution;
-import com.leo.careerforgeai.interview.domain.InterviewNodeExecutionStatus;
+import com.leo.careerforgeai.interview.domain.execution.InterviewNodeExecution;
+import com.leo.careerforgeai.interview.domain.execution.InterviewNodeExecutionStatus;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.InterviewNodeExecutionEntity;
 import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.shared.actor.ActorId;

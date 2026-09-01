@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.interview.application.port;
 
-import com.leo.careerforgeai.interview.domain.InterviewReport;
-import com.leo.careerforgeai.interview.domain.InterviewReportConfirmation;
+import com.leo.careerforgeai.interview.domain.report.InterviewReport;
+import com.leo.careerforgeai.interview.domain.report.InterviewReportConfirmation;
 
 import java.util.UUID;
 

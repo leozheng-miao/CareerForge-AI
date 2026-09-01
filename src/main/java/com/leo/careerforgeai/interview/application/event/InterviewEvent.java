@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.interview.application.event;
 
-import com.leo.careerforgeai.interview.domain.InterviewStatus;
+import com.leo.careerforgeai.interview.domain.session.InterviewStatus;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
 import java.time.Instant;

@@ -1,8 +1,8 @@
 package com.leo.careerforgeai.interview.application.port;
 
-import com.leo.careerforgeai.interview.domain.InterviewAnswer;
-import com.leo.careerforgeai.interview.domain.InterviewQuestion;
-import com.leo.careerforgeai.interview.domain.InterviewRound;
+import com.leo.careerforgeai.interview.domain.round.InterviewAnswer;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestion;
+import com.leo.careerforgeai.interview.domain.round.InterviewRound;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
 import java.util.List;

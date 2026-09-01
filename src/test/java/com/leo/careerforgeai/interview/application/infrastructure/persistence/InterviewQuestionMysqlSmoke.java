@@ -1,17 +1,17 @@
 package com.leo.careerforgeai.interview.application.infrastructure.persistence;
 
-import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionDraft;
+import com.leo.careerforgeai.interview.application.model.question.InterviewQuestionDraft;
 import com.leo.careerforgeai.interview.application.port.InterviewNodeExecutionRepository;
 import com.leo.careerforgeai.interview.application.port.InterviewRoleModelGateway;
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
 import com.leo.careerforgeai.interview.application.question.InterviewQuestionPersistenceService;
 import com.leo.careerforgeai.interview.application.session.MockInterviewVersionConflictException;
-import com.leo.careerforgeai.interview.domain.InterviewBudgetPolicy;
-import com.leo.careerforgeai.interview.domain.InterviewMode;
-import com.leo.careerforgeai.interview.domain.InterviewQuestion;
-import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
-import com.leo.careerforgeai.interview.domain.InterviewStatus;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.InterviewBudgetPolicy;
+import com.leo.careerforgeai.interview.domain.session.InterviewMode;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestion;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestionType;
+import com.leo.careerforgeai.interview.domain.session.InterviewStatus;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import com.leo.careerforgeai.interview.infrastructure.persistence.adapter.MyBatisInterviewNodeExecutionAdapter;
 import com.leo.careerforgeai.interview.infrastructure.persistence.converter.InterviewNodeExecutionPersistenceConverter;
 import com.leo.careerforgeai.model.domain.ModelUsage;
@@ -62,7 +62,7 @@ import javax.sql.DataSource;
 import com.mysql.cj.jdbc.MysqlDataSource;
 import java.time.ZoneOffset;
 import com.leo.careerforgeai.interview.application.answer.InterviewAnswerSubmissionService;
-import com.leo.careerforgeai.interview.domain.InterviewAnswer;
+import com.leo.careerforgeai.interview.domain.round.InterviewAnswer;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;

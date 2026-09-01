@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.interview.application.graph;
 
 import com.leo.careerforgeai.interview.application.report.InterviewReportGenerationService;
-import com.leo.careerforgeai.interview.domain.InterviewReport;
+import com.leo.careerforgeai.interview.domain.report.InterviewReport;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

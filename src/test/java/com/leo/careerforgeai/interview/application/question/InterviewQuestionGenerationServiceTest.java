@@ -1,15 +1,15 @@
 package com.leo.careerforgeai.interview.application.question;
 
 import com.leo.careerforgeai.interview.application.blueprint.InterviewBlueprintApplicationService;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionDraft;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionInput;
-import com.leo.careerforgeai.interview.application.model.validation.InterviewQuestionRoleContract;
+import com.leo.careerforgeai.interview.application.model.question.InterviewQuestionDraft;
+import com.leo.careerforgeai.interview.application.model.question.InterviewQuestionInput;
+import com.leo.careerforgeai.interview.application.model.question.InterviewQuestionRoleContract;
 import com.leo.careerforgeai.interview.application.port.InterviewRoleModelGateway;
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
-import com.leo.careerforgeai.interview.domain.InterviewMode;
-import com.leo.careerforgeai.interview.domain.InterviewQuestion;
-import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
-import com.leo.careerforgeai.interview.domain.InterviewRouteDecision;
+import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.session.InterviewMode;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestion;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestionType;
+import com.leo.careerforgeai.interview.domain.execution.InterviewRouteDecision;
 import com.leo.careerforgeai.model.domain.ModelUsage;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;

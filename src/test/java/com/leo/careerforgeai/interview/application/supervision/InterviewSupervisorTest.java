@@ -1,11 +1,11 @@
 package com.leo.careerforgeai.interview.application.supervision;
 
-import com.leo.careerforgeai.interview.domain.InterviewBudgetPolicy;
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
-import com.leo.careerforgeai.interview.domain.InterviewMode;
-import com.leo.careerforgeai.interview.domain.InterviewReviewPlan;
-import com.leo.careerforgeai.interview.domain.InterviewRouteDecision;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.InterviewBudgetPolicy;
+import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.session.InterviewMode;
+import com.leo.careerforgeai.interview.domain.review.InterviewReviewPlan;
+import com.leo.careerforgeai.interview.domain.execution.InterviewRouteDecision;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.junit.jupiter.api.Test;
 

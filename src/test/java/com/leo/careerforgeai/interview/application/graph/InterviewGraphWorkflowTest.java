@@ -2,11 +2,11 @@ package com.leo.careerforgeai.interview.application.graph;
 
 import com.leo.careerforgeai.interview.application.supervision.InterviewSupervisionApplicationService;
 import com.leo.careerforgeai.interview.application.supervision.InterviewSupervisorDecision;
-import com.leo.careerforgeai.interview.domain.InterviewFailureCode;
-import com.leo.careerforgeai.interview.domain.InterviewMode;
-import com.leo.careerforgeai.interview.domain.InterviewReviewPlan;
-import com.leo.careerforgeai.interview.domain.InterviewRouteDecision;
-import com.leo.careerforgeai.interview.domain.InterviewWaitReason;
+import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
+import com.leo.careerforgeai.interview.domain.session.InterviewMode;
+import com.leo.careerforgeai.interview.domain.review.InterviewReviewPlan;
+import com.leo.careerforgeai.interview.domain.execution.InterviewRouteDecision;
+import com.leo.careerforgeai.interview.domain.session.InterviewWaitReason;
 import org.bsc.langgraph4j.GraphInput;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.checkpoint.MemorySaver;

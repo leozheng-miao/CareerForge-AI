@@ -1,9 +1,9 @@
 package com.leo.careerforgeai.interview.application.question;
 
-import com.leo.careerforgeai.interview.application.model.contract.InterviewQuestionDraft;
+import com.leo.careerforgeai.interview.application.model.question.InterviewQuestionDraft;
 import com.leo.careerforgeai.interview.application.port.InterviewRoleModelGateway;
-import com.leo.careerforgeai.interview.domain.InterviewQuestion;
-import com.leo.careerforgeai.interview.domain.InterviewQuestionType;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestion;
+import com.leo.careerforgeai.interview.domain.round.InterviewQuestionType;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;

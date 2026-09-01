@@ -1,7 +1,7 @@
 
 package com.leo.careerforgeai.interview.infrastructure.persistence.converter;
 
-import com.leo.careerforgeai.interview.domain.MockInterviewInputSnapshot;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewInputSnapshot;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.MockInterviewInputArtifactEntity;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.MockInterviewInputSnapshotEntity;
 import com.leo.careerforgeai.shared.actor.ActorId;

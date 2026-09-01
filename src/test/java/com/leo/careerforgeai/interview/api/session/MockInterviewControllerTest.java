@@ -7,10 +7,10 @@ import com.leo.careerforgeai.interview.application.execution.MockInterviewReport
 import com.leo.careerforgeai.interview.application.session.MockInterviewCancellationConflictException;
 import com.leo.careerforgeai.interview.application.session.MockInterviewCreationApplicationService;
 import com.leo.careerforgeai.interview.application.session.MockInterviewLifecycleApplicationService;
-import com.leo.careerforgeai.interview.domain.InterviewBudgetPolicy;
-import com.leo.careerforgeai.interview.domain.InterviewMode;
-import com.leo.careerforgeai.interview.domain.InterviewStatus;
-import com.leo.careerforgeai.interview.domain.MockInterviewSession;
+import com.leo.careerforgeai.interview.domain.session.InterviewBudgetPolicy;
+import com.leo.careerforgeai.interview.domain.session.InterviewMode;
+import com.leo.careerforgeai.interview.domain.session.InterviewStatus;
+import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.web.GlobalExceptionHandler;
 import jakarta.validation.Validation;

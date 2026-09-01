@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.interview.infrastructure.persistence.converter;
 
-import com.leo.careerforgeai.interview.domain.InterviewReportConfirmation;
+import com.leo.careerforgeai.interview.domain.report.InterviewReportConfirmation;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.InterviewReportConfirmationPersistenceModels.ConfirmationRow;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.InterviewReportConfirmationPersistenceModels.DecisionRow;
 import com.leo.careerforgeai.shared.actor.ActorId;

@@ -1,7 +1,7 @@
 package com.leo.careerforgeai.interview.application.port;
 
-import com.leo.careerforgeai.interview.domain.EvidenceReview;
-import com.leo.careerforgeai.interview.domain.TechnicalReview;
+import com.leo.careerforgeai.interview.domain.review.EvidenceReview;
+import com.leo.careerforgeai.interview.domain.review.TechnicalReview;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
 import java.util.Optional;

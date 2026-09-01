@@ -1,8 +1,8 @@
 package com.leo.careerforgeai.interview.infrastructure.persistence.adapter;
 
 import com.leo.careerforgeai.interview.application.port.PersonalEvidenceArtifactRepository;
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceArtifact;
-import com.leo.careerforgeai.interview.domain.PersonalEvidenceStatus;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceArtifact;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceStatus;
 import com.leo.careerforgeai.interview.infrastructure.persistence.converter.PersonalEvidencePersistenceConverter;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.PersonalEvidenceArtifactEntity;
 import com.leo.careerforgeai.interview.infrastructure.persistence.mapper.PersonalEvidenceFactMapper;

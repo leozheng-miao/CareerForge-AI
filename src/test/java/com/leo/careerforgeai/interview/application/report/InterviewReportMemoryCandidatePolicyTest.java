@@ -1,15 +1,15 @@
 package com.leo.careerforgeai.interview.application.report;
 
-import com.leo.careerforgeai.interview.application.model.contract.InterviewReportDraft;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewReportInput;
-import com.leo.careerforgeai.interview.application.model.contract.InterviewReportSuggestionDraft;
+import com.leo.careerforgeai.interview.application.model.report.InterviewReportDraft;
+import com.leo.careerforgeai.interview.application.model.report.InterviewReportInput;
+import com.leo.careerforgeai.interview.application.model.report.InterviewReportSuggestionDraft;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import com.leo.careerforgeai.interview.domain.EvidenceConsistencyVerdict;
+import com.leo.careerforgeai.interview.domain.review.EvidenceConsistencyVerdict;
 import java.util.Map;
 
 /**

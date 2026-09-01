@@ -1,6 +1,6 @@
 package com.leo.careerforgeai.interview.application.graph;
 
-import com.leo.careerforgeai.interview.domain.InterviewRouteDecision;
+import com.leo.careerforgeai.interview.domain.execution.InterviewRouteDecision;
 import org.bsc.langgraph4j.CompileConfig;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphStateException;

@@ -170,6 +170,16 @@ careerforge:
       final-top-k: ${RAG_FINAL_TOP_K:5}
       rerank-enabled: ${RAG_RERANK_ENABLED:false}
       max-content-chars: ${RAG_MAX_CONTENT_CHARS:3000}
+    rerank:
+      provider: ${RAG_RERANK_PROVIDER:deepseek}
+      qwen3:
+        endpoint: ${DASHSCOPE_RERANK_ENDPOINT:}
+        api-key: ${DASHSCOPE_API_KEY:}
+        model: ${DASHSCOPE_RERANK_MODEL:qwen3-rerank}
+        max-candidates: ${QWEN3_RERANK_MAX_CANDIDATES:20}
+        max-document-chars: ${QWEN3_RERANK_MAX_DOCUMENT_CHARS:4000}
+        timeout: ${QWEN3_RERANK_TIMEOUT:60s}
+        instruct: Given a web search query, retrieve relevant passages that answer the query.
   redis:
     namespace: ${CAREERFORGE_REDIS_NAMESPACE:careerforge}
     environment: ${CAREERFORGE_REDIS_ENVIRONMENT:local}

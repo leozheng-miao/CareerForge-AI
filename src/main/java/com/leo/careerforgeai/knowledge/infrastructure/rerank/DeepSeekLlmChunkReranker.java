@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 /**
  * @program: CareerForge-AI
@@ -36,9 +37,14 @@ import java.util.stream.Collectors;
  * @date: 2026-08-05
  **/
 @Component
+@ConditionalOnProperty(
+        prefix = "careerforge.knowledge.rerank",
+        name = "provider",
+        havingValue = "deepseek",
+        matchIfMissing = true
+)
 @Slf4j
 public class DeepSeekLlmChunkReranker implements ChunkReranker {
-
     private static final int MAX_QUERY_CHARS = 2_000;
     private static final int MAX_CANDIDATES = 20;
 

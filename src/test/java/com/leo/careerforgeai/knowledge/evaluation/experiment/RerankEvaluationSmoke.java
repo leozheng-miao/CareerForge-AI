@@ -47,8 +47,7 @@ class RerankEvaluationSmoke {
     private static final int RRF_CANDIDATE_TOP_K = 10;
     private static final int ROUTE_CANDIDATE_TOP_K = 10;
     private static final int NUM_CANDIDATES = 50;
-    private static final Path REPORT_PATH = Path.of("target/rag-evaluation/rerank-evaluation.json");
-
+    private static final Path REPORT_PATH = Path.of("target/rag-evaluation/rerank-evaluation-qwen3.json");
     @Autowired
     private KnowledgeRetrievalService retrievalService;
 
@@ -177,6 +176,9 @@ class RerankEvaluationSmoke {
 
         assertThat(caseResults).hasSize(16);
         assertThat(totalTokens).isEqualTo(totalInputTokens + totalOutputTokens);
+        assertThat(appliedCount).isEqualTo(16);
+        assertThat(statusCounts.getOrDefault(RerankStatus.FALLBACK, 0L)).isZero();
+        assertThat(models).containsExactly("qwen3-rerank");
 
         RerankExperimentSummary rerankSummary = new RerankExperimentSummary(
                 afterRerank,

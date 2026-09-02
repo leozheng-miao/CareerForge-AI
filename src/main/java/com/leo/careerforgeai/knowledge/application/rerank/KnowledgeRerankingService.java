@@ -39,11 +39,11 @@ public class KnowledgeRerankingService {
 
         List<RrfRankedChunk> rrfCandidates = hybridResult.rrfChunks();
         if (!enabled) {
-            log.info("LLM Rerank已关闭，使用RRF顺序，candidates={}", rrfCandidates.size());
+            log.info("Rerank已关闭，使用RRF顺序，candidates={}", rrfCandidates.size());
             return new RerankedRetrievalResult(hybridResult, rrfCandidates, RerankStatus.DISABLED, 0, null, 0, 0, 0);
         }
         if (rrfCandidates.isEmpty()) {
-            log.info("LLM Rerank跳过，原因=候选为空");
+            log.info("Rerank跳过，原因=候选为空");
             return new RerankedRetrievalResult(hybridResult, rrfCandidates, RerankStatus.SKIPPED_EMPTY, 0, null, 0, 0, 0);
         }
 
@@ -52,7 +52,7 @@ public class KnowledgeRerankingService {
             ChunkRerankResult rerankResult = chunkReranker.rerank(query, rrfCandidates);
             List<RrfRankedChunk> normalized = validateAndNormalize(rrfCandidates, rerankResult.rankedChunks());
             long durationMs = Duration.ofNanos(System.nanoTime() - startNanos).toMillis();
-            log.info("LLM Rerank应用成功，candidates={}, retained={}, durationMs={}", rrfCandidates.size(), normalized.size(), durationMs);
+            log.info("Rerank应用成功，candidates={}, retained={}, durationMs={}", rrfCandidates.size(), normalized.size(), durationMs);
             return new RerankedRetrievalResult(
                     hybridResult,
                     normalized,
@@ -64,7 +64,7 @@ public class KnowledgeRerankingService {
                     rerankResult.totalTokens()
             );        } catch (ChunkRerankException e) {
             long durationMs = Duration.ofNanos(System.nanoTime() - startNanos).toMillis();
-            log.warn("LLM Rerank失败，回退RRF，candidates={}, durationMs={}, errorType={}, error={}", rrfCandidates.size(), durationMs, e.getClass().getSimpleName(), e.getMessage());
+            log.warn("Rerank失败，回退RRF，candidates={}, durationMs={}, errorType={}, error={}", rrfCandidates.size(), durationMs, e.getClass().getSimpleName(), e.getMessage());
             return new RerankedRetrievalResult(hybridResult, rrfCandidates, RerankStatus.FALLBACK, durationMs, null, 0, 0, 0);
         }
     }

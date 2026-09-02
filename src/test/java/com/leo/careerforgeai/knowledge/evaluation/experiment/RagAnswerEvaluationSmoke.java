@@ -45,7 +45,8 @@ class RagAnswerEvaluationSmoke {
     private static final int FINAL_TOP_K = 5;
     private static final int NUM_CANDIDATES = 50;
     private static final int MAX_CONTEXT_CHARS = 3_000;
-    private static final Path REPORT_PATH = Path.of("target/rag-evaluation/rag-answer-evaluation.json");
+    private static final boolean RERANK_ENABLED = Boolean.getBoolean("rag.answer.rerank.enabled");
+    private static final Path REPORT_PATH = Path.of("target/rag-evaluation/rag-answer-evaluation-" + (RERANK_ENABLED ? "qwen3" : "rrf") + ".json");
 
     @Autowired
     private KnowledgeRetrievalService retrievalService;
@@ -108,8 +109,13 @@ class RagAnswerEvaluationSmoke {
                     FINAL_TOP_K
             );
 
-            RerankedRetrievalResult rankedResult = rerankingService.rerank(evaluationCase.query(), hybridResult, false);
-            assertThat(rankedResult.status()).isEqualTo(RerankStatus.DISABLED);
+            RerankedRetrievalResult rankedResult = rerankingService.rerank(evaluationCase.query(), hybridResult, RERANK_ENABLED);
+            if (RERANK_ENABLED) {
+                assertThat(rankedResult.status()).isEqualTo(RerankStatus.APPLIED);
+                assertThat(rankedResult.rerankModel()).isEqualTo("qwen3-rerank");
+            } else {
+                assertThat(rankedResult.status()).isEqualTo(RerankStatus.DISABLED);
+            }
 
             AssembledContext context = contextAssembler.assemble(rankedResult.rankedChunks(), MAX_CONTEXT_CHARS);
             Set<String> contextChunkIds = context.chunks().stream().map(chunk -> chunk.chunkId()).collect(java.util.stream.Collectors.toSet());
@@ -172,8 +178,8 @@ class RagAnswerEvaluationSmoke {
                 DocumentCleaner.CLEANING_VERSION,
                 chunkingProperties.chunkerVersion(),
                 indexProperties.getIndexAlias(),
-                "HYBRID_RRF",
-                false,
+                RERANK_ENABLED ? "HYBRID_RRF_QWEN3_RERANK" : "HYBRID_RRF",
+                RERANK_ENABLED,
                 FINAL_TOP_K,
                 MAX_CONTEXT_CHARS,
                 true,

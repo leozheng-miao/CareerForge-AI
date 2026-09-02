@@ -13,6 +13,7 @@ import com.leo.careerforgeai.memory.domain.profile.*;
 import com.leo.careerforgeai.model.application.ModelGateway;
 import com.leo.careerforgeai.model.config.ModelProperties;
 import com.leo.careerforgeai.model.domain.*;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.model.domain.stream.ModelStreamEvent;
 import com.leo.careerforgeai.model.exception.ModelException;
 import com.leo.careerforgeai.model.exception.completion.ModelCompletionException;
@@ -55,7 +56,7 @@ class StructuredBusinessOutputStabilitySmoke {
 
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
     private final ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory();
-    private final ModelGateway realGateway = new DeepSeekChatClient(
+    private final DeepSeekChatClient realGateway = new DeepSeekChatClient(
             new ModelProperties(
                     URI.create(requiredEnv("AI_MODEL_BASE_URL")),
                     requiredEnv("AI_MODEL_API_KEY"),
@@ -152,14 +153,15 @@ class StructuredBusinessOutputStabilitySmoke {
     private ModelGateway capturingGateway(List<ModelResponse> calls) {
         return new ModelGateway() {
             @Override
-            public ModelResponse chat(ModelRequest request) {
+            public ModelResponse chat(ModelTaskType taskType, ModelRequest request) {
                 ModelResponse response = realGateway.chat(request);
                 calls.add(response);
                 return response;
             }
 
             @Override
-            public void stream(ModelRequest request, Consumer<ModelStreamEvent> consumer) {
+            public void stream(ModelTaskType taskType, ModelRequest request,
+                               Consumer<ModelStreamEvent> consumer) {
                 realGateway.stream(request, consumer);
             }
         };

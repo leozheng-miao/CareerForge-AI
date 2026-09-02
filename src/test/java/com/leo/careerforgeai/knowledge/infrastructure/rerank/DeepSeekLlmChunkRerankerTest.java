@@ -11,6 +11,7 @@ import com.leo.careerforgeai.model.domain.ModelRequest;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelRole;
 import com.leo.careerforgeai.model.domain.ModelUsage;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,7 @@ class DeepSeekLlmChunkRerankerTest {
     @Test
     void shouldBuildStructuredRequestAndMapOrderedCandidates() {
         List<RrfRankedChunk> candidates = List.of(candidate(A_ID, 1), candidate(B_ID, 2), candidate(C_ID, 3));
-        when(modelGateway.chat(any())).thenReturn(response("{\"chunkIds\":[\"" + C_ID + "\",\"" + A_ID + "\",\"" + B_ID + "\"]}"));
+        when(modelGateway.chat(eq(ModelTaskType.RAG_RERANK), any())).thenReturn(response("{\"chunkIds\":[\"" + C_ID + "\",\"" + A_ID + "\",\"" + B_ID + "\"]}"));
 
         ChunkRerankResult result = reranker.rerank("什么内容最能解释 Java 并发？", candidates);
 
@@ -54,7 +55,7 @@ class DeepSeekLlmChunkRerankerTest {
         assertThat(result.totalTokens()).isEqualTo(230);
 
         ArgumentCaptor<ModelRequest> captor = ArgumentCaptor.forClass(ModelRequest.class);
-        verify(modelGateway).chat(captor.capture());
+        verify(modelGateway).chat(eq(ModelTaskType.RAG_RERANK), captor.capture());
         ModelRequest request = captor.getValue();
 
         assertThat(request.outputFormat()).isEqualTo(ModelOutputFormat.JSON_OBJECT);
@@ -70,7 +71,7 @@ class DeepSeekLlmChunkRerankerTest {
     @MethodSource("invalidOutputs")
     void shouldRejectUntrustedModelOutput(String output) {
         List<RrfRankedChunk> candidates = List.of(candidate(A_ID, 1), candidate(B_ID, 2));
-        when(modelGateway.chat(any())).thenReturn(response(output));
+        when(modelGateway.chat(eq(ModelTaskType.RAG_RERANK), any())).thenReturn(response(output));
 
         assertThatThrownBy(() -> reranker.rerank("Java 并发", candidates)).isInstanceOf(ChunkRerankException.class);
     }
@@ -99,7 +100,7 @@ class DeepSeekLlmChunkRerankerTest {
     @Test
     void shouldWrapModelGatewayFailure() {
         RuntimeException failure = new RuntimeException("provider unavailable");
-        when(modelGateway.chat(any())).thenThrow(failure);
+        when(modelGateway.chat(eq(ModelTaskType.RAG_RERANK), any())).thenThrow(failure);
 
         assertThatThrownBy(() -> reranker.rerank("Java 并发", List.of(candidate(A_ID, 1))))
                 .isInstanceOf(ChunkRerankException.class)

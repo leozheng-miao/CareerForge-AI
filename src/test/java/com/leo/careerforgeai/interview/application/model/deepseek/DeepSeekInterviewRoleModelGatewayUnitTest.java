@@ -8,17 +8,13 @@ import com.leo.careerforgeai.interview.domain.session.InterviewMode;
 import com.leo.careerforgeai.interview.domain.round.InterviewQuestionType;
 import com.leo.careerforgeai.interview.infrastructure.model.deepseek.DeepSeekInterviewRoleModelGateway;
 import com.leo.careerforgeai.model.application.ModelGateway;
-import com.leo.careerforgeai.model.application.reliability.ModelCallBulkhead;
-import com.leo.careerforgeai.model.application.reliability.ModelCircuitBreaker;
-import com.leo.careerforgeai.model.application.reliability.ModelReliabilityMetrics;
-import com.leo.careerforgeai.model.config.ModelCallBulkheadProperties;
 import com.leo.careerforgeai.model.config.ModelReliabilityProperties;
 import com.leo.careerforgeai.model.domain.ModelOutputFormat;
 import com.leo.careerforgeai.model.domain.ModelRequest;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelUsage;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
-import com.leo.careerforgeai.model.exception.ModelException;
 import com.leo.careerforgeai.model.exception.completion.ModelCompletionException;
 import com.leo.careerforgeai.model.exception.completion.ModelCompletionStatus;
 import jakarta.validation.Validation;
@@ -29,7 +25,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +55,6 @@ import java.util.stream.Stream;
 class DeepSeekInterviewRoleModelGatewayUnitTest {
 
     private ModelGateway modelGateway;
-    private ModelReliabilityMetrics metrics;
     private InterviewRoleModelGateway gateway;
     private InterviewQuestionRoleContract contract;
     private ValidatorFactory validatorFactory;
@@ -68,8 +62,6 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
     @BeforeEach
     void setUp() {
         modelGateway = mock(ModelGateway.class);
-        metrics = new ModelReliabilityMetrics();
-
         ModelReliabilityProperties reliabilityProperties =
                 new ModelReliabilityProperties(
                         1,
@@ -91,17 +83,7 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
 
         gateway = new DeepSeekInterviewRoleModelGateway(
                 modelGateway,
-                JsonMapper.builder().build(),
-                new ModelCircuitBreaker(
-                        reliabilityProperties,
-                        Clock.systemUTC(),
-                        metrics
-                ),
-                new ModelCallBulkhead(
-                        new ModelCallBulkheadProperties(1)
-                ),
-                reliabilityProperties,
-                metrics
+                JsonMapper.builder().build()
         );
     }
 
@@ -113,7 +95,7 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
     /** 验证首次结构失败后只执行一次修复并聚合两次调用用量。 */
     @Test
     void shouldRepairInitialStructureFailureOnce() {
-        when(modelGateway.chat(any())).thenReturn(
+        when(modelGateway.chat(any(ModelTaskType.class), any())).thenReturn(
                 response(
                         "request-initial-invalid",
                         "{",
@@ -146,7 +128,7 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
 
         ArgumentCaptor<ModelRequest> requestCaptor =
                 ArgumentCaptor.forClass(ModelRequest.class);
-        verify(modelGateway, times(2)).chat(requestCaptor.capture());
+        verify(modelGateway, times(2)).chat(any(ModelTaskType.class), requestCaptor.capture());
 
         List<ModelRequest> requests = requestCaptor.getAllValues();
         assertThat(requests).allSatisfy(request -> {
@@ -158,15 +140,12 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
         });
         assertThat(requests.get(1).messages().getFirst().content())
                 .contains("唯一一次结构修复");
-
-        assertThat(metrics.snapshot().logicalCalls()).isEqualTo(2);
-        assertThat(metrics.snapshot().retryAttempts()).isZero();
     }
 
     /** 验证修复输出仍非法时失败关闭且不执行第三次调用。 */
     @Test
     void shouldFailClosedWhenRepairIsStillInvalid() {
-        when(modelGateway.chat(any())).thenReturn(
+        when(modelGateway.chat(any(ModelTaskType.class), any())).thenReturn(
                 response(
                         "request-initial-invalid",
                         "{",
@@ -196,15 +175,13 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
                 }
         );
 
-        verify(modelGateway, times(2)).chat(any(ModelRequest.class));
-        assertThat(metrics.snapshot().logicalCalls()).isEqualTo(2);
-        assertThat(metrics.snapshot().retryAttempts()).isZero();
+        verify(modelGateway, times(2)).chat(any(ModelTaskType.class), any(ModelRequest.class));
     }
 
     /** 验证结构合法但违反业务契约时不得通过重新生成掩盖错误。 */
     @Test
     void shouldNotRepairBusinessContractViolation() {
-        when(modelGateway.chat(any())).thenReturn(
+        when(modelGateway.chat(any(ModelTaskType.class), any())).thenReturn(
                 response(
                         "request-business-invalid",
                         output(3),
@@ -233,9 +210,7 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
                 }
         );
 
-        verify(modelGateway).chat(any(ModelRequest.class));
-        assertThat(metrics.snapshot().logicalCalls()).isEqualTo(1);
-        assertThat(metrics.snapshot().retryAttempts()).isZero();
+        verify(modelGateway).chat(any(ModelTaskType.class), any(ModelRequest.class));
     }
 
     /** 验证供应商输出截断不会被误当作JSON结构错误执行修复。 */
@@ -251,7 +226,7 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
                         100,
                         "{\"question\":\"未完成"
                 );
-        when(modelGateway.chat(any())).thenThrow(failure);
+        when(modelGateway.chat(any(ModelTaskType.class), any())).thenThrow(failure);
 
         assertThatThrownBy(() -> gateway.generate(
                 contract,
@@ -259,9 +234,7 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
                 Duration.ofSeconds(5)
         )).isSameAs(failure);
 
-        verify(modelGateway).chat(any(ModelRequest.class));
-        assertThat(metrics.snapshot().logicalCalls()).isEqualTo(1);
-        assertThat(metrics.snapshot().retryAttempts()).isZero();
+        verify(modelGateway).chat(any(ModelTaskType.class), any(ModelRequest.class));
     }
 
     /** 验证历史结构化失败样本能够定位到最早失败阶段且最多修复一次。 */
@@ -274,7 +247,7 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
             StructuredOutputFailureReason expectedReason,
             String expectedFieldPath
     ) {
-        when(modelGateway.chat(any())).thenReturn(
+        when(modelGateway.chat(any(ModelTaskType.class), any())).thenReturn(
                 response(
                         "request-initial-" + caseId,
                         invalidOutput,
@@ -300,9 +273,7 @@ class DeepSeekInterviewRoleModelGatewayUnitTest {
                 }
         );
 
-        verify(modelGateway, times(2)).chat(any(ModelRequest.class));
-        assertThat(metrics.snapshot().logicalCalls()).isEqualTo(2);
-        assertThat(metrics.snapshot().retryAttempts()).isZero();
+        verify(modelGateway, times(2)).chat(any(ModelTaskType.class), any(ModelRequest.class));
     }
 
     private static Stream<Arguments> invalidStructuredOutputs() {

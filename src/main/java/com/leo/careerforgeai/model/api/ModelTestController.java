@@ -1,5 +1,6 @@
 package com.leo.careerforgeai.model.api;
 
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
 import com.leo.careerforgeai.model.application.ModelGateway;
@@ -55,7 +56,7 @@ public class ModelTestController {
                 ),
                 ModelOutputFormat.TEXT
         );
-        ModelResponse res = modelGateway.chat(modelRequest);
+        ModelResponse res = modelGateway.chat(ModelTaskType.CAREER_COACH, modelRequest);
 
         return ResultUtils.success(res.content());
     }
@@ -75,10 +76,7 @@ public class ModelTestController {
         );
         taskExecutor.execute(() -> {
             try {
-                modelGateway.stream(
-                        modelRequest,
-                        event -> sendEvent(emitter, event)
-                );
+                modelGateway.stream(ModelTaskType.CAREER_COACH, modelRequest, event -> sendEvent(emitter, event));
                 emitter.complete();
             }
             catch (RuntimeException e) {

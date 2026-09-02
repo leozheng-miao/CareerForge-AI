@@ -6,6 +6,7 @@ import com.leo.careerforgeai.career.application.requirement.JobRequirementsParse
 import com.leo.careerforgeai.model.application.ModelGateway;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelUsage;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
 import jakarta.validation.Validation;
@@ -17,6 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -34,7 +36,7 @@ class JobRequirementsParserErrorTest {
     void shouldPreserveObservedCostForInvalidStructuredOutput() {
         ModelGateway gateway = mock(ModelGateway.class);
         ModelUsage usage = new ModelUsage(90, 10, 100);
-        when(gateway.chat(any())).thenReturn(
+        when(gateway.chat(eq(ModelTaskType.JOB_REQUIREMENTS_EXTRACTION), any())).thenReturn(
                 new ModelResponse("req-1", "deepseek-v4-flash", "{invalid-json}", usage));
 
         JobRequirementsParser parser = new JobRequirementsParser(
@@ -52,7 +54,7 @@ class JobRequirementsParserErrorTest {
     @DisplayName("成功解析时保留内部模型Token和耗时")
     void shouldPreserveModelUsageAndDuration() {
         ModelGateway gateway = mock(ModelGateway.class);
-        when(gateway.chat(any())).thenReturn(new ModelResponse(
+        when(gateway.chat(eq(ModelTaskType.JOB_REQUIREMENTS_EXTRACTION), any())).thenReturn(new ModelResponse(
                 "req-1",
                 "deepseek-v4-flash",
                 """
@@ -87,7 +89,7 @@ class JobRequirementsParserErrorTest {
     @DisplayName("成功结构化输出缺少Token时分类为无效模型响应")
     void shouldRejectSuccessfulResponseWithoutUsage() {
         ModelGateway gateway = mock(ModelGateway.class);
-        when(gateway.chat(any())).thenReturn(new ModelResponse(
+        when(gateway.chat(eq(ModelTaskType.JOB_REQUIREMENTS_EXTRACTION), any())).thenReturn(new ModelResponse(
                 "req-1",
                 "deepseek-v4-flash",
                 """
@@ -121,7 +123,7 @@ class JobRequirementsParserErrorTest {
     @DisplayName("模型调用失败时保留耗时但不伪造Token")
     void shouldPreserveDurationWithoutFabricatingUsageOnModelFailure() {
         ModelGateway gateway = mock(ModelGateway.class);
-        when(gateway.chat(any())).thenThrow(
+        when(gateway.chat(eq(ModelTaskType.JOB_REQUIREMENTS_EXTRACTION), any())).thenThrow(
                 new ModelException(ModelErrorType.TIMEOUT, "provider timeout"));
 
         JobRequirementsParser parser = new JobRequirementsParser(

@@ -6,6 +6,7 @@ import com.leo.careerforgeai.model.domain.ModelOutputFormat;
 import com.leo.careerforgeai.model.domain.ModelRequest;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelRole;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
 import com.leo.careerforgeai.model.exception.structured.StructuredOutputFailureReason;
@@ -73,7 +74,7 @@ public final class CareerCoachStructuredOutputRepairer {
                 0.0,
                 Duration.ofSeconds(30)
         );
-        ModelResponse response = modelGateway.chat(request);
+        ModelResponse response = modelGateway.chat(ModelTaskType.STRUCTURED_OUTPUT_REPAIR, request);
         validateResponse(response);
         return response;
     }

@@ -7,6 +7,9 @@ import com.leo.careerforgeai.model.domain.ModelRequest;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelRole;
 import com.leo.careerforgeai.model.domain.ModelUsage;
+import com.leo.careerforgeai.model.domain.routing.ModelCapability;
+import com.leo.careerforgeai.model.domain.routing.ModelExecutionProfile;
+import com.leo.careerforgeai.model.domain.routing.ReasoningMode;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
 import com.leo.careerforgeai.model.exception.completion.ModelCompletionException;
@@ -38,6 +41,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.time.Duration;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /** 验证 DeepSeek HTTP、超时、网络和响应解析错误的统一分类。 */
@@ -52,6 +56,7 @@ class DeepSeekChatClientErrorTest {
             "403, PERMISSION_ERROR",
             "404, MODEL_NOT_FOUND",
             "408, TIMEOUT",
+            "400, PROVIDER_REQUEST_REJECTED",
             "429, RATE_LIMITED",
             "500, PROVIDER_ERROR"
     })
@@ -255,7 +260,20 @@ class DeepSeekChatClientErrorTest {
                 .isEqualTo(new ModelUsage(10, 6, 16));
     }
 
-    /** 模拟普通非流式HTTP响应。 */
+    @Test
+    void shouldRejectProfileOwnedByAnotherProvider() {
+        ModelExecutionProfile profile = new ModelExecutionProfile(
+                "kimi-standard", "kimi", "kimi-k2.6",
+                Set.of(ModelCapability.CHAT), ReasoningMode.DISABLED,
+                null, 2_000, Duration.ofSeconds(30),
+                "kimi-2026-09-02", true);
+
+        assertThatThrownBy(() -> createClient(jsonMapper).chat(profile, createRequest()))
+                .isInstanceOfSatisfying(ModelException.class,
+                        exception -> assertThat(exception.getErrorType())
+                                .isEqualTo(ModelErrorType.CONFIGURATION_ERROR));
+    }
+
     /** 模拟普通非流式HTTP响应。 */
     private void stubStringResponse(int statusCode, String body) {
         HttpResponse<String> response = mock(HttpResponse.class);

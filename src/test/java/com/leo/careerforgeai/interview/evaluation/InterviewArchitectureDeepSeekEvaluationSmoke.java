@@ -30,6 +30,7 @@ import com.leo.careerforgeai.model.domain.ModelOutputFormat;
 import com.leo.careerforgeai.model.domain.ModelRequest;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelRole;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import org.bsc.langgraph4j.GraphInput;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.checkpoint.MemorySaver;
@@ -184,7 +185,10 @@ class InterviewArchitectureDeepSeekEvaluationSmoke {
         );
 
         long startedNanos = System.nanoTime();
-        ModelResponse response = modelGateway.chat(request);
+        ModelResponse response = modelGateway.chat(
+                ModelTaskType.INTERVIEW_TECHNICAL_REVIEW,
+                request
+        );
         long durationMs = elapsedMillis(startedNanos);
 
         if (response == null || response.content() == null || response.content().isBlank()) {

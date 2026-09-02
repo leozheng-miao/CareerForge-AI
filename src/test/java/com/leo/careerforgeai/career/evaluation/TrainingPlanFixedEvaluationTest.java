@@ -12,6 +12,7 @@ import com.leo.careerforgeai.memory.domain.profile.*;
 import com.leo.careerforgeai.model.application.ModelGateway;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelUsage;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.testsupport.MutableCurrentActorProvider;
 import jakarta.validation.Validation;
@@ -86,7 +87,7 @@ class TrainingPlanFixedEvaluationTest {
                 }
 
                 ModelGateway modelGateway = mock(ModelGateway.class);
-                when(modelGateway.chat(any())).thenReturn(modelResponse(
+                when(modelGateway.chat(eq(ModelTaskType.TRAINING_PLAN_GENERATION), any())).thenReturn(modelResponse(
                         evaluationCase.caseId(),
                         planJson(
                                 evaluationCase.estimatedMinutes(),

@@ -7,6 +7,7 @@ import com.leo.careerforgeai.memory.application.profile.ConfirmedSkillProfile;
 import com.leo.careerforgeai.memory.domain.profile.*;
 import com.leo.careerforgeai.model.application.ModelGateway;
 import com.leo.careerforgeai.model.domain.*;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
@@ -68,7 +69,7 @@ class TrainingPlanGeneratorTest {
 
     @Test
     void shouldGenerateValidatedDraftItems() {
-        when(modelGateway.chat(any())).thenReturn(response(validOutput()));
+        when(modelGateway.chat(eq(ModelTaskType.TRAINING_PLAN_GENERATION), any())).thenReturn(response(validOutput()));
 
         TrainingPlanGenerator.GeneratedPlan result = generator.generate(input);
 
@@ -89,7 +90,7 @@ class TrainingPlanGeneratorTest {
         assertThat(item.completionEvidenceRefs()).isEmpty();
 
         ArgumentCaptor<ModelRequest> requestCaptor = ArgumentCaptor.forClass(ModelRequest.class);
-        verify(modelGateway).chat(requestCaptor.capture());
+        verify(modelGateway).chat(eq(ModelTaskType.TRAINING_PLAN_GENERATION), requestCaptor.capture());
         assertThat(requestCaptor.getValue().outputFormat()).isEqualTo(ModelOutputFormat.JSON_OBJECT);
         assertThat(requestCaptor.getValue().messages()).extracting(ModelMessage::role)
                 .containsExactly(ModelRole.SYSTEM, ModelRole.USER);
@@ -98,7 +99,7 @@ class TrainingPlanGeneratorTest {
     @Test
     void shouldNotLogUntrustedModelOutputContent() {
         String untrustedOutput = "not-json api-key=secret-value 用户隐私正文";
-        when(modelGateway.chat(any())).thenReturn(response(untrustedOutput));
+        when(modelGateway.chat(eq(ModelTaskType.TRAINING_PLAN_GENERATION), any())).thenReturn(response(untrustedOutput));
 
         Logger logger = (Logger) LoggerFactory.getLogger(TrainingPlanGenerator.class);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
@@ -135,14 +136,14 @@ class TrainingPlanGeneratorTest {
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("invalidOutputs")
     void shouldRejectUntrustedModelOutput(String expectedMessage, String output) {
-        when(modelGateway.chat(any())).thenReturn(response(output));
+        when(modelGateway.chat(eq(ModelTaskType.TRAINING_PLAN_GENERATION), any())).thenReturn(response(output));
 
         assertThatThrownBy(() -> generator.generate(input))
                 .isInstanceOfSatisfying(TrainingPlanGenerationException.class, exception ->
                         assertThat(exception.getErrorType()).isEqualTo(MODEL_OUTPUT_INVALID))
                 .hasMessage(expectedMessage);
 
-        verify(modelGateway).chat(any(ModelRequest.class));
+        verify(modelGateway).chat(eq(ModelTaskType.TRAINING_PLAN_GENERATION), any(ModelRequest.class));
     }
 
     @Test
@@ -156,12 +157,12 @@ class TrainingPlanGeneratorTest {
                         adjustment,
                         "e".repeat(64)
                 );
-        when(modelGateway.chat(any())).thenReturn(response(validOutput()));
+        when(modelGateway.chat(eq(ModelTaskType.TRAINING_PLAN_GENERATION), any())).thenReturn(response(validOutput()));
 
         generator.generate(input, List.of(constraint));
 
         ArgumentCaptor<ModelRequest> requestCaptor = ArgumentCaptor.forClass(ModelRequest.class);
-        verify(modelGateway).chat(requestCaptor.capture());
+        verify(modelGateway).chat(eq(ModelTaskType.TRAINING_PLAN_GENERATION), requestCaptor.capture());
 
         List<ModelMessage> messages = requestCaptor.getValue().messages();
         String systemMessage = messages.getFirst().content();

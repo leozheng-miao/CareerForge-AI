@@ -19,6 +19,7 @@ import com.leo.careerforgeai.model.domain.ModelRequest;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelRole;
 import com.leo.careerforgeai.model.domain.ModelUsage;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import jakarta.validation.Validator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -164,7 +165,7 @@ public final class MemoryCandidateExtractor {
         ModelResponse response;
 
         try {
-            response = modelGateway.chat(request);
+            response = modelGateway.chat(ModelTaskType.MEMORY_EXTRACTION, request);
         } catch (RuntimeException exception) {
             throw failure(
                     MemoryExtractionErrorType.MODEL_CALL_FAILED,

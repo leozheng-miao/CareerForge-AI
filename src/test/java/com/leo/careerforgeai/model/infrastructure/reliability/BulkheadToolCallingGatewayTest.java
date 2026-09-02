@@ -69,6 +69,48 @@ class BulkheadToolCallingGatewayTest {
     }
 
     @Test
+    void shouldIsolateConcurrentCapacityByProvider() throws Exception {
+        ModelCallBulkhead bulkhead = new ModelCallBulkhead(
+                new ModelCallBulkheadProperties(1));
+        CountDownLatch deepseekEntered = new CountDownLatch(1);
+        CountDownLatch releaseDeepseek = new CountDownLatch(1);
+
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future<String> heldCall = executor.submit(() ->
+                    bulkhead.execute("deepseek", () -> {
+                        deepseekEntered.countDown();
+                        try {
+                            if (!releaseDeepseek.await(2, TimeUnit.SECONDS)) {
+                                throw new IllegalStateException("等待释放DeepSeek调用超时");
+                            }
+                        } catch (InterruptedException exception) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException(
+                                    "DeepSeek调用测试被中断", exception);
+                        }
+                        return "deepseek-completed";
+                    }));
+
+            assertThat(deepseekEntered.await(2, TimeUnit.SECONDS)).isTrue();
+            try {
+                assertThatThrownBy(() ->
+                        bulkhead.execute("deepseek", () -> "rejected"))
+                        .isInstanceOfSatisfying(ModelException.class, exception ->
+                                assertThat(exception.getErrorType())
+                                        .isEqualTo(ModelErrorType.CAPACITY_REJECTED));
+
+                assertThat(bulkhead.execute("kimi", () -> "kimi-completed"))
+                        .isEqualTo("kimi-completed");
+            } finally {
+                releaseDeepseek.countDown();
+            }
+
+            assertThat(heldCall.get(2, TimeUnit.SECONDS))
+                    .isEqualTo("deepseek-completed");
+        }
+    }
+
+    @Test
     void shouldReleasePermitWhenDelegateThrows() {
         ToolCallingGateway delegate = mock(ToolCallingGateway.class);
         ToolCallingRequest request = mock(ToolCallingRequest.class);

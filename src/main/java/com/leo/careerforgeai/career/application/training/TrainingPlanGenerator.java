@@ -4,6 +4,7 @@ import com.leo.careerforgeai.career.domain.TrainingPlan;
 import com.leo.careerforgeai.career.domain.TrainingPlanItem;
 import com.leo.careerforgeai.model.application.ModelGateway;
 import com.leo.careerforgeai.model.domain.*;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.model.exception.ModelException;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
@@ -121,7 +122,7 @@ public class TrainingPlanGenerator {
         long startedAt = System.nanoTime();
         ModelResponse response;
         try {
-            response = modelGateway.chat(request);
+            response = modelGateway.chat(ModelTaskType.TRAINING_PLAN_GENERATION, request);
         } catch (ModelException exception) {
             throw failure(MODEL_CALL_FAILED, "训练计划模型调用失败", exception);
         } catch (RuntimeException exception) {

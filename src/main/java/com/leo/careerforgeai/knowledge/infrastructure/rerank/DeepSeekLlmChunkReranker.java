@@ -12,6 +12,7 @@ import com.leo.careerforgeai.model.domain.ModelRequest;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelRole;
 import com.leo.careerforgeai.model.domain.ModelUsage;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import jakarta.validation.Validator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -98,7 +99,7 @@ public class DeepSeekLlmChunkReranker implements ChunkReranker {
         long startNanos = System.nanoTime();
         ModelResponse response;
         try {
-            response = modelGateway.chat(request);
+            response = modelGateway.chat(ModelTaskType.RAG_RERANK, request);
         } catch (RuntimeException e) {
             throw new ChunkRerankException("LLM Rerank 模型调用失败", e);
         }

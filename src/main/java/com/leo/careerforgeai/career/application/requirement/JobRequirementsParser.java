@@ -2,6 +2,7 @@ package com.leo.careerforgeai.career.application.requirement;
 
 import com.leo.careerforgeai.career.application.requirement.model.JobRequirementsModelOutput;
 import com.leo.careerforgeai.career.domain.JobRequirements;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
 import com.leo.careerforgeai.shared.exception.BusinessException;
@@ -138,7 +139,7 @@ public class JobRequirementsParser {
         long modelStartedAt = System.nanoTime();
         ModelResponse response;
         try {
-            response = modelGateway.chat(modelRequest);
+            response = modelGateway.chat(ModelTaskType.JOB_REQUIREMENTS_EXTRACTION, modelRequest);
         } catch (ModelException exception) {
             long modelDurationMs = elapsedMillis(modelStartedAt);
             throw new JobRequirementsParseException(

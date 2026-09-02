@@ -1,5 +1,6 @@
 package com.leo.careerforgeai.model.infrastructure.deepseek;
 
+import com.leo.careerforgeai.model.domain.routing.ReasoningEffort;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
 import com.leo.careerforgeai.model.infrastructure.deepseek.dto.DeepSeekChatRequest;
@@ -8,7 +9,6 @@ import com.leo.careerforgeai.model.infrastructure.deepseek.dto.DeepSeekStreamChu
 import com.leo.careerforgeai.model.infrastructure.deepseek.stream.DeepSeekSseParser;
 import com.leo.careerforgeai.shared.exception.BusinessException;
 import com.leo.careerforgeai.shared.exception.ErrorCode;
-import com.leo.careerforgeai.model.application.ModelGateway;
 import com.leo.careerforgeai.model.config.ModelProperties;
 import com.leo.careerforgeai.model.domain.ModelRequest;
 import com.leo.careerforgeai.model.domain.ModelResponse;
@@ -40,6 +40,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.concurrent.TimeoutException;
+import com.leo.careerforgeai.model.application.ProviderModelClient;
+import com.leo.careerforgeai.model.domain.routing.ModelCapability;
+import com.leo.careerforgeai.model.domain.routing.ModelExecutionProfile;
+import com.leo.careerforgeai.model.domain.routing.ReasoningMode;
 
 /**
  * @program: CareerForge-AI
@@ -49,7 +53,7 @@ import java.util.concurrent.TimeoutException;
  **/
 @Component
 @Slf4j
-public class DeepSeekChatClient implements ModelGateway {
+public class DeepSeekChatClient implements ProviderModelClient {
     private final ModelProperties properties;
     private final JsonMapper jsonMapper;
     private final HttpClient httpClient;
@@ -65,11 +69,37 @@ public class DeepSeekChatClient implements ModelGateway {
         this.httpClient = httpClient;
     }
 
+    public ModelResponse chat(ModelRequest request) {
+        return executeChat(properties.getName(), request,
+                ReasoningMode.DISABLED, null);
+    }
 
     @Override
-    public ModelResponse chat(ModelRequest request) {
+    public ModelResponse chat(ModelExecutionProfile profile, ModelRequest request) {
+        validateProfile(profile);
+        return executeChat(profile.model(), effectiveRequest(profile, request),
+                profile.reasoningMode(), profile.reasoningEffort());
+    }
+
+    public void stream(ModelRequest request,
+                       Consumer<ModelStreamEvent> eventConsumer) {
+        executeStream(properties.getName(), request, ReasoningMode.DISABLED,
+                null, eventConsumer);
+    }
+
+    @Override
+    public void stream(ModelExecutionProfile profile, ModelRequest request,
+                       Consumer<ModelStreamEvent> eventConsumer) {
+        validateProfile(profile);
+        executeStream(profile.model(), effectiveRequest(profile, request),
+                profile.reasoningMode(), profile.reasoningEffort(), eventConsumer);
+    }
+
+    private ModelResponse executeChat(String model, ModelRequest request,
+                                      ReasoningMode reasoningMode,
+                                      ReasoningEffort reasoningEffort) {
         try {
-            DeepSeekChatRequest providerRequest = toProviderRequest(request, false);
+            DeepSeekChatRequest providerRequest = toProviderRequest(request, model, reasoningMode, reasoningEffort, false);
             DeepSeekChatResponse providerResponse = execute(providerRequest, request.timeout());
             return toModelResponse(providerResponse);
         } catch (HttpConnectTimeoutException e) {
@@ -85,12 +115,15 @@ public class DeepSeekChatClient implements ModelGateway {
         }
     }
 
-    @Override
-    public void stream(ModelRequest request, Consumer<ModelStreamEvent> eventConsumer) {
+
+    private void executeStream(String model, ModelRequest request,
+                               ReasoningMode reasoningMode,
+                               ReasoningEffort reasoningEffort,
+                               Consumer<ModelStreamEvent> eventConsumer) {
         if (eventConsumer == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "流式事件消费者不能为空");
         }
-        DeepSeekChatRequest providerRequest = toProviderRequest(request, true);
+        DeepSeekChatRequest providerRequest = toProviderRequest(request, model, reasoningMode, reasoningEffort, true);
         String requestID = UUID.randomUUID().toString();
         eventConsumer.accept(new ModelStreamEvent(
                 ModelStreamEventType.START,
@@ -374,43 +407,63 @@ public class DeepSeekChatClient implements ModelGateway {
      * @param request
      * @return
      */
-    private DeepSeekChatRequest toProviderRequest(ModelRequest request, boolean stream) {
-        if (request == null || request.messages() == null || request.messages().isEmpty()) {
+    private DeepSeekChatRequest toProviderRequest(
+            ModelRequest request,
+            String model,
+            ReasoningMode reasoningMode,
+            ReasoningEffort reasoningEffort,
+            boolean stream
+    ) {
+        if (request == null || request.messages() == null
+                || request.messages().isEmpty()) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "模型消息不能为空");
         }
 
         List<DeepSeekChatRequest.Message> messages = request.messages().stream()
                 .map(message -> {
-                    if (message == null
-                            || message.role() == null
+                    if (message == null || message.role() == null
                             || message.content() == null
                             || message.content().isBlank()) {
-                        throw new BusinessException(ErrorCode.PARAMS_ERROR, "模型消息不合法");
+                        throw new BusinessException(
+                                ErrorCode.PARAMS_ERROR, "模型消息不合法");
                     }
-
                     return new DeepSeekChatRequest.Message(
                             message.role().name().toLowerCase(Locale.ROOT),
-                            message.content()
-                    );
+                            message.content());
                 })
                 .toList();
+
         String responseFormat = switch (request.outputFormat()) {
             case TEXT -> "text";
             case JSON_OBJECT -> "json_object";
         };
+        boolean thinkingEnabled = reasoningMode == ReasoningMode.ENABLED;
 
         return new DeepSeekChatRequest(
                 new DeepSeekChatRequest.ResponseFormat(responseFormat),
-                properties.getName(),
+                model,
                 messages,
                 request.maxOutputTokens(),
-                request.temperature(),
-                new DeepSeekChatRequest.Thinking("disabled"),
+                thinkingEnabled ? null : request.temperature(),
+                new DeepSeekChatRequest.Thinking(
+                        thinkingEnabled ? "enabled" : "disabled"),
+                thinkingEnabled ? mapReasoningEffort(reasoningEffort) : null,
                 stream,
                 stream ? new DeepSeekChatRequest.StreamOptions(true) : null
         );
     }
 
+    private String mapReasoningEffort(ReasoningEffort reasoningEffort) {
+        if (reasoningEffort == null) {
+            throw new ModelException(ModelErrorType.CONFIGURATION_ERROR,
+                    "DeepSeek Thinking必须配置reasoningEffort");
+        }
+        return switch (reasoningEffort) {
+            case LOW -> "low";
+            case MEDIUM, HIGH -> "high";
+            case MAX -> "max";
+        };
+    }
     /**
      * DeepSeek DTO 转统一响应 ModelResponse
      * @param response
@@ -601,9 +654,11 @@ public class DeepSeekChatClient implements ModelGateway {
             case 429 -> new ModelException(ModelErrorType.RATE_LIMITED, "模型供应商请求频率受限");
             default -> {
                 if (statusCode >= 500) {
-                    yield new ModelException(ModelErrorType.PROVIDER_ERROR, "模型供应商服务异常，statusCode=" + statusCode);
+                    yield new ModelException(ModelErrorType.PROVIDER_ERROR,
+                            "模型供应商服务异常，statusCode=" + statusCode);
                 }
-                yield new ModelException(ModelErrorType.PROVIDER_ERROR, "模型供应商拒绝请求，statusCode=" + statusCode);
+                yield new ModelException(ModelErrorType.PROVIDER_REQUEST_REJECTED,
+                        "模型供应商拒绝请求，statusCode=" + statusCode);
             }
         };
     }
@@ -619,6 +674,45 @@ public class DeepSeekChatClient implements ModelGateway {
         } catch (JacksonException e) {
             throw new ModelException(ModelErrorType.CONFIGURATION_ERROR, "模型请求序列化失败", e);
         }
+    }
+
+    private void validateProfile(ModelExecutionProfile profile) {
+        if (profile == null) throw new ModelException(ModelErrorType.CONFIGURATION_ERROR, "模型Profile不能为空");
+        if (!providerId().equals(profile.provider())) {
+            throw new ModelException(ModelErrorType.CONFIGURATION_ERROR,
+                    "DeepSeek Client不能执行其他供应商Profile");
+        }
+        if (!profile.enabled()) {
+            throw new ModelException(ModelErrorType.CONFIGURATION_ERROR, "模型Profile未启用");
+        }
+        if (!profile.capabilities().contains(ModelCapability.CHAT)) {
+            throw new ModelException(ModelErrorType.CONFIGURATION_ERROR, "DeepSeek Profile不支持Chat");
+        }
+        if (profile.reasoningMode() == ReasoningMode.ADAPTIVE) {
+            throw new ModelException(ModelErrorType.CONFIGURATION_ERROR,
+                    "DeepSeek当前仅支持显式开启或关闭Thinking");
+        }
+        if (profile.reasoningMode() == ReasoningMode.ENABLED
+                && !profile.capabilities().contains(ModelCapability.THINKING)) {
+            throw new ModelException(ModelErrorType.CONFIGURATION_ERROR,
+                    "DeepSeek Thinking Profile缺少THINKING能力");
+        }
+    }
+
+    private ModelRequest effectiveRequest(ModelExecutionProfile profile, ModelRequest request) {
+        if (request == null) throw new ModelException(ModelErrorType.CONFIGURATION_ERROR, "模型请求不能为空");
+        if (request.maxOutputTokens() > profile.maxOutputTokens()) {
+            throw new ModelException(ModelErrorType.CONFIGURATION_ERROR,
+                    "模型请求超过Profile输出Token上限");
+        }
+        Duration timeout = request.timeout().compareTo(profile.timeout()) < 0
+                ? request.timeout() : profile.timeout();
+        return request.withTimeout(timeout);
+    }
+
+    @Override
+    public String providerId() {
+        return "deepseek";
     }
 
     private static final class StreamState {

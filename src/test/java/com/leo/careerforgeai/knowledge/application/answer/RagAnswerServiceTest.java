@@ -11,6 +11,7 @@ import com.leo.careerforgeai.model.domain.ModelRequest;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelRole;
 import com.leo.careerforgeai.model.domain.ModelUsage;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
@@ -44,7 +45,7 @@ class RagAnswerServiceTest {
         DocumentChunk atomic = chunk(B_ID, "AtomicInteger 通过 CAS 循环原子更新单个变量。");
         AssembledContext context = context(List.of(malicious, atomic));
         String output = "{\"answer\":\"AtomicInteger 通过 CAS 完成原子更新。\",\"citedChunkIds\":[\"" + B_ID + "\",\"" + B_ID + "\",\"" + A_ID + "\"]}";
-        when(modelGateway.chat(any())).thenReturn(response(output));
+        when(modelGateway.chat(eq(ModelTaskType.RAG_ANSWER), any())).thenReturn(response(output));
 
         RagAnswer answer = service.answer("AtomicInteger 如何保证线程安全？", context);
 
@@ -53,7 +54,7 @@ class RagAnswerServiceTest {
         assertThat(answer.citations().getFirst().documentName()).isEqualTo("测试文档");
 
         ArgumentCaptor<ModelRequest> captor = ArgumentCaptor.forClass(ModelRequest.class);
-        verify(modelGateway).chat(captor.capture());
+        verify(modelGateway).chat(eq(ModelTaskType.RAG_ANSWER), captor.capture());
         ModelRequest request = captor.getValue();
 
         assertThat(request.outputFormat()).isEqualTo(ModelOutputFormat.JSON_OBJECT);
@@ -74,19 +75,19 @@ class RagAnswerServiceTest {
         verifyNoInteractions(modelGateway);
 
         reset(modelGateway);
-        when(modelGateway.chat(any())).thenReturn(response("{\"answer\":\"模型生成但没有依据的回答\",\"citedChunkIds\":[]}"));
+        when(modelGateway.chat(eq(ModelTaskType.RAG_ANSWER), any())).thenReturn(response("{\"answer\":\"模型生成但没有依据的回答\",\"citedChunkIds\":[]}"));
 
         RagAnswer emptyCitationAnswer = service.answer("不存在的问题", context(List.of(chunk(A_ID, "无关内容"))));
 
         assertThat(emptyCitationAnswer).isEqualTo(RagAnswer.insufficientContext());
-        verify(modelGateway).chat(any());
+        verify(modelGateway).chat(eq(ModelTaskType.RAG_ANSWER), any());
     }
 
     /** 验证非法 JSON、未知引用、额外字段和不一致拒答都会被拒绝。 */
     @ParameterizedTest
     @MethodSource("invalidOutputs")
     void shouldRejectUntrustedModelOutput(String output) {
-        when(modelGateway.chat(any())).thenReturn(response(output));
+        when(modelGateway.chat(eq(ModelTaskType.RAG_ANSWER), any())).thenReturn(response(output));
 
         assertThatThrownBy(() -> service.answer("Java 并发", context(List.of(chunk(A_ID, "Java 并发正文")))))
                 .isInstanceOf(RagAnswerException.class);
@@ -96,7 +97,7 @@ class RagAnswerServiceTest {
     @Test
     void shouldWrapModelGatewayFailure() {
         RuntimeException failure = new RuntimeException("provider unavailable");
-        when(modelGateway.chat(any())).thenThrow(failure);
+        when(modelGateway.chat(eq(ModelTaskType.RAG_ANSWER), any())).thenThrow(failure);
 
         assertThatThrownBy(() -> service.answer("Java 并发", context(List.of(chunk(A_ID, "Java 并发正文")))))
                 .isInstanceOf(RagAnswerException.class)

@@ -19,6 +19,7 @@ import com.leo.careerforgeai.model.domain.ModelRequest;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelRole;
 import com.leo.careerforgeai.model.domain.ModelUsage;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolCall;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
@@ -47,6 +48,7 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -129,7 +131,7 @@ class ParseJobRequirementsToolTest {
     @DisplayName("恶意JD保持为USER数据并成功返回结构化岗位要求")
     void shouldKeepMaliciousJobDescriptionAsUserData() throws Exception {
         ModelUsage usage = new ModelUsage(120, 40, 160);
-        when(modelGateway.chat(any(ModelRequest.class))).thenReturn(
+        when(modelGateway.chat(eq(ModelTaskType.JOB_REQUIREMENTS_EXTRACTION), any(ModelRequest.class))).thenReturn(
                 new ModelResponse(
                         "model-request-1",
                         "deepseek-v4-flash",
@@ -160,7 +162,7 @@ class ParseJobRequirementsToolTest {
 
         ArgumentCaptor<ModelRequest> requestCaptor =
                 ArgumentCaptor.forClass(ModelRequest.class);
-        verify(modelGateway).chat(requestCaptor.capture());
+        verify(modelGateway).chat(eq(ModelTaskType.JOB_REQUIREMENTS_EXTRACTION), requestCaptor.capture());
 
         ModelRequest modelRequest = requestCaptor.getValue();
         assertThat(modelRequest.outputFormat()).isEqualTo(ModelOutputFormat.JSON_OBJECT);
@@ -221,7 +223,7 @@ class ParseJobRequirementsToolTest {
     @DisplayName("非法模型输出映射为安全失败并保留已产生Token")
     void shouldMapInvalidModelOutputAndPreserveObservedCost() throws Exception {
         ModelUsage usage = new ModelUsage(90, 10, 100);
-        when(modelGateway.chat(any(ModelRequest.class))).thenReturn(
+        when(modelGateway.chat(eq(ModelTaskType.JOB_REQUIREMENTS_EXTRACTION), any(ModelRequest.class))).thenReturn(
                 new ModelResponse(
                         "model-request-2",
                         "deepseek-v4-flash",
@@ -253,7 +255,7 @@ class ParseJobRequirementsToolTest {
     @Test
     @DisplayName("上游超时返回TIMEOUT且不伪造Token")
     void shouldMapUpstreamTimeoutWithoutFabricatingUsage() throws Exception {
-        when(modelGateway.chat(any(ModelRequest.class))).thenThrow(
+        when(modelGateway.chat(eq(ModelTaskType.JOB_REQUIREMENTS_EXTRACTION), any(ModelRequest.class))).thenThrow(
                 new ModelException(
                         ModelErrorType.TIMEOUT,
                         "http://internal-provider api-key=secret-value"
@@ -283,7 +285,7 @@ class ParseJobRequirementsToolTest {
     @Test
     @DisplayName("模型网络故障返回安全MODEL_CALL_FAILED")
     void shouldMapModelCallFailureWithoutLeakingCause() throws Exception {
-        when(modelGateway.chat(any(ModelRequest.class))).thenThrow(
+        when(modelGateway.chat(eq(ModelTaskType.JOB_REQUIREMENTS_EXTRACTION), any(ModelRequest.class))).thenThrow(
                 new ModelException(
                         ModelErrorType.NETWORK_ERROR,
                         "/Users/internal/model-client secret-token"

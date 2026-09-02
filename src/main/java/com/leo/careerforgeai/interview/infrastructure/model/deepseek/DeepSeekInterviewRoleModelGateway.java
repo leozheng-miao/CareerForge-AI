@@ -17,6 +17,7 @@ import com.leo.careerforgeai.model.domain.ModelRequest;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelRole;
 import com.leo.careerforgeai.model.domain.ModelUsage;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
 import lombok.extern.slf4j.Slf4j;
@@ -51,24 +52,12 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
 
     private final ModelGateway modelGateway;
     private final JsonMapper jsonMapper;
-    private final ModelCircuitBreaker circuitBreaker;
-    private final ModelCallBulkhead bulkhead;
-    private final ModelRetryExecutor retryExecutor;
     private static final int MAX_STRUCTURED_OUTPUT_CHARS = 100_000;
 
-    public DeepSeekInterviewRoleModelGateway(
-            ModelGateway modelGateway,
-            JsonMapper jsonMapper,
-            ModelCircuitBreaker circuitBreaker,
-            ModelCallBulkhead bulkhead,
-            ModelReliabilityProperties reliabilityProperties,
-            ModelReliabilityMetrics reliabilityMetrics
-    ) {
+    public DeepSeekInterviewRoleModelGateway(ModelGateway modelGateway,
+                                             JsonMapper jsonMapper) {
         this.modelGateway = Objects.requireNonNull(modelGateway, "modelGateway不能为空");
         this.jsonMapper = Objects.requireNonNull(jsonMapper, "jsonMapper不能为空");
-        this.circuitBreaker = Objects.requireNonNull(circuitBreaker, "circuitBreaker不能为空");
-        this.bulkhead = Objects.requireNonNull(bulkhead, "bulkhead不能为空");
-        this.retryExecutor = new ModelRetryExecutor(reliabilityProperties, reliabilityMetrics);
     }
 
     @Override
@@ -81,9 +70,8 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
         long startedNanos = System.nanoTime();
         long deadlineNanos = startedNanos + timeout.toNanos();
         try {
-            Result<O> result = circuitBreaker.execute(
-                    () -> executeLogicalCall(contract, input, promptVersion, startedNanos, deadlineNanos)
-            );
+            Result<O> result = executeLogicalCall(
+                    contract, input, promptVersion, startedNanos, deadlineNanos);
             log.info(
                     "面试角色模型调用完成，role={}, promptVersion={}, model={}, durationMs={}, totalTokens={}, modelCallCount={}, repaired={}, responseHash={}",
                     contract.role(), promptVersion, result.model(), result.durationMs(),
@@ -113,7 +101,7 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
                 ),
                 remainingTimeout(deadlineNanos)
         );
-        ModelResponse initialResponse = executeModelCall(initialRequest, deadlineNanos);
+        ModelResponse initialResponse = executeModelCall(taskType(contract.role()), initialRequest, deadlineNanos);
         String initialRaw = initialResponse.content();
         ModelUsage initialUsage = requireUsage(initialResponse.usage());
         requireText(initialResponse.requestId(), "模型requestId", 128);
@@ -179,7 +167,11 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
                 ),
                 remainingTimeout(deadlineNanos)
         );
-        ModelResponse repairResponse = executeModelCall(repairRequest, deadlineNanos);
+        ModelResponse repairResponse = executeModelCall(
+                ModelTaskType.STRUCTURED_OUTPUT_REPAIR,
+                repairRequest,
+                deadlineNanos
+        );
         String repairedRaw = repairResponse.content();
         ModelUsage repairedUsage = requireUsage(repairResponse.usage());
         requireText(repairResponse.requestId(), "修复requestId", 128);
@@ -227,11 +219,12 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
         );
     }
 
-    private ModelResponse executeModelCall(ModelRequest request, long deadlineNanos) {
-        Duration timeout = remainingTimeout(deadlineNanos);
-        ModelResponse response = retryExecutor.execute(
-                timeout,
-                remaining -> bulkhead.execute(() -> modelGateway.chat(request.withTimeout(remaining)))
+    private ModelResponse executeModelCall(ModelTaskType taskType,
+                                           ModelRequest request,
+                                           long deadlineNanos) {
+        ModelResponse response = modelGateway.chat(
+                taskType,
+                request.withTimeout(remainingTimeout(deadlineNanos))
         );
         if (response == null) {
             throw new ModelException(ModelErrorType.INVALID_RESPONSE, "模型响应不能为空");
@@ -383,6 +376,15 @@ public class DeepSeekInterviewRoleModelGateway implements InterviewRoleModelGate
                 repaired,
                 sha256(rawContent)
         );
+    }
+
+    private ModelTaskType taskType(InterviewRole role) {
+        return switch (role) {
+            case INTERVIEWER -> ModelTaskType.INTERVIEW_QUESTION;
+            case TECHNICAL_REVIEWER -> ModelTaskType.INTERVIEW_TECHNICAL_REVIEW;
+            case EVIDENCE_REVIEWER -> ModelTaskType.INTERVIEW_EVIDENCE_REVIEW;
+            case REPORT_COACH -> ModelTaskType.INTERVIEW_REPORT;
+        };
     }
 
     private <I, O> String systemPrompt(InterviewRoleContract<I, O> contract) {

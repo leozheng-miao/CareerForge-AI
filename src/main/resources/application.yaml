@@ -70,6 +70,58 @@ careerforge:
     fixed-id: ${CAREERFORGE_ACTOR_ID:actor-dev}
   persistence:
     enabled: ${CAREERFORGE_PERSISTENCE_ENABLED:true}
+  model-routing:
+    version: routing-v1
+    providers:
+      deepseek:
+        base-url: ${AI_MODEL_BASE_URL}
+        api-key: ${AI_MODEL_API_KEY}
+        enabled: true
+      kimi:
+        base-url: ${KIMI_BASE_URL:https://api.moonshot.cn/v1}
+        api-key: ${MOONSHOT_API_KEY:}
+        enabled: ${KIMI_PROVIDER_ENABLED:false}
+    profiles:
+      deepseek-standard:
+        provider: deepseek
+        model: ${AI_MODEL_NAME}
+        capabilities: [ CHAT, JSON_OBJECT, STREAMING ]
+        reasoning-mode: DISABLED
+        max-output-tokens: 4000
+        timeout: 60s
+        price-version: deepseek-2026-09-01
+        enabled: true
+      deepseek-thinking:
+        provider: deepseek
+        model: ${AI_MODEL_NAME}
+        capabilities: [ CHAT, JSON_OBJECT, STREAMING, THINKING ]
+        reasoning-mode: ENABLED
+        reasoning-effort: ${DEEPSEEK_THINKING_EFFORT:LOW}
+        max-output-tokens: 4000
+        timeout: 90s
+        price-version: deepseek-2026-09-01
+        enabled: ${DEEPSEEK_THINKING_ENABLED:false}
+      kimi-standard:
+        provider: kimi
+        model: ${KIMI_MODEL:kimi-k2.6}
+        capabilities: [ CHAT, JSON_OBJECT ]
+        reasoning-mode: DISABLED
+        max-output-tokens: 4000
+        timeout: 60s
+        price-version: kimi-2026-09-01
+        enabled: ${KIMI_PROVIDER_ENABLED:false}
+    routes:
+      JOB_REQUIREMENTS_EXTRACTION: [ deepseek-standard ]
+      CAREER_COACH: [ deepseek-standard ]
+      MEMORY_EXTRACTION: [ deepseek-standard, kimi-standard ]
+      TRAINING_PLAN_GENERATION: [ deepseek-standard ]
+      RAG_ANSWER: [ deepseek-standard ]
+      RAG_RERANK: [ deepseek-standard ]
+      INTERVIEW_QUESTION: [ deepseek-standard ]
+      INTERVIEW_TECHNICAL_REVIEW: [ deepseek-thinking, deepseek-standard ]
+      INTERVIEW_EVIDENCE_REVIEW: [ deepseek-standard ]
+      INTERVIEW_REPORT: [ deepseek-standard ]
+      STRUCTURED_OUTPUT_REPAIR: [ deepseek-standard ]
   model:
     base-url: ${AI_MODEL_BASE_URL}
     api-key: ${AI_MODEL_API_KEY}

@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.Comparator;
@@ -86,10 +87,14 @@ public final class FakeMockInterviewSessionRepository implements MockInterviewSe
     }
 
     @Override
-    public List<MockInterviewSession> findExecutionRequiredUpdatedBefore(ActorId ownerId, Instant updatedBefore, int limit) {
+    public List<MockInterviewSession> findSystemRecoveryCandidatesUpdatedBefore(
+            Instant updatedBefore,
+            int limit
+    ) {
+        Objects.requireNonNull(updatedBefore, "updatedBefore不能为空");
         if (limit < 1 || limit > 1000) throw new IllegalArgumentException("limit必须在1到1000之间");
+
         return sessions.values().stream()
-                .filter(session -> session.ownerId().equals(ownerId))
                 .filter(session -> session.updatedAt().isBefore(updatedBefore))
                 .filter(session -> session.status() == InterviewStatus.GENERATING_QUESTION
                         || session.status() == InterviewStatus.REVIEWING

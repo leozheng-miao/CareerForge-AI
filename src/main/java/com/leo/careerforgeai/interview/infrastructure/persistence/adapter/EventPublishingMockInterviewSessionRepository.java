@@ -62,8 +62,11 @@ public class EventPublishingMockInterviewSessionRepository implements MockInterv
     }
 
     @Override
-    public List<MockInterviewSession> findExecutionRequiredUpdatedBefore(ActorId ownerId, Instant updatedBefore, int limit) {
-        return delegate.findExecutionRequiredUpdatedBefore(ownerId, updatedBefore, limit);
+    public List<MockInterviewSession> findSystemRecoveryCandidatesUpdatedBefore(
+            Instant updatedBefore,
+            int limit
+    ) {
+        return delegate.findSystemRecoveryCandidatesUpdatedBefore(updatedBefore, limit);
     }
 
     private void publishStateEvent(MockInterviewSession session) {

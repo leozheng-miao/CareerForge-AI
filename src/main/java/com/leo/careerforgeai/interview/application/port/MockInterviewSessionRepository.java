@@ -24,6 +24,5 @@ public interface MockInterviewSessionRepository {
 
     boolean updateIfVersionMatches(ActorId ownerId, MockInterviewSession updatedSession, long expectedVersion);
 
-    List<MockInterviewSession> findExecutionRequiredUpdatedBefore(ActorId ownerId, Instant updatedBefore, int limit);
-
+    List<MockInterviewSession> findSystemRecoveryCandidatesUpdatedBefore(Instant updatedBefore, int limit);
 }

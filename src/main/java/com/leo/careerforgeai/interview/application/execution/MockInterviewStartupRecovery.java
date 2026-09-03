@@ -36,7 +36,6 @@ public class MockInterviewStartupRecovery {
 
     private static final int BATCH_SIZE = 100;
 
-    private final CurrentActorProvider currentActorProvider;
     private final MockInterviewSessionRepository sessionRepository;
     private final CoachingRunAsyncDispatcher dispatcher;
     private final MockInterviewAsyncTask asyncTask;
@@ -44,13 +43,13 @@ public class MockInterviewStartupRecovery {
     private final Clock clock;
     private final Instant recoveryCutoff;
 
-    public MockInterviewStartupRecovery(CurrentActorProvider currentActorProvider,
-                                        MockInterviewSessionRepository sessionRepository,
-                                        CoachingRunAsyncDispatcher dispatcher,
-                                        MockInterviewAsyncTask asyncTask,
-                                        CoachingRunExecutionProperties executionProperties,
-                                        Clock clock) {
-        this.currentActorProvider = Objects.requireNonNull(currentActorProvider, "currentActorProvider不能为空");
+    public MockInterviewStartupRecovery(
+            MockInterviewSessionRepository sessionRepository,
+            CoachingRunAsyncDispatcher dispatcher,
+            MockInterviewAsyncTask asyncTask,
+            CoachingRunExecutionProperties executionProperties,
+            Clock clock
+    ) {
         this.sessionRepository = Objects.requireNonNull(sessionRepository, "sessionRepository不能为空");
         this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher不能为空");
         this.asyncTask = Objects.requireNonNull(asyncTask, "asyncTask不能为空");
@@ -61,40 +60,33 @@ public class MockInterviewStartupRecovery {
 
     @EventListener(ApplicationReadyEvent.class)
     public void recoverExecutionRequiredInterviews() {
-        ActorId ownerId = Objects.requireNonNull(currentActorProvider.currentActor(), "currentActor不能为空");
         Set<UUID> attempted = new HashSet<>();
         int recoveredTotal = 0;
 
         while (!Thread.currentThread().isInterrupted()) {
-            List<MockInterviewSession> candidates = sessionRepository.findExecutionRequiredUpdatedBefore(
-                    ownerId, recoveryCutoff, BATCH_SIZE
-            );
+            List<MockInterviewSession> candidates =
+                    sessionRepository.findSystemRecoveryCandidatesUpdatedBefore(recoveryCutoff, BATCH_SIZE);
             if (candidates.isEmpty()) break;
 
             int attemptedInBatch = 0;
             for (MockInterviewSession candidate : candidates) {
                 if (!attempted.add(candidate.interviewId())) continue;
                 attemptedInBatch++;
-                if (recover(ownerId, candidate)) recoveredTotal++;
+                if (recover(candidate)) recoveredTotal++;
                 if (Thread.currentThread().isInterrupted()) break;
             }
             if (attemptedInBatch == 0) {
-                log.error("模拟面试启动恢复无法继续，ownerId={}, blockedCandidateCount={}",
-                        ownerId.value(), candidates.size());
+                log.error("模拟面试启动恢复无法继续，blockedCandidateCount={}", candidates.size());
                 break;
             }
         }
 
-        log.info("模拟面试启动恢复完成，ownerId={}, cutoff={}, recoveredCount={}",
-                ownerId.value(), recoveryCutoff, recoveredTotal);
+        log.info("模拟面试启动恢复完成，cutoff={}, recoveredCount={}",
+                recoveryCutoff, recoveredTotal);
     }
 
-    private boolean recover(ActorId ownerId, MockInterviewSession candidate) {
-        if (!candidate.ownerId().equals(ownerId)) {
-            log.error("模拟面试启动恢复候选owner不一致，interviewId={}", candidate.interviewId());
-            return false;
-        }
-
+    private boolean recover(MockInterviewSession candidate) {
+        ActorId ownerId = candidate.ownerId();
         Instant submittedAt = clock.instant();
         RunExecutionContext context = new RunExecutionContext(
                 ownerId,

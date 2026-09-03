@@ -49,7 +49,7 @@ class MockInterviewStartupRecoveryTest {
 
         when(candidate.ownerId()).thenReturn(OWNER);
         when(candidate.interviewId()).thenReturn(INTERVIEW_ID);
-        when(repository.findExecutionRequiredUpdatedBefore(OWNER, NOW, 100))
+        when(repository.findSystemRecoveryCandidatesUpdatedBefore(NOW, 100))
                 .thenReturn(List.of(candidate), List.of());
         when(dispatcher.dispatch(
                 any(RunExecutionContext.class),
@@ -62,7 +62,7 @@ class MockInterviewStartupRecoveryTest {
         });
 
         MockInterviewStartupRecovery recovery = new MockInterviewStartupRecovery(
-                () -> OWNER, repository, dispatcher, asyncTask, properties, clock
+                repository, dispatcher, asyncTask, properties, clock
         );
         recovery.recoverExecutionRequiredInterviews();
 
@@ -72,5 +72,6 @@ class MockInterviewStartupRecoveryTest {
                         && context.submittedAt().equals(NOW)
                         && context.deadline().equals(NOW.plusSeconds(30))
         ));
-        verify(repository, times(2)).findExecutionRequiredUpdatedBefore(OWNER, NOW, 100);    }
+        verify(repository, times(2)).findSystemRecoveryCandidatesUpdatedBefore(NOW, 100);
+    }
 }

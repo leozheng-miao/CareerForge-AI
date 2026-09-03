@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    default: local
   datasource:
     url: ${MYSQL_URL:jdbc:mysql://localhost:3306/careerforge?useUnicode=true&characterEncoding=UTF-8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
     username: root
@@ -60,6 +62,17 @@ spring:
     deserialization:
       fail-on-unknown-properties: true
 careerforge:
+  auth:
+    enabled: ${CAREERFORGE_AUTH_ENABLED:true}
+    issuer: ${CAREERFORGE_AUTH_ISSUER:careerforge-api}
+    audience: ${CAREERFORGE_AUTH_AUDIENCE:careerforge-web}
+    access-token-secret-base64: ${CAREERFORGE_ACCESS_TOKEN_SECRET:KWBE5ZNZ4zGv997psrc6ZJfP3FjjGBjnzleC04CgJ70=}
+    access-token-ttl: ${CAREERFORGE_ACCESS_TOKEN_TTL:15m}
+    refresh-token-ttl: ${CAREERFORGE_REFRESH_TOKEN_TTL:30d}
+    refresh-token-bytes: ${CAREERFORGE_REFRESH_TOKEN_BYTES:32}
+  login-rate-limit:
+    max-attempts: ${CAREERFORGE_AUTH_LOGIN_MAX_ATTEMPTS:10}
+    window: ${CAREERFORGE_AUTH_LOGIN_WINDOW:10m}
   interview:
     supervisor:
       next-round-model-calls: ${INTERVIEW_NEXT_ROUND_MODEL_CALLS:3}
@@ -237,3 +250,4 @@ knife4j:
           - com.leo.careerforgeai.career.api
           - com.leo.careerforgeai.knowledge.api
           - com.leo.careerforgeai.agent.api
+          - com.leo.careerforgeai.auth.api

@@ -97,19 +97,21 @@ public class MyBatisPlusMockInterviewSessionAdapter implements MockInterviewSess
     }
 
     @Override
-    public List<MockInterviewSession> findExecutionRequiredUpdatedBefore(ActorId ownerId, Instant updatedBefore, int limit) {
-        Objects.requireNonNull(ownerId, "ownerId不能为空");
+    public List<MockInterviewSession> findSystemRecoveryCandidatesUpdatedBefore(
+            Instant updatedBefore,
+            int limit
+    ) {
         Objects.requireNonNull(updatedBefore, "updatedBefore不能为空");
         if (limit < 1 || limit > 1000) throw new IllegalArgumentException("limit必须在1到1000之间");
 
         LambdaQueryWrapper<MockInterviewSessionEntity> query = new LambdaQueryWrapper<>();
-        query.eq(MockInterviewSessionEntity::getOwnerId, ownerId.value())
-                .in(MockInterviewSessionEntity::getInterviewStatus,
+        query.in(MockInterviewSessionEntity::getInterviewStatus,
                         InterviewStatus.GENERATING_QUESTION.name(),
                         InterviewStatus.REVIEWING.name(),
                         InterviewStatus.GENERATING_REPORT.name())
                 .lt(MockInterviewSessionEntity::getUpdatedAt, updatedBefore)
                 .orderByAsc(MockInterviewSessionEntity::getUpdatedAt)
+                .orderByAsc(MockInterviewSessionEntity::getInterviewId)
                 .last("LIMIT " + limit);
         return mapper.selectList(query).stream().map(converter::toDomain).toList();
     }

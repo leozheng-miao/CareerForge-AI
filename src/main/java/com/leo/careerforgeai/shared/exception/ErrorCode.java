@@ -23,6 +23,10 @@ public enum ErrorCode {
     USER_NOT_EXIST(40011, "用户不存在"),
     PASSWORD_ERROR(40012, "用户名或密码错误"),
     JWT_INVALID(40110, "JWT 无效或已过期"),
+    REFRESH_TOKEN_INVALID(40111, "Refresh Token无效或已过期"),
+    REFRESH_TOKEN_REPLAYED(40112, "检测到Refresh Token重复使用，请重新登录"),
+    ACCOUNT_DISABLED(40310, "账户已被禁用"),
+    AUTH_STATE_CONFLICT(40910, "认证状态已经变化，请重新登录"),
     SYSTEM_ERROR(50000, "系统内部异常"),
     OPERATION_ERROR(50001, "操作失败"),
     SERVICE_UNAVAILABLE_ERROR(50300, "服务暂时不可用");

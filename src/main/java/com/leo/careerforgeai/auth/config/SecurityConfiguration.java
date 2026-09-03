@@ -29,6 +29,7 @@ import tools.jackson.databind.json.JsonMapper;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 
 /**
  * @program: CareerForge-AI
@@ -37,6 +38,7 @@ import java.util.List;
  * @date: 2026-09-02
  **/
 @Configuration(proxyBeanMethods = false)
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class SecurityConfiguration {
 
     @Bean

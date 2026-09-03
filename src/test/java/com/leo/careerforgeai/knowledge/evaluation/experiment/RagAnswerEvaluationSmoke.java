@@ -194,6 +194,15 @@ class RagAnswerEvaluationSmoke {
         printSummary(summary);
         printBadCases(observations);
         System.out.printf("report=%s, experimentDurationMs=%d%n", REPORT_PATH.toAbsolutePath(), experimentDurationMs);
+
+        double minimumGoldCitationHitRate =
+                RERANK_ENABLED ? 0.90 : 0.875;
+
+        assertThat(summary.generationFailures()).as("RAG模型生成失败数").isZero();
+        assertThat(summary.answerabilityAccuracy()).as("可回答性判断准确率").isGreaterThanOrEqualTo(0.95);
+        assertThat(summary.unanswerableAccuracy()).as("无答案问题拒答准确率").isEqualTo(1.0);
+        assertThat(summary.citationLegalRate()).as("引用白名单合法率").isEqualTo(1.0);
+        assertThat(summary.goldCitationHitRate()).as("Gold Chunk引用命中率").isGreaterThanOrEqualTo(minimumGoldCitationHitRate);
     }
 
     private boolean isAnswerabilityCorrect(

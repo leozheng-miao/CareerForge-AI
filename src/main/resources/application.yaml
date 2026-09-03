@@ -84,7 +84,7 @@ careerforge:
   persistence:
     enabled: ${CAREERFORGE_PERSISTENCE_ENABLED:true}
   model-routing:
-    version: routing-v1
+    version: routing-v2
     providers:
       deepseek:
         base-url: ${AI_MODEL_BASE_URL}
@@ -126,12 +126,11 @@ careerforge:
     routes:
       JOB_REQUIREMENTS_EXTRACTION: [ deepseek-standard ]
       CAREER_COACH: [ deepseek-standard ]
-      MEMORY_EXTRACTION: [ deepseek-standard, kimi-standard ]
+      MEMORY_EXTRACTION: [ deepseek-standard ]
       TRAINING_PLAN_GENERATION: [ deepseek-standard ]
       RAG_ANSWER: [ deepseek-standard ]
-      RAG_RERANK: [ deepseek-standard ]
       INTERVIEW_QUESTION: [ deepseek-standard ]
-      INTERVIEW_TECHNICAL_REVIEW: [ deepseek-thinking, deepseek-standard ]
+      INTERVIEW_TECHNICAL_REVIEW: [ deepseek-standard ]
       INTERVIEW_EVIDENCE_REVIEW: [ deepseek-standard ]
       INTERVIEW_REPORT: [ deepseek-standard ]
       STRUCTURED_OUTPUT_REPAIR: [ deepseek-standard ]
@@ -184,7 +183,7 @@ careerforge:
       rerank-enabled: ${RAG_RERANK_ENABLED:false}
       max-content-chars: ${RAG_MAX_CONTENT_CHARS:3000}
     rerank:
-      provider: ${RAG_RERANK_PROVIDER:deepseek}
+      provider: ${RAG_RERANK_PROVIDER:qwen3}
       qwen3:
         endpoint: ${DASHSCOPE_RERANK_ENDPOINT:}
         api-key: ${DASHSCOPE_API_KEY:}

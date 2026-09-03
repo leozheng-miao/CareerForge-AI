@@ -37,6 +37,12 @@ import java.util.*;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.leo.careerforgeai.model.application.ProviderModelClient;
+import com.leo.careerforgeai.model.config.ModelRoutingProperties;
+import com.leo.careerforgeai.model.domain.routing.*;
+import com.leo.careerforgeai.model.infrastructure.kimi.KimiChatClient;
+
+import java.time.Duration;
 
 /**
  * @program: CareerForge-AI
@@ -54,18 +60,17 @@ class StructuredBusinessOutputStabilitySmoke {
     private static final UUID GAP_ITEM_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
     private static final Instant NOW = Instant.parse("2026-09-02T00:00:00Z");
 
+    private static final String PROVIDER = System.getenv()
+            .getOrDefault("MODEL_EVAL_PROVIDER", "deepseek")
+            .strip().toLowerCase(Locale.ROOT);
+    private static final Duration TIMEOUT = Duration.ofSeconds(60);
+    private static final Set<ModelCapability> CAPABILITIES = Set.of(ModelCapability.CHAT, ModelCapability.JSON_OBJECT);
+
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
     private final ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory();
-    private final DeepSeekChatClient realGateway = new DeepSeekChatClient(
-            new ModelProperties(
-                    URI.create(requiredEnv("AI_MODEL_BASE_URL")),
-                    requiredEnv("AI_MODEL_API_KEY"),
-                    requiredEnv("AI_MODEL_NAME")
-            ),
-            jsonMapper,
-            new DeepSeekSseParser(jsonMapper),
-            HttpClient.newHttpClient()
-    );
+    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final ProviderModelClient realGateway = createProviderClient();
+    private final ModelExecutionProfile evaluationProfile = createEvaluationProfile();
 
     @AfterEach
     void closeResources() {
@@ -82,6 +87,7 @@ class StructuredBusinessOutputStabilitySmoke {
         int successes = 0, failures = 0, repairs = 0, providerCalls = 0;
         long totalTokens = 0;
         List<Long> durations = new ArrayList<>();
+        String caseId = "CP8-MEMORY-" + PROVIDER.toUpperCase(Locale.ROOT);
 
         for (int repeat = 1; repeat <= REPEATS; repeat++) {
             long started = System.nanoTime();
@@ -93,22 +99,22 @@ class StructuredBusinessOutputStabilitySmoke {
                 durations.add(result.modelDurationMs());
                 System.out.printf(
                         Locale.ROOT,
-                        "caseId=CP2-MEMORY, repeat=%d/%d, status=SUCCEEDED, requestId=%s, modelCallCount=%d, candidates=%d, totalTokens=%d, durationMs=%d%n",
+                        "caseId=" + caseId + ", repeat=%d/%d, status=SUCCEEDED, requestId=%s, modelCallCount=%d, candidates=%d, totalTokens=%d, durationMs=%d%n",
                         repeat, REPEATS, result.modelRequestId(), result.modelCallCount(),
                         result.candidates().size(), result.modelUsage().totalTokens(), result.modelDurationMs()
                 );
             } catch (RuntimeException exception) {
                 failures++;
-                printFailure("CP2-MEMORY", repeat, exception, elapsedMillis(started));
+                printFailure(caseId, repeat, exception, elapsedMillis(started));
             } finally {
-                printProviderCalls("CP2-MEMORY", repeat, calls);
+                printProviderCalls(caseId, repeat, calls);
                 providerCalls += calls.size();
                 totalTokens += totalTokens(calls);
                 calls.clear();
             }
         }
 
-        printSummary("CP2-MEMORY", successes, failures, repairs, providerCalls, totalTokens, durations);
+        printSummary(caseId, successes, failures, repairs, providerCalls, totalTokens, durations);
         assertThat(failures).isZero();
     }
 
@@ -122,6 +128,7 @@ class StructuredBusinessOutputStabilitySmoke {
         int successes = 0, failures = 0, providerCalls = 0;
         long totalTokens = 0;
         List<Long> durations = new ArrayList<>();
+        String caseId = "CP8-TRAINING-" + PROVIDER.toUpperCase(Locale.ROOT);
 
         for (int repeat = 1; repeat <= REPEATS; repeat++) {
             long started = System.nanoTime();
@@ -131,30 +138,31 @@ class StructuredBusinessOutputStabilitySmoke {
                 durations.add(result.modelDurationMs());
                 System.out.printf(
                         Locale.ROOT,
-                        "caseId=CP2-TRAINING, repeat=%d/%d, status=SUCCEEDED, requestId=%s, items=%d, totalTokens=%d, durationMs=%d%n",
+                        "caseId=" + caseId + ", repeat=%d/%d, status=SUCCEEDED, requestId=%s, items=%d, totalTokens=%d, durationMs=%d%n",
                         repeat, REPEATS, result.modelRequestId(), result.items().size(),
                         result.modelUsage().totalTokens(), result.modelDurationMs()
                 );
             } catch (RuntimeException exception) {
                 failures++;
-                printFailure("CP2-TRAINING", repeat, exception, elapsedMillis(started));
+                printFailure(caseId, repeat, exception, elapsedMillis(started));
             } finally {
-                printProviderCalls("CP2-TRAINING", repeat, calls);
+                printProviderCalls(caseId, repeat, calls);
                 providerCalls += calls.size();
                 totalTokens += totalTokens(calls);
                 calls.clear();
             }
         }
 
-        printSummary("CP2-TRAINING", successes, failures, 0, providerCalls, totalTokens, durations);
+        printSummary(caseId, successes, failures, 0, providerCalls, totalTokens, durations);
         assertThat(failures).isZero();
     }
-
     private ModelGateway capturingGateway(List<ModelResponse> calls) {
         return new ModelGateway() {
             @Override
-            public ModelResponse chat(ModelTaskType taskType, ModelRequest request) {
-                ModelResponse response = realGateway.chat(request);
+            public ModelResponse chat(ModelTaskType taskType,
+                                      ModelRequest request) {
+                ModelResponse response =
+                        realGateway.chat(evaluationProfile, request);
                 calls.add(response);
                 return response;
             }
@@ -162,7 +170,7 @@ class StructuredBusinessOutputStabilitySmoke {
             @Override
             public void stream(ModelTaskType taskType, ModelRequest request,
                                Consumer<ModelStreamEvent> consumer) {
-                realGateway.stream(request, consumer);
+                realGateway.stream(evaluationProfile, request, consumer);
             }
         };
     }
@@ -302,6 +310,58 @@ class StructuredBusinessOutputStabilitySmoke {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("当前JVM不支持SHA-256", exception);
         }
+    }
+
+    private ProviderModelClient createProviderClient() {
+        return switch (PROVIDER) {
+            case "deepseek" -> new DeepSeekChatClient(
+                    new ModelProperties(
+                            URI.create(requiredEnv("AI_MODEL_BASE_URL")),
+                            requiredEnv("AI_MODEL_API_KEY"),
+                            requiredEnv("AI_MODEL_NAME")),
+                    jsonMapper, new DeepSeekSseParser(jsonMapper), httpClient);
+            case "kimi" -> new KimiChatClient(
+                    kimiProperties(), jsonMapper, httpClient);
+            default -> throw new IllegalArgumentException(
+                    "MODEL_EVAL_PROVIDER仅支持deepseek或kimi");
+        };
+    }
+
+    private ModelExecutionProfile createEvaluationProfile() {
+        String model = switch (PROVIDER) {
+            case "deepseek" -> requiredEnv("AI_MODEL_NAME");
+            case "kimi" -> System.getenv()
+                    .getOrDefault("KIMI_MODEL", "kimi-k2.6");
+            default -> throw new IllegalArgumentException(
+                    "MODEL_EVAL_PROVIDER仅支持deepseek或kimi");
+        };
+        return new ModelExecutionProfile(
+                PROVIDER + "-structured-eval", PROVIDER, model,
+                CAPABILITIES, ReasoningMode.DISABLED, null,
+                4_000, TIMEOUT, "evaluation-only", true);
+    }
+
+    private ModelRoutingProperties kimiProperties() {
+        String model = System.getenv()
+                .getOrDefault("KIMI_MODEL", "kimi-k2.6");
+        return new ModelRoutingProperties(
+                "cp8-structured-evaluation-v1",
+                Map.of("kimi", new ModelRoutingProperties.Provider(
+                        URI.create(System.getenv().getOrDefault(
+                                "KIMI_BASE_URL",
+                                "https://api.moonshot.cn/v1")),
+                        requiredEnv("MOONSHOT_API_KEY"), true)),
+                Map.of("kimi-structured-eval",
+                        new ModelRoutingProperties.Profile(
+                                "kimi", model, CAPABILITIES,
+                                ReasoningMode.DISABLED, null,
+                                4_000, TIMEOUT,
+                                "evaluation-only", true)),
+                Map.of(
+                        ModelTaskType.MEMORY_EXTRACTION,
+                        List.of("kimi-structured-eval"),
+                        ModelTaskType.TRAINING_PLAN_GENERATION,
+                        List.of("kimi-structured-eval")));
     }
 
     private static String requiredEnv(String name) {

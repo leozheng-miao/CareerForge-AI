@@ -63,6 +63,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import com.leo.careerforgeai.model.config.ModelRoutingProperties;
+import com.leo.careerforgeai.model.domain.routing.ModelExecutionProfile;
+
+import java.util.ArrayList;
 
 /**
  * @program: CareerForge-AI
@@ -75,6 +79,7 @@ import static org.mockito.Mockito.when;
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = {
                 "careerforge.persistence.enabled=false",
+                "careerforge.auth.enabled=false",
                 "spring.flyway.enabled=false",
                 "spring.ai.chat.client.enabled=false",
                 "spring.ai.model.chat=none",
@@ -106,6 +111,11 @@ class InterviewArchitectureDeepSeekEvaluationSmoke {
 
     @Autowired
     private JsonMapper jsonMapper;
+
+    private static final double MINIMUM_TECHNICAL_SCORE_RANGE_RATE = 80.0;
+
+    @Autowired
+    private ModelRoutingProperties routingProperties;
 
     @Test
     void shouldCaptureComparableSingleReviewerAndMultiRoleGraphResults() throws Exception {
@@ -160,6 +170,162 @@ class InterviewArchitectureDeepSeekEvaluationSmoke {
                 failures
         );
         assertThat(failures).as("真实架构对照失败数，失败样本必须进入Bad Case").isZero();
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "cp8.interview.technical-quality-smoke", matches = "true")
+    void shouldEvaluateTechnicalReviewerProfileAgainstGoldScoreRanges() {
+        String expectedProfile = System.getProperty("cp8.interview.expected-profile");
+        assertThat(expectedProfile).as("必须指定本轮预期Profile").isNotBlank();
+
+        ModelExecutionProfile profile = routingProperties.executionRoutes()
+                .get(ModelTaskType.INTERVIEW_TECHNICAL_REVIEW).stream()
+                .filter(ModelExecutionProfile::enabled).findFirst().orElseThrow();
+        assertThat(profile.profileId()).isEqualTo(expectedProfile);
+
+        InterviewArchitectureEvaluationDataset dataset = InterviewArchitectureEvaluationDataset.load(
+                "interview/evaluation/interview-architecture-cases-v2.json"
+        );
+        int failures = 0, repaired = 0, modelCalls = 0, rangeHits = 0, rangeTotal = 0;
+        long totalTokens = 0;
+        List<Long> durations = new ArrayList<>();
+
+        for (InterviewArchitectureEvaluationDataset.EvaluationCase evaluationCase : dataset.cases()) {
+            rangeTotal += evaluationCase.scoreDimensions().size();
+            long startedNanos = System.nanoTime();
+            try {
+                TechnicalReviewInput input = new TechnicalReviewInput(
+                        id(evaluationCase.caseId() + ":interview"), 1,
+                        id(evaluationCase.caseId() + ":question"),
+                        id(evaluationCase.caseId() + ":answer"),
+                        evaluationCase.question(), evaluationCase.answer(),
+                        evaluationCase.targetSkills(), evaluationCase.scoreDimensions(),
+                        evaluationCase.scoringRubric()
+                );
+                InterviewRoleModelGateway.Result<TechnicalReviewDraft> result =
+                        roleModelGateway.generate(technicalContract, input, CALL_TIMEOUT);
+
+                int caseHits = (int) evaluationCase.expectedScoreRanges().entrySet().stream()
+                        .filter(entry -> entry.getValue().contains(result.output().dimensionScores().get(entry.getKey())))
+                        .count();
+                rangeHits += caseHits;
+                repaired += result.repaired() ? 1 : 0;
+                modelCalls += result.modelCallCount();
+                totalTokens += result.usage().totalTokens();
+                durations.add(result.durationMs());
+
+                System.out.printf(Locale.ROOT,
+                        "caseId=%s, profile=%s, status=SUCCEEDED, scoreRangeHits=%d/%d, repaired=%s, modelCalls=%d, totalTokens=%d, durationMs=%d, responseHash=%s, technicalOutput=%s%n",
+                        evaluationCase.caseId(), profile.profileId(), caseHits,
+                        evaluationCase.scoreDimensions().size(), result.repaired(),
+                        result.modelCallCount(), result.usage().totalTokens(),
+                        result.durationMs(), result.responseHash(), serialize(result.output()));
+            } catch (RuntimeException exception) {
+                failures++;
+                System.out.printf(Locale.ROOT,
+                        "caseId=%s, profile=%s, status=FAILED, errorType=%s, durationMs=%d%n",
+                        evaluationCase.caseId(), profile.profileId(),
+                        exception.getClass().getSimpleName(), elapsedMillis(startedNanos));
+            }
+        }
+
+        double scoreRangeRate = percentage(rangeHits, rangeTotal);
+        System.out.printf(Locale.ROOT,
+                "task=INTERVIEW_TECHNICAL_REVIEW, profile=%s, reasoningMode=%s, cases=%d, failures=%d, repaired=%d, scoreWithinGoldRange=%.2f%%, modelCalls=%d, totalTokens=%d, p50DurationMs=%d, p95DurationMs=%d%n",
+                profile.profileId(), profile.reasoningMode(), dataset.cases().size(), failures,
+                repaired, scoreRangeRate, modelCalls, totalTokens,
+                percentile(durations, 0.50), percentile(durations, 0.95));
+
+        assertThat(failures).as("技术评审生成失败数").isZero();
+        assertThat(scoreRangeRate).as("评分落入Gold范围的比例")
+                .isGreaterThanOrEqualTo(MINIMUM_TECHNICAL_SCORE_RANGE_RATE);
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "cp8.interview.evidence-quality-smoke", matches = "true")
+    void shouldEvaluateEvidenceReviewerAgainstGoldLabels() {
+        ModelExecutionProfile profile = routingProperties.executionRoutes()
+                .get(ModelTaskType.INTERVIEW_EVIDENCE_REVIEW).stream()
+                .filter(ModelExecutionProfile::enabled).findFirst().orElseThrow();
+        assertThat(profile.profileId()).isEqualTo("deepseek-standard");
+
+        InterviewArchitectureEvaluationDataset dataset = InterviewArchitectureEvaluationDataset.load(
+                "interview/evaluation/interview-architecture-cases-v2.json"
+        );
+        List<InterviewArchitectureEvaluationDataset.EvaluationCase> cases = dataset.cases().stream()
+                .filter(evaluationCase -> !evaluationCase.evidenceByChunkId().isEmpty()).toList();
+
+        int failures = 0, repaired = 0, verdictHits = 0;
+        int referenceHits = 0, expectedReferences = 0, predictedReferences = 0, legalReferences = 0;
+        long totalTokens = 0;
+        List<Long> durations = new ArrayList<>();
+
+        for (InterviewArchitectureEvaluationDataset.EvaluationCase evaluationCase : cases) {
+            long startedNanos = System.nanoTime();
+            try {
+                EvidenceReviewInput input = new EvidenceReviewInput(
+                        id(evaluationCase.caseId() + ":interview"), 1,
+                        id(evaluationCase.caseId() + ":question"),
+                        id(evaluationCase.caseId() + ":answer"),
+                        evaluationCase.question(), evaluationCase.answer(),
+                        evaluationCase.evidenceByChunkId()
+                );
+                InterviewRoleModelGateway.Result<EvidenceReviewDraft> result =
+                        roleModelGateway.generate(evidenceContract, input, CALL_TIMEOUT);
+                Set<String> expected = Set.copyOf(evaluationCase.expectedEvidenceReferenceIds());
+                Set<String> predicted = Set.copyOf(result.output().evidenceReferenceIds());
+
+                if (result.output().verdict() == evaluationCase.expectedEvidenceVerdict()) verdictHits++;
+                referenceHits += (int) predicted.stream().filter(expected::contains).count();
+                legalReferences += (int) predicted.stream()
+                        .filter(evaluationCase.evidenceByChunkId()::containsKey).count();
+                expectedReferences += expected.size();
+                predictedReferences += predicted.size();
+                repaired += result.repaired() ? 1 : 0;
+                totalTokens += result.usage().totalTokens();
+                durations.add(result.durationMs());
+
+                System.out.printf(Locale.ROOT,
+                        "caseId=%s, profile=%s, status=SUCCEEDED, expectedVerdict=%s, actualVerdict=%s, expectedReferences=%s, actualReferences=%s, repaired=%s, totalTokens=%d, durationMs=%d, responseHash=%s%n",
+                        evaluationCase.caseId(), profile.profileId(),
+                        evaluationCase.expectedEvidenceVerdict(), result.output().verdict(),
+                        expected, predicted, result.repaired(), result.usage().totalTokens(),
+                        result.durationMs(), result.responseHash());
+            } catch (RuntimeException exception) {
+                failures++;
+                System.out.printf(Locale.ROOT,
+                        "caseId=%s, profile=%s, status=FAILED, errorType=%s, durationMs=%d%n",
+                        evaluationCase.caseId(), profile.profileId(),
+                        exception.getClass().getSimpleName(), elapsedMillis(startedNanos));
+            }
+        }
+
+        double verdictAccuracy = percentage(verdictHits, cases.size());
+        double referencePrecision = percentage(referenceHits, predictedReferences);
+        double referenceRecall = percentage(referenceHits, expectedReferences);
+        double legalReferenceRate = percentage(legalReferences, predictedReferences);
+
+        System.out.printf(Locale.ROOT,
+                "task=INTERVIEW_EVIDENCE_REVIEW, profile=%s, cases=%d, failures=%d, repaired=%d, verdictAccuracy=%.2f%%, referencePrecision=%.2f%%, referenceRecall=%.2f%%, legalReferenceRate=%.2f%%, totalTokens=%d, p50DurationMs=%d, p95DurationMs=%d%n",
+                profile.profileId(), cases.size(), failures, repaired, verdictAccuracy,
+                referencePrecision, referenceRecall, legalReferenceRate, totalTokens,
+                percentile(durations, 0.50), percentile(durations, 0.95));
+
+        assertThat(failures).as("证据评审生成失败数").isZero();
+        assertThat(verdictAccuracy).as("证据结论准确率").isGreaterThanOrEqualTo(80.0);
+        assertThat(referencePrecision).as("Gold引用准确率").isGreaterThanOrEqualTo(80.0);
+        assertThat(referenceRecall).as("Gold引用召回率").isGreaterThanOrEqualTo(90.0);
+        assertThat(legalReferenceRate).as("引用白名单合法率").isEqualTo(100.0);
+    }
+
+    private double percentage(int numerator, int denominator) {
+        return denominator == 0 ? 0.0 : numerator * 100.0 / denominator;
+    }
+
+    private long percentile(List<Long> samples, double percentile) {
+        if (samples.isEmpty()) return 0;
+        List<Long> sorted = samples.stream().sorted().toList();
+        return sorted.get(Math.max(0, (int) Math.ceil(percentile * sorted.size()) - 1));
     }
 
     private BaselineRun runBaseline(

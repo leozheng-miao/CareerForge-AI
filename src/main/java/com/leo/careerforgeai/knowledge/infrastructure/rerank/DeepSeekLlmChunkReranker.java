@@ -40,8 +40,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 @ConditionalOnProperty(
         prefix = "careerforge.knowledge.rerank",
         name = "provider",
-        havingValue = "deepseek",
-        matchIfMissing = true
+        havingValue = "deepseek"
 )
 @Slf4j
 public class DeepSeekLlmChunkReranker implements ChunkReranker {

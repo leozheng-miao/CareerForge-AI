@@ -12,6 +12,7 @@ import com.leo.careerforgeai.interview.application.model.question.InterviewQuest
 import com.leo.careerforgeai.interview.application.model.report.InterviewReportRoleContract;
 import com.leo.careerforgeai.interview.application.model.review.TechnicalReviewRoleContract;
 import com.leo.careerforgeai.interview.application.port.InterviewRoleModelGateway;
+import com.leo.careerforgeai.interview.application.report.InterviewReportMemoryCandidatePolicy;
 import com.leo.careerforgeai.interview.domain.session.InterviewMode;
 import com.leo.careerforgeai.interview.domain.round.InterviewQuestionType;
 import com.leo.careerforgeai.model.exception.ModelException;
@@ -28,6 +29,10 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.leo.careerforgeai.model.config.ModelRoutingProperties;
+import com.leo.careerforgeai.model.domain.routing.ModelExecutionProfile;
+import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * @program: CareerForge-AI
@@ -39,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "careerforge.persistence.enabled=false",
         "spring.flyway.enabled=false",
         "spring.ai.chat.client.enabled=false",
+        "careerforge.auth.enabled=false",
         "spring.ai.model.chat=none"
 })
 class InterviewRoleModelStabilitySmoke {
@@ -62,6 +68,12 @@ class InterviewRoleModelStabilitySmoke {
 
     @Autowired
     private InterviewReportRoleContract reportContract;
+
+    @Autowired
+    private ModelRoutingProperties routingProperties;
+
+    @Autowired
+    private InterviewReportMemoryCandidatePolicy reportPolicy;
 
     @Test
     void shouldMeasureFourRoleStructuredOutputStability() {
@@ -171,6 +183,199 @@ class InterviewRoleModelStabilitySmoke {
                 result.durationMs(),
                 result.responseHash()
         );
+    }
+
+    @Test
+    @EnabledIfSystemProperty(
+            named = "cp8.interview.technical-profile-smoke",
+            matches = "true"
+    )
+    void shouldMeasureTechnicalReviewerProfile() {
+        String expectedProfile = System.getProperty(
+                "cp8.interview.expected-profile"
+        );
+        assertThat(expectedProfile)
+                .as("必须指定本轮预期Profile")
+                .isNotBlank();
+
+        ModelExecutionProfile selectedProfile =
+                routingProperties.executionRoutes()
+                        .get(ModelTaskType.INTERVIEW_TECHNICAL_REVIEW)
+                        .stream()
+                        .filter(ModelExecutionProfile::enabled)
+                        .findFirst()
+                        .orElseThrow();
+
+        assertThat(selectedProfile.profileId())
+                .isEqualTo(expectedProfile);
+
+        String casePrefix = "CP8-TECHNICAL-"
+                + expectedProfile.toUpperCase(Locale.ROOT)
+                .replace('-', '_');
+
+        int failures = runRole(
+                casePrefix,
+                technicalContract,
+                technicalInputs()
+        );
+
+        System.out.printf(
+                Locale.ROOT,
+                "task=INTERVIEW_TECHNICAL_REVIEW, profile=%s, "
+                        + "reasoningMode=%s, model=%s%n",
+                selectedProfile.profileId(),
+                selectedProfile.reasoningMode(),
+                selectedProfile.model()
+        );
+
+        assertThat(failures)
+                .as("技术评审Profile最终失败次数")
+                .isZero();
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "cp8.interview.question-quality-smoke", matches = "true")
+    void shouldEvaluateInterviewerQuestionQuality() {
+        ModelExecutionProfile profile = routingProperties.executionRoutes()
+                .get(ModelTaskType.INTERVIEW_QUESTION).stream()
+                .filter(ModelExecutionProfile::enabled).findFirst().orElseThrow();
+        assertThat(profile.profileId()).isEqualTo("deepseek-standard");
+
+        List<InterviewQuestionInput> inputs = questionInputs();
+        List<List<String>> requiredAnchors = List.of(
+                List.of("synchronized", "reentrantlock"),
+                List.of("redis", "限流", "降级"),
+                List.of("mysql", "redis", "一致性")
+        );
+        List<List<String>> previousTopicAnchors = List.of(
+                List.of(),
+                List.of("synchronized", "reentrantlock", "锁机制"),
+                List.of("synchronized", "reentrantlock", "限流")
+        );
+
+        int failures = 0, repaired = 0, aligned = 0, repeatedTopics = 0, modelCalls = 0;
+        long totalTokens = 0;
+        List<Long> durations = new ArrayList<>();
+
+        for (int index = 0; index < inputs.size(); index++) {
+            InterviewQuestionInput input = inputs.get(index);
+            String caseId = "CP8-INTERVIEWER-%02d".formatted(index + 1);
+            long startedNanos = System.nanoTime();
+            try {
+                InterviewRoleModelGateway.Result<InterviewQuestionDraft> result =
+                        modelGateway.generate(questionContract, input, CALL_TIMEOUT);
+                InterviewQuestionDraft output = result.output();
+                String searchable = (output.question() + " " + String.join(" ", output.targetSkills())
+                        + " " + String.join(" ", output.evaluationPoints())).toLowerCase(Locale.ROOT);
+                boolean goalAligned = requiredAnchors.get(index).stream().allMatch(searchable::contains);
+                boolean repeatedTopic = previousTopicAnchors.get(index).stream().anyMatch(searchable::contains);
+
+                if (goalAligned) aligned++;
+                if (repeatedTopic) repeatedTopics++;
+                if (result.repaired()) repaired++;
+                modelCalls += result.modelCallCount();
+                totalTokens += result.usage().totalTokens();
+                durations.add(result.durationMs());
+
+                System.out.printf(Locale.ROOT,
+                        "caseId=%s, profile=%s, status=SUCCEEDED, goalAligned=%s, repeatedTopic=%s, questionType=%s, difficulty=%d, targetSkills=%s, question=%s, repaired=%s, totalTokens=%d, durationMs=%d, responseHash=%s%n",
+                        caseId, profile.profileId(), goalAligned, repeatedTopic,
+                        output.questionType(), output.difficulty(), output.targetSkills(),
+                        output.question(), result.repaired(), result.usage().totalTokens(),
+                        result.durationMs(), result.responseHash());
+            } catch (RuntimeException exception) {
+                failures++;
+                long durationMs = Math.max(0, Duration.ofNanos(System.nanoTime() - startedNanos).toMillis());
+                System.out.printf(Locale.ROOT,
+                        "caseId=%s, profile=%s, status=FAILED, errorType=%s, durationMs=%d%n",
+                        caseId, profile.profileId(), errorType(exception), durationMs);
+            }
+        }
+
+        double goalAlignmentRate = percentage(aligned, inputs.size());
+        double repeatedTopicRate = percentage(repeatedTopics, inputs.size());
+        System.out.printf(Locale.ROOT,
+                "task=INTERVIEW_QUESTION, profile=%s, cases=%d, failures=%d, repaired=%d, goalAlignmentRate=%.2f%%, repeatedTopicRate=%.2f%%, modelCalls=%d, totalTokens=%d, p50DurationMs=%d, p95DurationMs=%d%n",
+                profile.profileId(), inputs.size(), failures, repaired, goalAlignmentRate,
+                repeatedTopicRate, modelCalls, totalTokens,
+                percentile(durations, 0.50), percentile(durations, 0.95));
+
+        assertThat(failures).as("面试问题生成失败数").isZero();
+        assertThat(goalAlignmentRate).as("问题目标锚点覆盖率").isEqualTo(100.0);
+        assertThat(repeatedTopicRate).as("已完成主题重复率").isZero();
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "cp8.interview.report-quality-smoke", matches = "true")
+    void shouldEvaluateReportCoachActionQualityAndSafety() {
+        ModelExecutionProfile profile = routingProperties.executionRoutes()
+                .get(ModelTaskType.INTERVIEW_REPORT).stream()
+                .filter(ModelExecutionProfile::enabled).findFirst().orElseThrow();
+        assertThat(profile.profileId()).isEqualTo("deepseek-standard");
+
+        List<InterviewReportInput> inputs = reportInputs().subList(1, 3);
+        List<List<List<String>>> requiredAnchorGroups = List.of(
+                List.of(List.of("token", "令牌"), List.of("成本", "用量", "预算")),
+                List.of(List.of("半开", "half-open"), List.of("恢复", "探测", "试探"))
+        );
+
+        int failures = 0, repaired = 0, aligned = 0, safeOutputs = 0, filteredOutputs = 0, modelCalls = 0;
+        long inputTokens = 0, outputTokens = 0;
+        List<Long> durations = new ArrayList<>();
+
+        for (int index = 0; index < inputs.size(); index++) {
+            InterviewReportInput input = inputs.get(index);
+            String caseId = "CP8-REPORT-%02d".formatted(index + 1);
+            long startedNanos = System.nanoTime();
+            try {
+                InterviewRoleModelGateway.Result<InterviewReportDraft> result =
+                        modelGateway.generate(reportContract, input, CALL_TIMEOUT);
+                InterviewReportDraft raw = result.output();
+                InterviewReportDraft filtered = reportPolicy.filter(input, raw);
+                String searchable = (String.join(" ", raw.technicalGaps()) + " "
+                        + String.join(" ", raw.improvementActions())).toLowerCase(Locale.ROOT);
+                boolean actionAligned = requiredAnchorGroups.get(index).stream()
+                        .allMatch(group -> group.stream().anyMatch(searchable::contains));
+                boolean safe = filtered.strengths().isEmpty()
+                        && filtered.proposedMemoryCandidates().isEmpty()
+                        && filtered.proposedTrainingPlanAdjustments().isEmpty();
+
+                if (actionAligned) aligned++;
+                if (safe) safeOutputs++;
+                if (!filtered.equals(raw)) filteredOutputs++;
+                if (result.repaired()) repaired++;
+                modelCalls += result.modelCallCount();
+                inputTokens += result.usage().inputTokens();
+                outputTokens += result.usage().outputTokens();
+                durations.add(result.durationMs());
+
+                System.out.printf(Locale.ROOT,
+                        "caseId=%s, profile=%s, status=SUCCEEDED, actionAligned=%s, safeAfterFilter=%s, filtered=%s, technicalGaps=%s, improvementActions=%s, repaired=%s, inputTokens=%d, outputTokens=%d, durationMs=%d, responseHash=%s%n",
+                        caseId, profile.profileId(), actionAligned, safe, !filtered.equals(raw),
+                        raw.technicalGaps(), raw.improvementActions(), result.repaired(),
+                        result.usage().inputTokens(), result.usage().outputTokens(),
+                        result.durationMs(), result.responseHash());
+            } catch (RuntimeException exception) {
+                failures++;
+                long durationMs = Math.max(0, Duration.ofNanos(System.nanoTime() - startedNanos).toMillis());
+                System.out.printf(Locale.ROOT,
+                        "caseId=%s, profile=%s, status=FAILED, errorType=%s, durationMs=%d%n",
+                        caseId, profile.profileId(), errorType(exception), durationMs);
+            }
+        }
+
+        double actionCoverage = percentage(aligned, inputs.size());
+        double safetyRate = percentage(safeOutputs, inputs.size());
+        System.out.printf(Locale.ROOT,
+                "task=INTERVIEW_REPORT, profile=%s, cases=%d, failures=%d, repaired=%d, actionCoverage=%.2f%%, safetyRate=%.2f%%, filteredOutputs=%d, modelCalls=%d, inputTokens=%d, outputTokens=%d, totalTokens=%d, p50DurationMs=%d, p95DurationMs=%d%n",
+                profile.profileId(), inputs.size(), failures, repaired, actionCoverage,
+                safetyRate, filteredOutputs, modelCalls, inputTokens, outputTokens,
+                inputTokens + outputTokens, percentile(durations, 0.50),
+                percentile(durations, 0.95));
+
+        assertThat(failures).as("报告生成失败数").isZero();
+        assertThat(actionCoverage).as("已知缺口改进建议覆盖率").isEqualTo(100.0);
+        assertThat(safetyRate).as("Java过滤后的候选安全率").isEqualTo(100.0);
     }
 
     private <I, O> int runRole(

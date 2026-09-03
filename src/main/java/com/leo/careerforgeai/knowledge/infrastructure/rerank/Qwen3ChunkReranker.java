@@ -50,8 +50,6 @@ public final class Qwen3ChunkReranker implements ChunkReranker {
     ) {
         this.properties = Objects.requireNonNull(
                 properties, "properties不能为空");
-        properties.requiredEndpoint();
-        properties.requiredApiKey();
         this.jsonMapper = Objects.requireNonNull(
                 jsonMapper, "jsonMapper不能为空");
         this.httpClient = Objects.requireNonNull(

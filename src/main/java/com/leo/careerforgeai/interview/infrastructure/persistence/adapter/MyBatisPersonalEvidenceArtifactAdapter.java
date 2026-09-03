@@ -3,6 +3,7 @@ package com.leo.careerforgeai.interview.infrastructure.persistence.adapter;
 import com.leo.careerforgeai.interview.application.port.PersonalEvidenceArtifactRepository;
 import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceArtifact;
 import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceStatus;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceType;
 import com.leo.careerforgeai.interview.infrastructure.persistence.converter.PersonalEvidencePersistenceConverter;
 import com.leo.careerforgeai.interview.infrastructure.persistence.entity.PersonalEvidenceArtifactEntity;
 import com.leo.careerforgeai.interview.infrastructure.persistence.mapper.PersonalEvidenceFactMapper;
@@ -11,6 +12,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -142,6 +144,36 @@ public class MyBatisPersonalEvidenceArtifactAdapter
                 artifactId.toString(),
                 artifactVersion
         )).map(this::loadCompleteArtifact);
+    }
+
+    @Override
+    public List<ActiveArtifactSummary> findActivePage(
+            ActorId ownerId,
+            PersonalEvidenceType type,
+            Instant beforeUpdatedAt,
+            UUID beforeArtifactId,
+            int limit
+    ) {
+        Objects.requireNonNull(ownerId, "ownerId不能为空");
+        if ((beforeUpdatedAt == null) != (beforeArtifactId == null)) {
+            throw new IllegalArgumentException("分页位置必须同时包含updatedAt和artifactId");
+        }
+        if (limit < 1 || limit > 100) throw new IllegalArgumentException("limit必须在1到100之间");
+
+        return mapper.findActivePage(
+                ownerId.value(),
+                type == null ? null : type.name(),
+                beforeUpdatedAt,
+                beforeArtifactId == null ? null : beforeArtifactId.toString(),
+                limit
+        ).stream().map(entity -> new ActiveArtifactSummary(
+                UUID.fromString(entity.getArtifactId()),
+                requireVersion(entity.getArtifactVersion()),
+                PersonalEvidenceType.valueOf(entity.getArtifactType()),
+                entity.getSourceName(),
+                Objects.requireNonNull(entity.getCreatedAt(), "数据库createdAt不能为空"),
+                Objects.requireNonNull(entity.getUpdatedAt(), "数据库updatedAt不能为空")
+        )).toList();
     }
 
     private void insertArtifactAndChunks(PersonalEvidenceArtifact artifact) {

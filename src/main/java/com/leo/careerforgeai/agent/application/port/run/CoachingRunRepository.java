@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.agent.application.port.run;
 
 import com.leo.careerforgeai.agent.domain.run.CoachingRun;
+import com.leo.careerforgeai.agent.domain.run.CoachingRunStatus;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
 import java.time.Instant;
@@ -37,5 +38,14 @@ public interface CoachingRunRepository {
             ActorId ownerId,
             CoachingRun updatedRun,
             long expectedVersion
+    );
+
+    List<CoachingRun> findPage(
+            ActorId ownerId,
+            UUID sessionId,
+            CoachingRunStatus status,
+            Instant beforeCreatedAt,
+            UUID beforeRunId,
+            int limit
     );
 }

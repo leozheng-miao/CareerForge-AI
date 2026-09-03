@@ -6,6 +6,7 @@ import com.leo.careerforgeai.agent.application.run.submission.CoachingRunClaimRe
 import com.leo.careerforgeai.agent.application.run.submission.CoachingRunRequestConflictException;
 import com.leo.careerforgeai.agent.application.run.submission.CoachingRunRequestFingerprintService;
 import com.leo.careerforgeai.agent.domain.run.CoachingRun;
+import com.leo.careerforgeai.agent.domain.run.CoachingRunStatus;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
 import org.junit.jupiter.api.Test;
@@ -192,6 +193,18 @@ class CoachingRunClaimConcurrencyMatrixTest {
                 long expectedVersion
         ) {
             throw new AssertionError("并发认领测试不应更新Run状态");
+        }
+
+        @Override
+        public List<CoachingRun> findPage(
+                ActorId ownerId,
+                UUID sessionId,
+                CoachingRunStatus status,
+                Instant beforeCreatedAt,
+                UUID beforeRunId,
+                int limit
+        ) {
+            throw new AssertionError("当前并发测试不应执行Run分页查询");
         }
 
         private int storedRunCount() {

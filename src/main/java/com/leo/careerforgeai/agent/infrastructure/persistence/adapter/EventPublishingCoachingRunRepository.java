@@ -3,6 +3,7 @@ package com.leo.careerforgeai.agent.infrastructure.persistence.adapter;
 import com.leo.careerforgeai.agent.application.port.run.CoachingRunRepository;
 import com.leo.careerforgeai.agent.application.run.event.CoachingRunEvent;
 import com.leo.careerforgeai.agent.domain.run.CoachingRun;
+import com.leo.careerforgeai.agent.domain.run.CoachingRunStatus;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
@@ -64,6 +65,25 @@ public class EventPublishingCoachingRunRepository implements CoachingRunReposito
         boolean updated = delegate.updateIfVersionMatches(ownerId, updatedRun, expectedVersion);
         if (updated) publishStateEvent(updatedRun);
         return updated;
+    }
+
+    @Override
+    public List<CoachingRun> findPage(
+            ActorId ownerId,
+            UUID sessionId,
+            CoachingRunStatus status,
+            Instant beforeCreatedAt,
+            UUID beforeRunId,
+            int limit
+    ) {
+        return delegate.findPage(
+                ownerId,
+                sessionId,
+                status,
+                beforeCreatedAt,
+                beforeRunId,
+                limit
+        );
     }
 
     private void publishStateEvent(CoachingRun run) {

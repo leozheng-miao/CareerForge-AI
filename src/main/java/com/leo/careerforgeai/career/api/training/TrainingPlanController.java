@@ -6,14 +6,18 @@ import com.leo.careerforgeai.career.api.dto.training.GenerateTrainingPlanRequest
 import com.leo.careerforgeai.career.api.dto.training.TrainingPlanResponse;
 import com.leo.careerforgeai.career.application.training.TrainingPlanApplicationService;
 import com.leo.careerforgeai.career.application.training.TrainingPlanGenerationApplicationService;
+import com.leo.careerforgeai.career.domain.TrainingPlan;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -113,5 +117,44 @@ public class TrainingPlanController {
         return ResultUtils.success(
                 TrainingPlanResponse.from(planService.cancel(planId, request.expectedVersion()))
         );
+    }
+
+    @GetMapping
+    @Operation(summary = "分页查询当前用户的训练计划")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "返回训练计划历史"),
+            @ApiResponse(responseCode = "400", description = "status、limit或cursor不合法")
+    })
+    public BaseResponse<TrainingPlanPageResponse> list(
+            @RequestParam(required = false) TrainingPlan.PlanStatus status,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ResultUtils.success(TrainingPlanPageResponse.from(
+                planService.list(status, cursor, limit)
+        ));
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 训练计划分页响应
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param items 当前页计划
+     * @param nextCursor 下一页Cursor
+     * @param hasMore 是否存在下一页
+     */
+    public record TrainingPlanPageResponse(
+            List<TrainingPlanResponse> items,
+            String nextCursor,
+            boolean hasMore
+    ) {
+        static TrainingPlanPageResponse from(TrainingPlanApplicationService.PlanPage page) {
+            return new TrainingPlanPageResponse(
+                    page.items().stream().map(TrainingPlanResponse::from).toList(),
+                    page.nextCursor(),
+                    page.hasMore()
+            );
+        }
     }
 }

@@ -16,7 +16,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -120,6 +122,83 @@ public class SkillGapSnapshotApplicationService {
                 .orElseThrow(() -> new IllegalArgumentException("能力差距快照不存在或不属于当前用户"));
         requireOwner(actorId, snapshot.ownerId(), "SkillGapSnapshot查询结果违反owner边界");
         return snapshot;
+    }
+
+    @Transactional(readOnly = true)
+    public SnapshotPage list(String cursor, int limit) {
+        if (limit < 1 || limit > 20) throw new IllegalArgumentException("limit必须在1到20之间");
+        SnapshotCursor decoded = decodeCursor(cursor);
+        List<SkillGapSnapshot> rows = repository.findSkillGapSnapshotPage(
+                currentActor(),
+                decoded == null ? null : decoded.createdAt(),
+                decoded == null ? null : decoded.snapshotId(),
+                limit + 1
+        );
+        boolean hasMore = rows.size() > limit;
+        List<SkillGapSnapshot> items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
+        return new SnapshotPage(
+                items,
+                hasMore ? encodeCursor(items.getLast()) : null,
+                hasMore
+        );
+    }
+
+    private static String encodeCursor(SkillGapSnapshot snapshot) {
+        String value = snapshot.createdAt() + "|" + snapshot.snapshotId();
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static SnapshotCursor decodeCursor(String cursor) {
+        if (cursor == null) return null;
+        if (cursor.isBlank() || cursor.length() > 256) throw invalidCursor();
+        try {
+            String value = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            String[] parts = value.split("\\|", -1);
+            if (parts.length != 2) throw invalidCursor();
+            return new SnapshotCursor(Instant.parse(parts[0]), UUID.fromString(parts[1]));
+        } catch (RuntimeException exception) {
+            throw invalidCursor();
+        }
+    }
+
+    private static IllegalArgumentException invalidCursor() {
+        return new IllegalArgumentException("cursor格式不合法");
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 能力差距快照分页结果
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param items 当前页快照
+     * @param nextCursor 下一页Cursor
+     * @param hasMore 是否存在下一页
+     */
+    public record SnapshotPage(
+            List<SkillGapSnapshot> items,
+            String nextCursor,
+            boolean hasMore
+    ) {
+        public SnapshotPage {
+            items = List.copyOf(Objects.requireNonNull(items, "items不能为空"));
+            if (hasMore != (nextCursor != null)) throw new IllegalArgumentException("分页状态不一致");
+        }
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 能力差距快照分页位置
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param createdAt 创建时间
+     * @param snapshotId 快照ID
+     */
+    private record SnapshotCursor(Instant createdAt, UUID snapshotId) {
+        private SnapshotCursor {
+            Objects.requireNonNull(createdAt, "createdAt不能为空");
+            Objects.requireNonNull(snapshotId, "snapshotId不能为空");
+        }
     }
 
     private void validateItems(

@@ -381,6 +381,18 @@ class CoachingRunConsistencyMatrixTest {
             return updated.get();
         }
 
+        @Override
+        public List<CoachingRun> findPage(
+                ActorId ownerId,
+                UUID sessionId,
+                CoachingRunStatus status,
+                Instant beforeCreatedAt,
+                UUID beforeRunId,
+                int limit
+        ) {
+            throw new AssertionError("当前并发测试不应执行Run分页查询");
+        }
+
         private int storedRunCount() {
             return runsByRequest.size();
         }

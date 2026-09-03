@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -230,6 +231,32 @@ class PersonalEvidenceApplicationServiceTest {
                 long artifactVersion
         ) {
             return findVersion(ownerId, artifactId, artifactVersion);
+        }
+
+        @Override
+        public List<ActiveArtifactSummary> findActivePage(
+                ActorId ownerId,
+                PersonalEvidenceType type,
+                Instant beforeUpdatedAt,
+                UUID beforeArtifactId,
+                int limit
+        ) {
+            return artifacts.values().stream()
+                    .filter(item -> item.ownerId().equals(ownerId))
+                    .filter(item -> item.status() == PersonalEvidenceStatus.ACTIVE)
+                    .filter(item -> type == null || item.type() == type)
+                    .filter(item -> beforeUpdatedAt == null
+                            || item.updatedAt().isBefore(beforeUpdatedAt)
+                            || item.updatedAt().equals(beforeUpdatedAt)
+                            && item.artifactId().compareTo(beforeArtifactId) < 0)
+                    .sorted(Comparator.comparing(PersonalEvidenceArtifact::updatedAt)
+                            .thenComparing(PersonalEvidenceArtifact::artifactId).reversed())
+                    .limit(limit)
+                    .map(item -> new ActiveArtifactSummary(
+                            item.artifactId(), item.artifactVersion(), item.type(),
+                            item.sourceName(), item.createdAt(), item.updatedAt()
+                    ))
+                    .toList();
         }
 
         private static String key(PersonalEvidenceArtifact artifact) {

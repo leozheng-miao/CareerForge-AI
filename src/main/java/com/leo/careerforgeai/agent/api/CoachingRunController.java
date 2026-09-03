@@ -5,6 +5,7 @@ import com.leo.careerforgeai.agent.api.dto.CreateCoachingRunRequest;
 import com.leo.careerforgeai.agent.api.sse.CoachingRunSseService;
 import com.leo.careerforgeai.agent.application.run.CoachingRunApplicationService;
 import com.leo.careerforgeai.agent.application.run.submission.CoachingRunAsyncSubmissionApplicationService;
+import com.leo.careerforgeai.agent.domain.run.CoachingRunStatus;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,9 +25,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -92,5 +95,45 @@ public class CoachingRunController {
             @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId
     ) {
         return sseService.open(runId, lastEventId);
+    }
+
+    @GetMapping
+    @Operation(summary = "分页查询当前用户指定Session的Coaching Run")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "返回稳定排序的Run分页"),
+            @ApiResponse(responseCode = "400", description = "sessionId、status、limit或cursor不合法")
+    })
+    public BaseResponse<CoachingRunPageResponse> list(
+            @RequestParam UUID sessionId,
+            @RequestParam(required = false) CoachingRunStatus status,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return ResultUtils.success(CoachingRunPageResponse.from(
+                applicationService.list(sessionId, status, cursor, limit)
+        ));
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: Coaching Run分页响应
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param items 当前页Run
+     * @param nextCursor 下一页Cursor
+     * @param hasMore 是否存在下一页
+     */
+    public record CoachingRunPageResponse(
+            List<CoachingRunResponse> items,
+            String nextCursor,
+            boolean hasMore
+    ) {
+        static CoachingRunPageResponse from(CoachingRunApplicationService.RunPage page) {
+            return new CoachingRunPageResponse(
+                    page.items().stream().map(CoachingRunResponse::from).toList(),
+                    page.nextCursor(),
+                    page.hasMore()
+            );
+        }
     }
 }

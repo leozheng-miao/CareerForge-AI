@@ -8,8 +8,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -94,6 +96,85 @@ public class TrainingPlanApplicationService {
     public TrainingPlan cancel(UUID planId, long expectedVersion) {
         Instant now = clock.instant();
         return mutate(planId, expectedVersion, plan -> plan.cancel(now));
+    }
+
+    @Transactional(readOnly = true)
+    public PlanPage list(TrainingPlan.PlanStatus status, String cursor, int limit) {
+        if (limit < 1 || limit > 10) throw new IllegalArgumentException("limit必须在1到10之间");
+        PlanCursor decoded = decodeCursor(cursor);
+        String statusKey = status == null ? "*" : status.name();
+        if (decoded != null && !decoded.statusKey().equals(statusKey)) {
+            throw new IllegalArgumentException("cursor与当前状态过滤不匹配");
+        }
+
+        List<TrainingPlan> rows = repository.findTrainingPlanPage(
+                currentActor(),
+                status,
+                decoded == null ? null : decoded.beforePlanVersion(),
+                limit + 1
+        );
+        boolean hasMore = rows.size() > limit;
+        List<TrainingPlan> items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
+        return new PlanPage(
+                items,
+                hasMore ? encodeCursor(items.getLast(), statusKey) : null,
+                hasMore
+        );
+    }
+
+    private static String encodeCursor(TrainingPlan plan, String statusKey) {
+        String value = statusKey + "|" + plan.planVersion();
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static PlanCursor decodeCursor(String cursor) {
+        if (cursor == null) return null;
+        if (cursor.isBlank() || cursor.length() > 128) throw invalidCursor();
+        try {
+            String value = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            String[] parts = value.split("\\|", -1);
+            if (parts.length != 2 || parts[0].isBlank()) throw invalidCursor();
+            return new PlanCursor(parts[0], Long.parseLong(parts[1]));
+        } catch (RuntimeException exception) {
+            throw invalidCursor();
+        }
+    }
+
+    private static IllegalArgumentException invalidCursor() {
+        return new IllegalArgumentException("cursor格式不合法");
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 训练计划分页结果
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param items 当前页计划
+     * @param nextCursor 下一页Cursor
+     * @param hasMore 是否存在下一页
+     */
+    public record PlanPage(List<TrainingPlan> items, String nextCursor, boolean hasMore) {
+        public PlanPage {
+            items = List.copyOf(Objects.requireNonNull(items, "items不能为空"));
+            if (hasMore != (nextCursor != null)) throw new IllegalArgumentException("分页状态不一致");
+        }
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 与状态过滤绑定的训练计划分页位置
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param statusKey 状态过滤标识
+     * @param beforePlanVersion 下一页必须小于的业务版本
+     */
+    private record PlanCursor(String statusKey, long beforePlanVersion) {
+        private PlanCursor {
+            if (statusKey == null || statusKey.isBlank() || beforePlanVersion < 1) {
+                throw invalidCursor();
+            }
+        }
     }
 
     private TrainingPlan mutate(

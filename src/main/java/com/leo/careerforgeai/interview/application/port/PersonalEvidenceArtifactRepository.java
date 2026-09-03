@@ -1,8 +1,11 @@
 package com.leo.careerforgeai.interview.application.port;
 
 import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceArtifact;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceType;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -38,4 +41,33 @@ public interface PersonalEvidenceArtifactRepository {
             UUID artifactId,
             long artifactVersion
     );
+
+    List<ActiveArtifactSummary> findActivePage(
+            ActorId ownerId,
+            PersonalEvidenceType type,
+            Instant beforeUpdatedAt,
+            UUID beforeArtifactId,
+            int limit
+    );
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 当前用户可选择的ACTIVE个人证据轻量摘要
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param artifactId 证据ID
+     * @param artifactVersion 当前ACTIVE版本
+     * @param type 证据类型
+     * @param sourceName 来源名称
+     * @param createdAt 创建时间
+     * @param updatedAt 更新时间
+     */
+    record ActiveArtifactSummary(
+            UUID artifactId,
+            long artifactVersion,
+            PersonalEvidenceType type,
+            String sourceName,
+            Instant createdAt,
+            Instant updatedAt
+    ) {}
 }

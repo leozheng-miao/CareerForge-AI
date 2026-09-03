@@ -1,5 +1,6 @@
 package com.leo.careerforgeai.interview.application.port;
 
+import com.leo.careerforgeai.interview.domain.session.InterviewStatus;
 import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
@@ -25,4 +26,12 @@ public interface MockInterviewSessionRepository {
     boolean updateIfVersionMatches(ActorId ownerId, MockInterviewSession updatedSession, long expectedVersion);
 
     List<MockInterviewSession> findSystemRecoveryCandidatesUpdatedBefore(Instant updatedBefore, int limit);
+
+    List<MockInterviewSession> findPage(
+            ActorId ownerId,
+            InterviewStatus status,
+            Instant beforeUpdatedAt,
+            UUID beforeInterviewId,
+            int limit
+    );
 }

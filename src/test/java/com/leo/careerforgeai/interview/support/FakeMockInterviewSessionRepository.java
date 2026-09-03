@@ -104,4 +104,25 @@ public final class FakeMockInterviewSessionRepository implements MockInterviewSe
                 .limit(limit)
                 .toList();
     }
+
+    @Override
+    public List<MockInterviewSession> findPage(
+            ActorId ownerId,
+            InterviewStatus status,
+            Instant beforeUpdatedAt,
+            UUID beforeInterviewId,
+            int limit
+    ) {
+        return sessions.values().stream()
+                .filter(session -> session.ownerId().equals(ownerId))
+                .filter(session -> status == null || session.status() == status)
+                .filter(session -> beforeUpdatedAt == null
+                        || session.updatedAt().isBefore(beforeUpdatedAt)
+                        || session.updatedAt().equals(beforeUpdatedAt)
+                        && session.interviewId().compareTo(beforeInterviewId) < 0)
+                .sorted(Comparator.comparing(MockInterviewSession::updatedAt)
+                        .thenComparing(MockInterviewSession::interviewId).reversed())
+                .limit(limit)
+                .toList();
+    }
 }

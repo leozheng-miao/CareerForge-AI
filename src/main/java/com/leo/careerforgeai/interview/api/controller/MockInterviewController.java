@@ -9,6 +9,7 @@ import com.leo.careerforgeai.interview.application.execution.MockInterviewAsyncS
 import com.leo.careerforgeai.interview.application.execution.MockInterviewReportRetryApplicationService;
 import com.leo.careerforgeai.interview.application.session.MockInterviewCreationApplicationService;
 import com.leo.careerforgeai.interview.application.session.MockInterviewLifecycleApplicationService;
+import com.leo.careerforgeai.interview.domain.session.InterviewStatus;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +20,7 @@ import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -111,5 +113,40 @@ public class MockInterviewController {
         return ResultUtils.success(MockInterviewSessionResponse.from(
                 lifecycleService.cancel(interviewId, request.expectedVersion())
         ));
+    }
+
+    @GetMapping
+    @Operation(summary = "分页查询当前用户的模拟面试历史")
+    public BaseResponse<MockInterviewPageResponse> list(
+            @RequestParam(required = false) InterviewStatus status,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ResultUtils.success(MockInterviewPageResponse.from(
+                lifecycleService.list(status, cursor, limit)
+        ));
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 模拟面试历史分页响应
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param items 当前页面试
+     * @param nextCursor 下一页Cursor
+     * @param hasMore 是否存在下一页
+     */
+    public record MockInterviewPageResponse(
+            List<MockInterviewSessionResponse> items,
+            String nextCursor,
+            boolean hasMore
+    ) {
+        static MockInterviewPageResponse from(MockInterviewLifecycleApplicationService.SessionPage page) {
+            return new MockInterviewPageResponse(
+                    page.items().stream().map(MockInterviewSessionResponse::from).toList(),
+                    page.nextCursor(),
+                    page.hasMore()
+            );
+        }
     }
 }

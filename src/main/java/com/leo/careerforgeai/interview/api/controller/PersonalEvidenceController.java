@@ -5,6 +5,7 @@ import com.leo.careerforgeai.interview.api.dto.evidence.PersonalEvidenceResponse
 import com.leo.careerforgeai.interview.api.dto.evidence.PersonalEvidenceVersionRequest;
 import com.leo.careerforgeai.interview.api.dto.evidence.UpdatePersonalEvidenceRequest;
 import com.leo.careerforgeai.interview.application.evidence.PersonalEvidenceApplicationService;
+import com.leo.careerforgeai.interview.domain.evidence.PersonalEvidenceType;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,8 @@ import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -73,5 +76,64 @@ public class PersonalEvidenceController {
         return ResultUtils.success(PersonalEvidenceResponse.from(
                 applicationService.revoke(artifactId, request.expectedVersion())
         ));
+    }
+
+    @GetMapping
+    @Operation(summary = "分页查询当前用户可选择的ACTIVE个人证据")
+    public BaseResponse<PersonalEvidencePageResponse> list(
+            @RequestParam(required = false) PersonalEvidenceType type,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ResultUtils.success(PersonalEvidencePageResponse.from(
+                applicationService.list(type, cursor, limit)
+        ));
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 个人证据轻量列表项
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param artifactId 证据ID
+     * @param artifactVersion 当前ACTIVE版本
+     * @param type 证据类型
+     * @param sourceName 来源名称
+     * @param createdAt 创建时间
+     * @param updatedAt 更新时间
+     */
+    public record PersonalEvidenceListItemResponse(
+            UUID artifactId,
+            long artifactVersion,
+            PersonalEvidenceType type,
+            String sourceName,
+            Instant createdAt,
+            Instant updatedAt
+    ) {}
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 个人证据分页响应
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param items 当前页证据
+     * @param nextCursor 下一页Cursor
+     * @param hasMore 是否存在下一页
+     */
+    public record PersonalEvidencePageResponse(
+            List<PersonalEvidenceListItemResponse> items,
+            String nextCursor,
+            boolean hasMore
+    ) {
+        static PersonalEvidencePageResponse from(PersonalEvidenceApplicationService.EvidencePage page) {
+            return new PersonalEvidencePageResponse(
+                    page.items().stream().map(item -> new PersonalEvidenceListItemResponse(
+                            item.artifactId(), item.artifactVersion(), item.type(),
+                            item.sourceName(), item.createdAt(), item.updatedAt()
+                    )).toList(),
+                    page.nextCursor(),
+                    page.hasMore()
+            );
+        }
     }
 }

@@ -23,6 +23,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -355,6 +356,57 @@ public class MyBatisPlusCareerPlanningAdapter implements CareerPlanningRepositor
                     "目标岗位草案确认发生并发冲突"
             );
         }
+    }
+
+    @Override
+    public List<SkillGapSnapshot> findSkillGapSnapshotPage(
+            ActorId ownerId,
+            Instant beforeCreatedAt,
+            UUID beforeSnapshotId,
+            int limit
+    ) {
+        Objects.requireNonNull(ownerId, "ownerId不能为空");
+        if ((beforeCreatedAt == null) != (beforeSnapshotId == null)) {
+            throw new IllegalArgumentException("分页位置必须同时包含createdAt和snapshotId");
+        }
+        if (limit < 1 || limit > 21) throw new IllegalArgumentException("limit必须在1到21之间");
+
+        LambdaQueryWrapper<SkillGapSnapshotEntity> query = new LambdaQueryWrapper<>();
+        query.eq(SkillGapSnapshotEntity::getOwnerId, ownerId.value());
+        if (beforeCreatedAt != null) {
+            query.and(position -> position
+                    .lt(SkillGapSnapshotEntity::getCreatedAt, beforeCreatedAt)
+                    .or(sameTime -> sameTime
+                            .eq(SkillGapSnapshotEntity::getCreatedAt, beforeCreatedAt)
+                            .lt(SkillGapSnapshotEntity::getSnapshotId, beforeSnapshotId.toString())));
+        }
+        query.orderByDesc(SkillGapSnapshotEntity::getCreatedAt)
+                .orderByDesc(SkillGapSnapshotEntity::getSnapshotId)
+                .last("LIMIT " + limit);
+        return gapSnapshotMapper.selectList(query).stream().map(converter::toDomain).toList();
+    }
+
+    @Override
+    public List<TrainingPlan> findTrainingPlanPage(
+            ActorId ownerId,
+            TrainingPlan.PlanStatus status,
+            Long beforePlanVersion,
+            int limit
+    ) {
+        Objects.requireNonNull(ownerId, "ownerId不能为空");
+        if (beforePlanVersion != null && beforePlanVersion < 1) {
+            throw new IllegalArgumentException("beforePlanVersion必须大于0");
+        }
+        if (limit < 1 || limit > 11) throw new IllegalArgumentException("limit必须在1到11之间");
+
+        LambdaQueryWrapper<TrainingPlanEntity> query = new LambdaQueryWrapper<>();
+        query.eq(TrainingPlanEntity::getOwnerId, ownerId.value());
+        if (status != null) query.eq(TrainingPlanEntity::getPlanStatus, status.name());
+        if (beforePlanVersion != null) {
+            query.lt(TrainingPlanEntity::getPlanVersion, beforePlanVersion);
+        }
+        query.orderByDesc(TrainingPlanEntity::getPlanVersion).last("LIMIT " + limit);
+        return trainingPlanMapper.selectList(query).stream().map(this::loadCompletePlan).toList();
     }
 
     private TrainingPlan loadCompletePlan(TrainingPlanEntity planEntity) {

@@ -7,9 +7,13 @@ import com.leo.careerforgeai.agent.api.dto.CreateCoachingSessionRequest;
 import com.leo.careerforgeai.agent.api.dto.SendCoachingMessageRequest;
 import com.leo.careerforgeai.agent.application.coach.conversation.ConversationalCareerCoachApplicationService;
 import com.leo.careerforgeai.memory.application.conversation.CoachingSessionApplicationService;
+import com.leo.careerforgeai.memory.application.conversation.CoachingSessionQueryApplicationService;
+import com.leo.careerforgeai.memory.domain.conversation.CoachingSessionStatus;
 import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -18,6 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -37,6 +42,7 @@ public class CoachingSessionController {
 
     private final CoachingSessionApplicationService sessionApplicationService;
     private final ConversationalCareerCoachApplicationService conversationalCareerCoachService;
+    private final CoachingSessionQueryApplicationService sessionQueryApplicationService;
 
     /** 使用服务端当前Actor创建新会话。 */
     @PostMapping
@@ -62,19 +68,22 @@ public class CoachingSessionController {
         );
     }
 
-    /** 查询当前Actor会话最近的Turn，供会话展示和Memory来源选择。 */
+    /** 分页查询当前用户最近的Turn，供会话展示和Memory来源选择。 */
     @GetMapping("/{sessionId}/turns")
-    @Operation(summary = "查询当前用户会话最近的Turn")
-    public BaseResponse<List<CoachingTurnResponse>> getRecentTurns(
-            @PathVariable UUID sessionId
+    @Operation(summary = "分页查询当前用户会话的Turn历史")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "返回按turnSequence升序排列的当前页"),
+            @ApiResponse(responseCode = "400", description = "limit或cursor不合法"),
+            @ApiResponse(responseCode = "404", description = "Session不存在或不属于当前用户")
+    })
+    public BaseResponse<CoachingTurnPageResponse> getTurns(
+            @PathVariable UUID sessionId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "20") int limit
     ) {
-        List<CoachingTurnResponse> turns = sessionApplicationService
-                .getRecentTurns(sessionId)
-                .stream()
-                .map(CoachingTurnResponse::from)
-                .toList();
-
-        return ResultUtils.success(turns);
+        return ResultUtils.success(CoachingTurnPageResponse.from(
+                sessionQueryApplicationService.listTurns(sessionId, cursor, limit)
+        ));
     }
 
     /** 在当前Actor拥有的ACTIVE会话中发送一条消息。 */
@@ -92,5 +101,71 @@ public class CoachingSessionController {
                         )
                 )
         );
+    }
+
+    @GetMapping
+    @Operation(summary = "分页查询当前用户的Career Coach会话")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "返回稳定排序的会话分页"),
+            @ApiResponse(responseCode = "400", description = "limit、status或cursor不合法")
+    })
+    public BaseResponse<CoachingSessionPageResponse> list(
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) CoachingSessionStatus status,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return ResultUtils.success(CoachingSessionPageResponse.from(
+                sessionQueryApplicationService.list(cursor, status, limit)
+        ));
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: Career Coach会话分页响应
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param items 当前页会话
+     * @param nextCursor 下一页Cursor
+     * @param hasMore 是否存在下一页
+     */
+    public record CoachingSessionPageResponse(
+            List<CoachingSessionResponse> items,
+            String nextCursor,
+            boolean hasMore
+    ) {
+        static CoachingSessionPageResponse from(
+                CoachingSessionQueryApplicationService.SessionPage page
+        ) {
+            return new CoachingSessionPageResponse(
+                    page.items().stream().map(CoachingSessionResponse::from).toList(),
+                    page.nextCursor(),
+                    page.hasMore()
+            );
+        }
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: Career Coach Turn历史分页响应
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param items 当前页Turn
+     * @param nextCursor 更早一页Cursor
+     * @param hasMore 是否还有更早的Turn
+     */
+    public record CoachingTurnPageResponse(
+            List<CoachingTurnResponse> items,
+            String nextCursor,
+            boolean hasMore
+    ) {
+        static CoachingTurnPageResponse from(
+                CoachingSessionQueryApplicationService.TurnPage page
+        ) {
+            return new CoachingTurnPageResponse(
+                    page.items().stream().map(CoachingTurnResponse::from).toList(),
+                    page.nextCursor(),
+                    page.hasMore()
+            );
+        }
     }
 }

@@ -116,6 +116,37 @@ public class MyBatisPlusMockInterviewSessionAdapter implements MockInterviewSess
         return mapper.selectList(query).stream().map(converter::toDomain).toList();
     }
 
+    @Override
+    public List<MockInterviewSession> findPage(
+            ActorId ownerId,
+            InterviewStatus status,
+            Instant beforeUpdatedAt,
+            UUID beforeInterviewId,
+            int limit
+    ) {
+        Objects.requireNonNull(ownerId, "ownerId不能为空");
+        if ((beforeUpdatedAt == null) != (beforeInterviewId == null)) {
+            throw new IllegalArgumentException("分页位置必须同时包含updatedAt和interviewId");
+        }
+        if (limit < 1 || limit > 100) throw new IllegalArgumentException("limit必须在1到100之间");
+
+        LambdaQueryWrapper<MockInterviewSessionEntity> query = new LambdaQueryWrapper<>();
+        query.eq(MockInterviewSessionEntity::getOwnerId, ownerId.value())
+                .eq(status != null, MockInterviewSessionEntity::getInterviewStatus,
+                        status == null ? null : status.name());
+        if (beforeUpdatedAt != null) {
+            query.and(nested -> nested
+                    .lt(MockInterviewSessionEntity::getUpdatedAt, beforeUpdatedAt)
+                    .or()
+                    .eq(MockInterviewSessionEntity::getUpdatedAt, beforeUpdatedAt)
+                    .lt(MockInterviewSessionEntity::getInterviewId, beforeInterviewId.toString()));
+        }
+        query.orderByDesc(MockInterviewSessionEntity::getUpdatedAt)
+                .orderByDesc(MockInterviewSessionEntity::getInterviewId)
+                .last("LIMIT " + limit);
+        return mapper.selectList(query).stream().map(converter::toDomain).toList();
+    }
+
     private static void requireOwnerAndId(ActorId ownerId, UUID id, String fieldName) {
         Objects.requireNonNull(ownerId, "ownerId不能为空");
         Objects.requireNonNull(id, fieldName + "不能为空");

@@ -2,6 +2,7 @@ package com.leo.careerforgeai.interview.infrastructure.persistence.adapter;
 
 import com.leo.careerforgeai.interview.application.event.InterviewEvent;
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
+import com.leo.careerforgeai.interview.domain.session.InterviewStatus;
 import com.leo.careerforgeai.interview.domain.session.MockInterviewSession;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -67,6 +68,17 @@ public class EventPublishingMockInterviewSessionRepository implements MockInterv
             int limit
     ) {
         return delegate.findSystemRecoveryCandidatesUpdatedBefore(updatedBefore, limit);
+    }
+
+    @Override
+    public List<MockInterviewSession> findPage(
+            ActorId ownerId,
+            InterviewStatus status,
+            Instant beforeUpdatedAt,
+            UUID beforeInterviewId,
+            int limit
+    ) {
+        return delegate.findPage(ownerId, status, beforeUpdatedAt, beforeInterviewId, limit);
     }
 
     private void publishStateEvent(MockInterviewSession session) {

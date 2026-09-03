@@ -9,8 +9,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Base64;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -131,6 +134,89 @@ public class PersonalEvidenceApplicationService {
             throw new PersonalEvidenceVersionConflictException(artifactId, expectedVersion);
         }
         return revoked;
+    }
+
+    @Transactional(readOnly = true)
+    public EvidencePage list(PersonalEvidenceType type, String cursor, int limit) {
+        if (limit < 1 || limit > 20) throw new IllegalArgumentException("limit必须在1到20之间");
+        EvidenceCursor decoded = decodeCursor(cursor);
+        String typeKey = type == null ? "*" : type.name();
+        if (decoded != null && !decoded.typeKey().equals(typeKey)) {
+            throw new IllegalArgumentException("cursor与当前证据类型过滤不匹配");
+        }
+
+        List<PersonalEvidenceArtifactRepository.ActiveArtifactSummary> rows = repository.findActivePage(
+                currentActor(), type,
+                decoded == null ? null : decoded.beforeUpdatedAt(),
+                decoded == null ? null : decoded.beforeArtifactId(),
+                limit + 1
+        );
+        boolean hasMore = rows.size() > limit;
+        List<PersonalEvidenceArtifactRepository.ActiveArtifactSummary> items =
+                List.copyOf(rows.subList(0, Math.min(limit, rows.size())));
+        return new EvidencePage(items, hasMore ? encodeCursor(items.getLast(), typeKey) : null, hasMore);
+    }
+
+    private static String encodeCursor(
+            PersonalEvidenceArtifactRepository.ActiveArtifactSummary item,
+            String typeKey
+    ) {
+        String value = typeKey + "|" + item.updatedAt() + "|" + item.artifactId();
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static EvidenceCursor decodeCursor(String cursor) {
+        if (cursor == null) return null;
+        if (cursor.isBlank() || cursor.length() > 256) throw invalidCursor();
+        try {
+            String value = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            String[] parts = value.split("\\|", -1);
+            if (parts.length != 3 || parts[0].isBlank()) throw invalidCursor();
+            return new EvidenceCursor(parts[0], Instant.parse(parts[1]), UUID.fromString(parts[2]));
+        } catch (RuntimeException exception) {
+            throw invalidCursor();
+        }
+    }
+
+    private static IllegalArgumentException invalidCursor() {
+        return new IllegalArgumentException("cursor格式不合法");
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: ACTIVE个人证据分页结果
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param items 当前页轻量证据
+     * @param nextCursor 下一页Cursor
+     * @param hasMore 是否存在下一页
+     */
+    public record EvidencePage(
+            List<PersonalEvidenceArtifactRepository.ActiveArtifactSummary> items,
+            String nextCursor,
+            boolean hasMore
+    ) {
+        public EvidencePage {
+            items = List.copyOf(Objects.requireNonNull(items, "items不能为空"));
+            if (hasMore != (nextCursor != null)) throw new IllegalArgumentException("分页状态不一致");
+        }
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 与证据类型绑定的分页位置
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     * @param typeKey 证据类型过滤标识
+     * @param beforeUpdatedAt 下一页更新时间上界
+     * @param beforeArtifactId 同一更新时间下的证据ID上界
+     */
+    private record EvidenceCursor(String typeKey, Instant beforeUpdatedAt, UUID beforeArtifactId) {
+        private EvidenceCursor {
+            if (typeKey == null || typeKey.isBlank()
+                    || beforeUpdatedAt == null || beforeArtifactId == null) throw invalidCursor();
+        }
     }
 
     private PersonalEvidenceArtifact requireOwnedActive(ActorId ownerId, UUID artifactId) {

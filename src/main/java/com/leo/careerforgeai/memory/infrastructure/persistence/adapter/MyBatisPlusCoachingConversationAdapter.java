@@ -2,7 +2,9 @@ package com.leo.careerforgeai.memory.infrastructure.persistence.adapter;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.leo.careerforgeai.memory.application.port.conversation.CoachingConversationRepository;
+import com.leo.careerforgeai.memory.application.port.conversation.CoachingSessionQueryRepository;
 import com.leo.careerforgeai.memory.domain.conversation.CoachingSession;
+import com.leo.careerforgeai.memory.domain.conversation.CoachingSessionStatus;
 import com.leo.careerforgeai.memory.domain.conversation.ConversationTurn;
 import com.leo.careerforgeai.memory.infrastructure.persistence.converter.CoachingConversationPersistenceConverter;
 import com.leo.careerforgeai.memory.infrastructure.persistence.entity.CoachingSessionEntity;
@@ -13,6 +15,7 @@ import com.leo.careerforgeai.shared.actor.ActorId;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -26,8 +29,7 @@ import java.util.UUID;
  **/
 @Repository
 @ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
-public class MyBatisPlusCoachingConversationAdapter implements CoachingConversationRepository {
-
+public class MyBatisPlusCoachingConversationAdapter implements CoachingConversationRepository, CoachingSessionQueryRepository {
     public static final int MAX_RECENT_TURNS = 100;
 
     private final CoachingSessionMapper sessionMapper;
@@ -138,5 +140,53 @@ public class MyBatisPlusCoachingConversationAdapter implements CoachingConversat
         if (affectedRows != 1) {
             throw new IllegalStateException(message + ": affectedRows=" + affectedRows);
         }
+    }
+
+    @Override
+    public List<CoachingSession> findSessionPage(ActorId ownerId, CoachingSessionStatus status,
+                                                 Instant beforeUpdatedAt, UUID beforeSessionId, int limit) {
+        Objects.requireNonNull(ownerId, "ownerId不能为空");
+        if ((beforeUpdatedAt == null) != (beforeSessionId == null)) {
+            throw new IllegalArgumentException("分页位置必须同时包含updatedAt和sessionId");
+        }
+        if (limit < 1 || limit > 51) throw new IllegalArgumentException("limit必须在1到51之间");
+
+        LambdaQueryWrapper<CoachingSessionEntity> query = new LambdaQueryWrapper<>();
+        query.eq(CoachingSessionEntity::getOwnerId, ownerId.value());
+        if (status != null) query.eq(CoachingSessionEntity::getSessionStatus, status.name());
+        if (beforeUpdatedAt != null) {
+            query.and(position -> position
+                    .lt(CoachingSessionEntity::getUpdatedAt, beforeUpdatedAt)
+                    .or(sameTime -> sameTime
+                            .eq(CoachingSessionEntity::getUpdatedAt, beforeUpdatedAt)
+                            .lt(CoachingSessionEntity::getSessionId, beforeSessionId.toString())));
+        }
+        query.orderByDesc(CoachingSessionEntity::getUpdatedAt)
+                .orderByDesc(CoachingSessionEntity::getSessionId)
+                .last("LIMIT " + limit);
+        return sessionMapper.selectList(query).stream().map(converter::toDomain).toList();
+    }
+
+    @Override
+    public List<ConversationTurn> findTurnPage(
+            ActorId ownerId,
+            UUID sessionId,
+            Long beforeTurnSequence,
+            int limit
+    ) {
+        requireOwnerAndId(ownerId, sessionId, "sessionId");
+        if (beforeTurnSequence != null && beforeTurnSequence < 1) {
+            throw new IllegalArgumentException("beforeTurnSequence必须大于0");
+        }
+        if (limit < 1 || limit > 51) throw new IllegalArgumentException("limit必须在1到51之间");
+
+        LambdaQueryWrapper<ConversationTurnEntity> query = new LambdaQueryWrapper<>();
+        query.eq(ConversationTurnEntity::getOwnerId, ownerId.value())
+                .eq(ConversationTurnEntity::getSessionId, sessionId.toString());
+        if (beforeTurnSequence != null) {
+            query.lt(ConversationTurnEntity::getTurnSequence, beforeTurnSequence);
+        }
+        query.orderByDesc(ConversationTurnEntity::getTurnSequence).last("LIMIT " + limit);
+        return turnMapper.selectList(query).stream().map(converter::toDomain).toList();
     }
 }

@@ -174,6 +174,38 @@ public class MyBatisPlusCoachingRunAdapter
         return affectedRows == 1;
     }
 
+    @Override
+    public List<CoachingRun> findPage(
+            ActorId ownerId,
+            UUID sessionId,
+            CoachingRunStatus status,
+            Instant beforeCreatedAt,
+            UUID beforeRunId,
+            int limit
+    ) {
+        requireOwnerAndId(ownerId, sessionId, "sessionId");
+        if ((beforeCreatedAt == null) != (beforeRunId == null)) {
+            throw new IllegalArgumentException("分页位置必须同时包含createdAt和runId");
+        }
+        if (limit < 1 || limit > 51) throw new IllegalArgumentException("limit必须在1到51之间");
+
+        LambdaQueryWrapper<CoachingRunEntity> query = new LambdaQueryWrapper<>();
+        query.eq(CoachingRunEntity::getOwnerId, ownerId.value())
+                .eq(CoachingRunEntity::getSessionId, sessionId.toString());
+        if (status != null) query.eq(CoachingRunEntity::getRunStatus, status.name());
+        if (beforeCreatedAt != null) {
+            query.and(position -> position
+                    .lt(CoachingRunEntity::getCreatedAt, beforeCreatedAt)
+                    .or(sameTime -> sameTime
+                            .eq(CoachingRunEntity::getCreatedAt, beforeCreatedAt)
+                            .lt(CoachingRunEntity::getRunId, beforeRunId.toString())));
+        }
+        query.orderByDesc(CoachingRunEntity::getCreatedAt)
+                .orderByDesc(CoachingRunEntity::getRunId)
+                .last("LIMIT " + limit);
+        return mapper.selectList(query).stream().map(converter::toDomain).toList();
+    }
+
     private static void requireOwnerAndId(
             ActorId ownerId,
             UUID id,

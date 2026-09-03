@@ -10,6 +10,7 @@ import com.leo.careerforgeai.agent.domain.loop.AgentRunStatus;
 import com.leo.careerforgeai.agent.domain.loop.AgentTerminationReason;
 import com.leo.careerforgeai.agent.domain.loop.trace.AgentRunTrace;
 import com.leo.careerforgeai.memory.application.conversation.CoachingSessionApplicationService;
+import com.leo.careerforgeai.memory.application.conversation.CoachingSessionQueryApplicationService;
 import com.leo.careerforgeai.memory.application.conversation.CoachingSessionVersionConflictException;
 import com.leo.careerforgeai.memory.domain.conversation.CoachingSession;
 import com.leo.careerforgeai.memory.domain.conversation.ConversationTurn;
@@ -70,6 +71,9 @@ class CoachingSessionControllerTest {
     @Mock
     private ConversationalCareerCoachApplicationService conversationalCareerCoachService;
 
+    @Mock
+    private CoachingSessionQueryApplicationService sessionQueryApplicationService;
+
     private final ValidatorFactory validatorFactory =
             Validation.buildDefaultValidatorFactory();
 
@@ -84,7 +88,8 @@ class CoachingSessionControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new CoachingSessionController(
                                 sessionApplicationService,
-                                conversationalCareerCoachService
+                                conversationalCareerCoachService,
+                                sessionQueryApplicationService
                         )
                 )
                 .setControllerAdvice(
@@ -335,25 +340,31 @@ class CoachingSessionControllerTest {
                 NOW
         );
 
-        when(sessionApplicationService.getRecentTurns(SESSION_ID))
-                .thenReturn(List.of(turn));
+        when(sessionQueryApplicationService.listTurns(SESSION_ID, null, 20))
+                .thenReturn(new CoachingSessionQueryApplicationService.TurnPage(
+                        List.of(turn),
+                        null,
+                        false
+                ));
 
         mockMvc.perform(get(BASE_URL + "/" + SESSION_ID + "/turns"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data[0].turnId").value(turnId.toString()))
-                .andExpect(jsonPath("$.data[0].turnSequence").value(1))
-                .andExpect(jsonPath("$.data[0].role").value("USER"))
-                .andExpect(jsonPath("$.data[0].status").value("COMPLETED"))
-                .andExpect(jsonPath("$.data[0].content").value("我每周可以学习10小时"))
-                .andExpect(jsonPath("$.data[0].memoryExtractionEligible").value(true))
-                .andExpect(jsonPath("$.data[0].createdAt").exists())
-                .andExpect(jsonPath("$.data[0].ownerId").doesNotExist())
-                .andExpect(jsonPath("$.data[0].contentHash").doesNotExist())
-                .andExpect(jsonPath("$.data[0].exchangeId").doesNotExist())
-                .andExpect(jsonPath("$.data[0].agentRunId").doesNotExist());
+                .andExpect(jsonPath("$.data.items[0].turnId").value(turnId.toString()))
+                .andExpect(jsonPath("$.data.items[0].turnSequence").value(1))
+                .andExpect(jsonPath("$.data.items[0].role").value("USER"))
+                .andExpect(jsonPath("$.data.items[0].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.items[0].content").value("我每周可以学习10小时"))
+                .andExpect(jsonPath("$.data.items[0].memoryExtractionEligible").value(true))
+                .andExpect(jsonPath("$.data.items[0].createdAt").exists())
+                .andExpect(jsonPath("$.data.items[0].ownerId").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].contentHash").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].exchangeId").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].agentRunId").doesNotExist())
+                .andExpect(jsonPath("$.data.hasMore").value(false))
+                .andExpect(jsonPath("$.data.nextCursor").doesNotExist());
 
-        verify(sessionApplicationService).getRecentTurns(SESSION_ID);
+        verify(sessionQueryApplicationService).listTurns(SESSION_ID, null, 20);
     }
 
     private ConversationalCareerCoachResult

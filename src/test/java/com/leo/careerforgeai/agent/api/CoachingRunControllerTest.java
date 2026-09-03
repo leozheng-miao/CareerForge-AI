@@ -30,6 +30,7 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
@@ -261,6 +262,34 @@ class CoachingRunControllerTest {
                 .andExpect(content().string(not(containsString("JsonEOFException"))));
 
         verifyNoInteractions(submissionService);
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 验证Run列表分页响应不暴露owner和请求指纹
+     * @author: Miao Zheng
+     * @date: 2026-09-03
+     */
+    @Test
+    void shouldListOwnedRunsBySession() throws Exception {
+        CoachingRun run = succeededRun();
+        when(applicationService.list(SESSION_ID, null, null, 20))
+                .thenReturn(new CoachingRunApplicationService.RunPage(
+                        List.of(run),
+                        null,
+                        false
+                ));
+
+        mockMvc.perform(get(BASE_URL).param("sessionId", SESSION_ID.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].runId").value(RUN_ID.toString()))
+                .andExpect(jsonPath("$.data.items[0].status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.data.items[0].ownerId").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].requestFingerprint").doesNotExist())
+                .andExpect(jsonPath("$.data.hasMore").value(false))
+                .andExpect(jsonPath("$.data.nextCursor").doesNotExist());
+
+        verify(applicationService).list(SESSION_ID, null, null, 20);
     }
 
     private String validRequest() {

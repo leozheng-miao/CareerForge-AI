@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -180,5 +181,37 @@ public interface PersonalEvidenceFactMapper {
             @Param("ownerId") String ownerId,
             @Param("artifactId") String artifactId,
             @Param("artifactVersion") long artifactVersion
+    );
+
+    @Select("""
+        <script>
+        SELECT artifact_id AS artifactId,
+               artifact_version AS artifactVersion,
+               artifact_type AS artifactType,
+               source_name AS sourceName,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM personal_evidence_artifact
+        WHERE owner_id = #{ownerId}
+          AND artifact_status = 'ACTIVE'
+        <if test="artifactType != null">
+          AND artifact_type = #{artifactType}
+        </if>
+        <if test="beforeUpdatedAt != null">
+          AND (
+            updated_at &lt; #{beforeUpdatedAt}
+            OR (updated_at = #{beforeUpdatedAt} AND artifact_id &lt; #{beforeArtifactId})
+          )
+        </if>
+        ORDER BY updated_at DESC, artifact_id DESC
+        LIMIT #{limit}
+        </script>
+        """)
+    List<PersonalEvidenceArtifactEntity> findActivePage(
+            @Param("ownerId") String ownerId,
+            @Param("artifactType") String artifactType,
+            @Param("beforeUpdatedAt") Instant beforeUpdatedAt,
+            @Param("beforeArtifactId") String beforeArtifactId,
+            @Param("limit") int limit
     );
 }

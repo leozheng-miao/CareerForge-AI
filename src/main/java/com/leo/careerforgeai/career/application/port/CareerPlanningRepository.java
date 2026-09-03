@@ -6,6 +6,8 @@ import com.leo.careerforgeai.career.domain.TargetRoleDraft;
 import com.leo.careerforgeai.career.domain.TrainingPlan;
 import com.leo.careerforgeai.shared.actor.ActorId;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -71,5 +73,19 @@ public interface CareerPlanningRepository {
             TargetRoleDraft confirmedDraft,
             TargetRole targetRole,
             long expectedDraftVersion
+    );
+
+    List<SkillGapSnapshot> findSkillGapSnapshotPage(
+            ActorId ownerId,
+            Instant beforeCreatedAt,
+            UUID beforeSnapshotId,
+            int limit
+    );
+
+    List<TrainingPlan> findTrainingPlanPage(
+            ActorId ownerId,
+            TrainingPlan.PlanStatus status,
+            Long beforePlanVersion,
+            int limit
     );
 }

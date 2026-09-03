@@ -98,7 +98,7 @@ careerforge:
       deepseek-standard:
         provider: deepseek
         model: ${AI_MODEL_NAME}
-        capabilities: [ CHAT, JSON_OBJECT, STREAMING ]
+        capabilities: [ CHAT, JSON_OBJECT, TOOL_CALLING, STREAMING ]
         reasoning-mode: DISABLED
         max-output-tokens: 4000
         timeout: 60s
@@ -251,3 +251,34 @@ knife4j:
           - com.leo.careerforgeai.knowledge.api
           - com.leo.careerforgeai.agent.api
           - com.leo.careerforgeai.auth.api
+jdbc:
+  includes: QUERY
+  datasource-proxy:
+    type: SPRING_PROXY
+    include-parameter-values: false
+    query:
+      enable-logging: false
+  event:
+    enabled: false
+  resultset-operations:
+    enabled: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: never
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          enabled: ${OTEL_TRACING_EXPORT_ENABLED:false}
+  otlp:
+    metrics:
+      export:
+        enabled: ${OTEL_METRICS_EXPORT_ENABLED:false}

@@ -2,6 +2,7 @@ package com.leo.careerforgeai.interview.application.graph;
 
 import com.leo.careerforgeai.interview.application.supervision.InterviewSupervisionApplicationService;
 import com.leo.careerforgeai.interview.application.supervision.InterviewSupervisorDecision;
+import com.leo.careerforgeai.interview.config.InterviewGraphRuntimeConfiguration;
 import com.leo.careerforgeai.interview.domain.session.InterviewFailureCode;
 import com.leo.careerforgeai.interview.domain.session.InterviewMode;
 import com.leo.careerforgeai.interview.domain.review.InterviewReviewPlan;
@@ -26,6 +27,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 
 /**
  * @program: CareerForge-AI
@@ -90,6 +93,10 @@ class InterviewGraphWorkflowTest {
         InterviewSupervisionApplicationService supervisionService = mock(InterviewSupervisionApplicationService.class);
         InterviewSupervisionGraphNode supervisionNode = new InterviewSupervisionGraphNode(supervisionService);
         InterviewReportGraphNode reportNode = mock(InterviewReportGraphNode.class);
+        ObservationRegistry observations = ObservationRegistry.create();
+        observations.observationConfig().observationHandler(context -> true);
+        AtomicReference<Observation> technicalObservation = new AtomicReference<>();
+        AtomicReference<Observation> evidenceObservation = new AtomicReference<>();
 
         when(nodes.loadFrozenContext(any(InterviewGraphState.class))).thenReturn(Map.of());
         when(nodes.generateAndPersistQuestion(any(InterviewGraphState.class)))
@@ -102,11 +109,13 @@ class InterviewGraphWorkflowTest {
         when(reviewNodes.technicalReview(any(InterviewGraphState.class))).thenAnswer(invocation -> {
             technicalThread.set(Thread.currentThread().getName());
             branchBarrier.await(2, TimeUnit.SECONDS);
+            technicalObservation.set(observations.getCurrentObservation());
             return Map.of(InterviewGraphState.TECHNICAL_REVIEW_ID, technicalReviewId.toString());
         });
         when(reviewNodes.evidenceReview(any(InterviewGraphState.class))).thenAnswer(invocation -> {
             evidenceThread.set(Thread.currentThread().getName());
             branchBarrier.await(2, TimeUnit.SECONDS);
+            evidenceObservation.set(observations.getCurrentObservation());
             return Map.of(InterviewGraphState.EVIDENCE_REVIEW_ID, evidenceReviewId.toString());
         });
         when(reviewNodes.joinReviews(any(InterviewGraphState.class))).thenReturn(Map.of());
@@ -116,10 +125,8 @@ class InterviewGraphWorkflowTest {
         when(routeNodes.continueQuestioning(any(InterviewGraphState.class)))
                 .thenReturn(InterviewGraphState.clearCompletedRoundForNextQuestionUpdate());
 
-        try (ExecutorService executor = Executors.newThreadPerTaskExecutor(
-                Thread.ofVirtual().name("cp8-review-", 0).factory()
-        )) {
-            var workflow = new InterviewGraphWorkflow(nodes, reviewNodes, supervisionNode, routeNodes, reportNode).compile(new MemorySaver());
+        try (ExecutorService executor = new InterviewGraphRuntimeConfiguration().interviewReviewExecutor()) {
+            var workflow = new InterviewGraphWorkflow(nodes, reviewNodes, supervisionNode, routeNodes, reportNode, observations).compile(new MemorySaver());
             RunnableConfig config = RunnableConfig.builder()
                     .threadId("cp8-resume-" + interviewId)
                     .addParallelNodeExecutor(InterviewGraphWorkflow.PREPARE_REVIEWS, executor)
@@ -148,9 +155,19 @@ class InterviewGraphWorkflowTest {
                     InterviewGraphState.TECHNICAL_REVIEW_ID,
                     InterviewGraphState.EVIDENCE_REVIEW_ID
             );
-            assertThat(technicalThread.get()).startsWith("cp8-review-");
-            assertThat(evidenceThread.get()).startsWith("cp8-review-");
+            assertThat(technicalThread.get()).startsWith("careerforge-interview-review-");
+            assertThat(evidenceThread.get()).startsWith("careerforge-interview-review-");
             assertThat(technicalThread.get()).isNotEqualTo(evidenceThread.get());
+            assertThat(technicalObservation.get()).isNotNull();
+            assertThat(evidenceObservation.get()).isNotNull();
+            assertThat(technicalObservation.get().getContext()
+                    .getLowCardinalityKeyValue("node").getValue()).isEqualTo(InterviewGraphWorkflow.TECHNICAL_REVIEW);
+            assertThat(evidenceObservation.get().getContext()
+                    .getLowCardinalityKeyValue("node").getValue()).isEqualTo(InterviewGraphWorkflow.EVIDENCE_REVIEW);
+            assertThat(technicalObservation.get().getContext()
+                    .getLowCardinalityKeyValue("outcome").getValue()).isEqualTo("success");
+            assertThat(evidenceObservation.get().getContext()
+                    .getLowCardinalityKeyValue("outcome").getValue()).isEqualTo("success");
 
             verify(nodes).validateAnswerResume(any(InterviewGraphState.class));
             verify(reviewNodes).technicalReview(any(InterviewGraphState.class));

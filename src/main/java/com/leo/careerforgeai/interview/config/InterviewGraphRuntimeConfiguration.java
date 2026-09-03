@@ -6,6 +6,8 @@ import com.leo.careerforgeai.interview.application.graph.InterviewGraphState;
 import com.leo.careerforgeai.interview.application.graph.InterviewGraphWorkflow;
 import com.leo.careerforgeai.interview.application.port.MockInterviewSessionRepository;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
+import io.micrometer.context.ContextExecutorService;
+import io.micrometer.context.ContextSnapshotFactory;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphStateException;
 import org.bsc.langgraph4j.checkpoint.CreateOption;
@@ -30,6 +32,9 @@ import java.util.concurrent.Executors;
 @ConditionalOnProperty(name = "careerforge.persistence.enabled", havingValue = "true", matchIfMissing = true)
 public class InterviewGraphRuntimeConfiguration {
 
+    private static final ContextSnapshotFactory CONTEXT_SNAPSHOT_FACTORY =
+            ContextSnapshotFactory.builder().clearMissing(true).build();
+
     @Bean
     public MysqlSaver interviewCheckpointSaver(DataSource dataSource) {
         return MysqlSaver.builder()
@@ -40,9 +45,10 @@ public class InterviewGraphRuntimeConfiguration {
 
     @Bean(name = "interviewReviewExecutor", destroyMethod = "close")
     public ExecutorService interviewReviewExecutor() {
-        return Executors.newThreadPerTaskExecutor(
+        ExecutorService delegate = Executors.newThreadPerTaskExecutor(
                 Thread.ofVirtual().name("careerforge-interview-review-", 0).factory()
         );
+        return ContextExecutorService.wrap(delegate, CONTEXT_SNAPSHOT_FACTORY);
     }
 
     @Bean

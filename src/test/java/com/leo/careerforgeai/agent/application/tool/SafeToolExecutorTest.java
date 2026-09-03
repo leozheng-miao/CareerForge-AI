@@ -47,6 +47,8 @@ import org.slf4j.MDC;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 
 /**
  * @program: CareerForge-AI
@@ -311,17 +313,21 @@ class ToolSafetyTest {
             throws Exception {
         AtomicReference<String> capturedRunId = new AtomicReference<>();
         AtomicReference<String> capturedTraceId = new AtomicReference<>();
+        ObservationRegistry observations = ObservationRegistry.create();
+        observations.observationConfig().observationHandler(context -> true);
+        AtomicReference<Observation> capturedObservation = new AtomicReference<>();
 
         TestTool tool = tool(
                 defaultContract("search_tool"),
                 input -> {
                     capturedRunId.set(MDC.get(RunMdcContext.RUN_ID));
                     capturedTraceId.set(MDC.get(RunMdcContext.TRACE_ID));
+                    capturedObservation.set(observations.getCurrentObservation());
                     return output("ok");
                 }
         );
 
-        SafeToolExecutor executor = executor(tool);
+        SafeToolExecutor executor = executor(observations, tool);
 
         MDC.put(RunMdcContext.OWNER_ID, "actor-a");
         MDC.put(RunMdcContext.RUN_ID, "coaching-run-1");
@@ -352,11 +358,24 @@ class ToolSafetyTest {
         );
 
         assertThat(afterTask.get(2, TimeUnit.SECONDS)).isNull();
+        assertThat(capturedObservation.get()).isNotNull();
+        assertThat(capturedObservation.get().getContext()
+                .getLowCardinalityKeyValue("tool.name").getValue()).isEqualTo("search_tool");
+        assertThat(capturedObservation.get().getContext()
+                .getLowCardinalityKeyValue("outcome").getValue()).isEqualTo("success");
+        assertThat(capturedObservation.get().getContext()
+                .getLowCardinalityKeyValue("error.category").getValue()).isEqualTo("none");
     }
 
     private SafeToolExecutor executor(AgentTool<?, ?>... tools) {
         return new SafeToolExecutor(
                 new ToolRegistry(List.of(tools)), jsonMapper, validator, executorService, clock);
+    }
+
+    private SafeToolExecutor executor(ObservationRegistry observations, AgentTool<?, ?>... tools) {
+        return new SafeToolExecutor(
+                new ToolRegistry(List.of(tools)), jsonMapper, validator,
+                executorService, clock, observations);
     }
 
     /** 创建测试使用的MODEL_BACKED工具契约。 */

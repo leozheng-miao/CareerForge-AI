@@ -19,6 +19,7 @@ public final class RunMdcContext {
     public static final String OWNER_ID = "ownerId";
     public static final String RUN_ID = "runId";
     public static final String TRACE_ID = "traceId";
+    public static final String SPAN_ID = "spanId";
 
     private final Map<String, String> values;
 
@@ -40,6 +41,7 @@ public final class RunMdcContext {
         captureIfPresent(captured, OWNER_ID);
         captureIfPresent(captured, RUN_ID);
         captureIfPresent(captured, TRACE_ID);
+        captureIfPresent(captured, SPAN_ID);
         return new RunMdcContext(captured);
     }
 
@@ -74,8 +76,13 @@ public final class RunMdcContext {
 
     private Map<String, String> install() {
         Map<String, String> previous = MDC.getCopyOfContextMap();
+        String activeTraceId = previous == null ? null : previous.get(TRACE_ID);
+        String activeSpanId = previous == null ? null : previous.get(SPAN_ID);
+
         MDC.clear();
         values.forEach(MDC::put);
+        if (activeTraceId != null) MDC.put(TRACE_ID, activeTraceId);
+        if (activeSpanId != null) MDC.put(SPAN_ID, activeSpanId);
         return previous;
     }
 

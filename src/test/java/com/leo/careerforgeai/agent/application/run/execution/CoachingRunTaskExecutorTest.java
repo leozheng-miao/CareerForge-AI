@@ -2,6 +2,7 @@ package com.leo.careerforgeai.agent.application.run.execution;
 
 import com.leo.careerforgeai.agent.config.CoachingRunExecutionProperties;
 import com.leo.careerforgeai.shared.actor.ActorId;
+import io.micrometer.context.ContextRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -238,6 +239,32 @@ class CoachingRunTaskExecutorTest {
         RunAdmissionLease reacquired =
                 admissionGate.tryAcquire(OWNER).orElseThrow();
         reacquired.close();
+    }
+
+    @Test
+    void shouldPropagateRegisteredContextIntoVirtualThread() throws Exception {
+        ThreadLocal<String> traceContext = new ThreadLocal<>();
+        String accessorKey = getClass().getName() + ".trace";
+        ContextRegistry registry = ContextRegistry.getInstance();
+        registry.registerThreadLocalAccessor(accessorKey, traceContext);
+
+        try {
+            traceContext.set("parent-trace");
+            AtomicReference<String> captured = new AtomicReference<>();
+            RunAdmissionLease lease = admissionGate.tryAcquire(OWNER).orElseThrow();
+
+            Future<?> future = taskExecutor.submit(
+                    context(), lease, ignored -> captured.set(traceContext.get())
+            );
+            traceContext.remove();
+            future.get(2, TimeUnit.SECONDS);
+
+            assertThat(captured).hasValue("parent-trace");
+            assertThat(lease.isReleased()).isTrue();
+        } finally {
+            traceContext.remove();
+            registry.removeThreadLocalAccessor(accessorKey);
+        }
     }
 
     private RunExecutionContext context() {

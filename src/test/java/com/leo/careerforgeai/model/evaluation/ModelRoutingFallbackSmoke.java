@@ -11,6 +11,7 @@ import com.leo.careerforgeai.model.infrastructure.deepseek.DeepSeekChatClient;
 import com.leo.careerforgeai.model.infrastructure.deepseek.stream.DeepSeekSseParser;
 import com.leo.careerforgeai.model.infrastructure.kimi.KimiChatClient;
 import com.sun.net.httpserver.HttpServer;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import tools.jackson.databind.json.JsonMapper;
@@ -98,7 +99,9 @@ class ModelRoutingFallbackSmoke {
                     new ModelCallBulkhead(
                             new ModelCallBulkheadProperties(2)),
                     reliability,
-                    metrics
+                    metrics,
+                    ObservationRegistry.NOOP,
+                    audit -> { }
             );
 
             ModelRequest request = new ModelRequest(

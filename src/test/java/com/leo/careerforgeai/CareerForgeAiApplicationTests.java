@@ -8,6 +8,7 @@ import com.leo.careerforgeai.agent.application.tool.career.search.SearchCareerMa
 import com.leo.careerforgeai.agent.config.AgentLoopProperties;
 import com.leo.careerforgeai.agent.infrastructure.springai.coach.SpringAiCareerCoachService;
 import com.leo.careerforgeai.agent.infrastructure.springai.tool.adapter.SpringAiToolCallbackCatalog;
+import com.leo.careerforgeai.model.application.routing.RoutingToolCallingGateway;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -27,7 +28,6 @@ import javax.sql.DataSource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import com.leo.careerforgeai.model.application.ToolCallingGateway;
-import com.leo.careerforgeai.model.application.reliability.CircuitBreakingToolCallingGateway;
 
 /**
  * @program: CareerForge-AI
@@ -36,9 +36,14 @@ import com.leo.careerforgeai.model.application.reliability.CircuitBreakingToolCa
  * @date: 2026-08-07 02:10
  **/
 @SpringBootTest(properties = {
+        "careerforge.auth.enabled=false",
         "careerforge.model.base-url=http://localhost",
         "careerforge.model.api-key=test-placeholder",
         "spring.ai.mcp.server.enabled=false",
+        "careerforge.model-routing.providers.deepseek.base-url=http://localhost",
+        "careerforge.model-routing.providers.deepseek.api-key=test-placeholder",
+        "careerforge.model-routing.profiles.deepseek-standard.model=test-model",
+        "careerforge.model-routing.profiles.deepseek-thinking.model=test-model",
         "careerforge.model.name=test-model"
 })
 class CareerForgeAiApplicationTests {
@@ -141,23 +146,18 @@ class CareerForgeAiApplicationTests {
     }
 
     @Test
-    void shouldAssembleModelReliabilityGatewayChainWithSinglePrimaryEntry() {
+    void shouldAssembleRoutingToolCallingGatewayAsSinglePrimaryEntry() {
         assertThat(toolCallingGateway)
-                .isInstanceOf(CircuitBreakingToolCallingGateway.class);
+                .isInstanceOf(RoutingToolCallingGateway.class);
 
         assertThat(toolCallingGateway).isSameAs(
                 applicationContext.getBean(
-                        "circuitBreakingToolCallingGateway",
+                        "routingToolCallingGateway",
                         ToolCallingGateway.class
                 )
         );
 
         assertThat(applicationContext.getBeansOfType(ToolCallingGateway.class))
-                .containsOnlyKeys(
-                        "deepSeekToolCallingClient",
-                        "bulkheadToolCallingGateway",
-                        "retryingToolCallingGateway",
-                        "circuitBreakingToolCallingGateway"
-                );
+                .containsOnlyKeys("routingToolCallingGateway");
     }
 }

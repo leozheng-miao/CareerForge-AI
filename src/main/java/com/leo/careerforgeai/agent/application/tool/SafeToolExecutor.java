@@ -27,6 +27,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import io.micrometer.context.ContextSnapshotFactory;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
+
+import java.util.Locale;
+import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * @program: CareerForge-AI
@@ -40,6 +47,9 @@ public final class SafeToolExecutor {
     private static final String FALLBACK_FAILURE_JSON =
             "{\"status\":\"FAILURE\",\"data\":null,\"error\":{\"type\":\"EXECUTION_FAILED\",\"message\":\"工具执行失败\"}}";
     private static final int MAX_FAILURE_RESULT_CHARS = 512;
+    private static final ContextSnapshotFactory CONTEXT_SNAPSHOT_FACTORY = ContextSnapshotFactory.builder().clearMissing(true).build();
+
+    private final ObservationRegistry observationRegistry;
 
     private final ToolRegistry registry;
     private final JsonMapper jsonMapper;
@@ -49,11 +59,18 @@ public final class SafeToolExecutor {
 
     public SafeToolExecutor(ToolRegistry registry, JsonMapper jsonMapper, Validator validator,
                             ExecutorService executorService, Clock clock) {
+        this(registry, jsonMapper, validator, executorService, clock, ObservationRegistry.NOOP);
+    }
+
+    public SafeToolExecutor(ToolRegistry registry, JsonMapper jsonMapper, Validator validator,
+                            ExecutorService executorService, Clock clock,
+                            ObservationRegistry observationRegistry) {
         this.registry = registry;
         this.jsonMapper = jsonMapper;
         this.validator = validator;
         this.executorService = executorService;
         this.clock = clock;
+        this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry不能为空");
     }
 
     /** 安全执行一次模型请求的工具调用。 */
@@ -61,20 +78,52 @@ public final class SafeToolExecutor {
         if (toolCall == null) throw new IllegalArgumentException("toolCall 不能为空");
         if (context == null) throw new IllegalArgumentException("context 不能为空");
 
-        // 验证 tool 白名单
         Optional<AgentTool<?, ?>> registered = registry.find(toolCall.name());
         if (registered.isEmpty()) {
-            return failure(toolCall, ToolExecutionErrorType.UNKNOWN_TOOL, "工具不可用");
+            return observeTool("unknown", "unknown", "unknown",
+                    () -> failure(toolCall, ToolExecutionErrorType.UNKNOWN_TOOL, "工具不可用"));
         }
 
-        try {
-            return executeRegistered(toolCall, context, registered.get());
+        AgentTool<?, ?> tool = registered.get();
+        ToolContract<?, ?> contract = tool.contract();
+        return observeTool(contract.name(), tag(contract.implementationType()), tag(contract.riskLevel()), () -> {
+            try {
+                return executeRegistered(toolCall, context, tool);
+            } catch (RuntimeException exception) {
+                log.warn("工具执行器内部失败，agentRunId={}, toolCallId={}, toolName={}, exceptionType={}",
+                        safeLogValue(context.agentRunId()), safeLogValue(toolCall.id()),
+                        contract.name(), exception.getClass().getSimpleName());
+                return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "工具执行失败");
+            }
+        });
+    }
+
+    private ToolExecutionResult observeTool(String toolName, String implementationType, String riskLevel,
+                                            Supplier<ToolExecutionResult> action) {
+        Observation observation = Observation.createNotStarted("careerforge.tool.call", observationRegistry)
+                .contextualName("tool " + toolName)
+                .lowCardinalityKeyValue("tool.name", toolName)
+                .lowCardinalityKeyValue("implementation.type", implementationType)
+                .lowCardinalityKeyValue("risk.level", riskLevel)
+                .start();
+        try (Observation.Scope ignored = observation.openScope()) {
+            ToolExecutionResult result = action.get();
+            observation.lowCardinalityKeyValue("outcome", tag(result.status()))
+                    .lowCardinalityKeyValue("error.category",
+                            result.errorType() == null ? "none" : tag(result.errorType()));
+            return result;
         } catch (RuntimeException exception) {
-            log.warn("工具执行器内部失败，agentRunId={}, toolCallId={}, toolName={}, exceptionType={}",
-                    safeLogValue(context.agentRunId()), safeLogValue(toolCall.id()),
-                    toolCall.name(), exception.getClass().getSimpleName());
-            return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "工具执行失败");
+            observation.lowCardinalityKeyValue("outcome", "failure")
+                    .lowCardinalityKeyValue("error.category", "unexpected")
+                    .error(exception);
+            throw exception;
+        } finally {
+            observation.stop();
         }
+    }
+
+    private static String tag(Enum<?> value) {
+        return value.name().toLowerCase(Locale.ROOT);
     }
 
     /** 将通配符工具转交给类型安全的执行方法。 */
@@ -139,11 +188,9 @@ public final class SafeToolExecutor {
             // future 本质上用于 等待结果/检查是否完成/取得结果/捕获任务异常/请求取消任务/限制等待时间
             // RunMdcContext 保证 mdc在父子线程都存在不丢失
             RunMdcContext mdcContext = RunMdcContext.capture();
-            future = executorService.submit(
-                    mdcContext.wrapSupplier(
-                            () -> tool.execute(input, context)
-                    )
-            );
+            var task = CONTEXT_SNAPSHOT_FACTORY.captureAll()
+                    .wrap(mdcContext.wrapSupplier(() -> tool.execute(input, context)));
+            future = executorService.submit(task);
         } catch (RuntimeException exception) {
             return failure(toolCall, ToolExecutionErrorType.EXECUTION_FAILED, "工具执行任务无法提交");
         }

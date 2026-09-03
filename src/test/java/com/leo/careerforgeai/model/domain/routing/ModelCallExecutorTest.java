@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.model.domain.routing;
 
 import com.leo.careerforgeai.model.application.ProviderModelClient;
+import com.leo.careerforgeai.model.application.audit.ModelCallAuditRepository;
 import com.leo.careerforgeai.model.application.reliability.ModelCallBulkhead;
 import com.leo.careerforgeai.model.application.reliability.ModelCircuitBreaker;
 import com.leo.careerforgeai.model.application.reliability.ModelReliabilityMetrics;
@@ -14,17 +15,22 @@ import com.leo.careerforgeai.model.domain.ModelRequest;
 import com.leo.careerforgeai.model.domain.ModelResponse;
 import com.leo.careerforgeai.model.domain.ModelRole;
 import com.leo.careerforgeai.model.domain.ModelUsage;
+import com.leo.careerforgeai.model.domain.audit.ModelCallAudit;
 import com.leo.careerforgeai.model.domain.routing.ModelCapability;
 import com.leo.careerforgeai.model.domain.routing.ModelExecutionProfile;
 import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.model.domain.routing.ReasoningMode;
+import com.leo.careerforgeai.model.domain.stream.ModelStreamEvent;
+import com.leo.careerforgeai.model.domain.stream.ModelStreamEventType;
 import com.leo.careerforgeai.model.exception.ModelErrorType;
 import com.leo.careerforgeai.model.exception.ModelException;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +41,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -76,10 +83,11 @@ class ModelCallExecutorTest {
                 Duration.ofSeconds(10));
         ProviderModelClient deepseek = client("deepseek");
         ProviderModelClient kimi = client("kimi");
+        List<ModelCallAudit> audits = new ArrayList<>();
         when(deepseek.chat(eq(primary), any())).thenThrow(
                 new ModelException(ModelErrorType.RATE_LIMITED, "rate limited"));
         when(kimi.chat(eq(fallback), any())).thenReturn(response("kimi-k2.6"));
-        ModelCallExecutor executor = executor(List.of(primary, fallback), List.of(deepseek, kimi));
+        ModelCallExecutor executor = executor(List.of(primary, fallback), List.of(deepseek, kimi), audits::add);
 
         ModelResponse response = executor.chat(ModelTaskType.MEMORY_EXTRACTION, Set.of(),
                 request(), 2_000, true);
@@ -87,6 +95,13 @@ class ModelCallExecutorTest {
         assertThat(response.model()).isEqualTo("kimi-k2.6");
         verify(deepseek).chat(eq(primary), any());
         verify(kimi).chat(eq(fallback), any());
+        assertThat(audits).hasSize(2);
+        assertThat(audits.get(0).outcome()).isEqualTo(ModelCallAudit.Outcome.FAILURE);
+        assertThat(audits.get(0).errorCategory()).isEqualTo(ModelErrorType.RATE_LIMITED.name());
+        assertThat(audits.get(0).usage()).isNull();
+        assertThat(audits.get(1).outcome()).isEqualTo(ModelCallAudit.Outcome.SUCCESS);
+        assertThat(audits.get(1).fallbackCall()).isTrue();
+        assertThat(audits.get(1).usage()).isEqualTo(new ModelUsage(10, 2, 12));
     }
 
     @Test
@@ -107,6 +122,38 @@ class ModelCallExecutorTest {
                         exception -> assertThat(exception.getErrorType())
                                 .isEqualTo(ModelErrorType.INVALID_RESPONSE));
         verify(kimi, never()).chat(any(), any());
+    }
+
+    @Test
+    void shouldAuditCompletedStreamWithoutSavingContent() {
+        ModelExecutionProfile profile = profile("deepseek-primary", "deepseek", Duration.ofSeconds(10));
+        ProviderModelClient deepseek = client("deepseek");
+        List<ModelCallAudit> audits = new ArrayList<>();
+        List<ModelStreamEvent> events = new ArrayList<>();
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            java.util.function.Consumer<ModelStreamEvent> consumer = invocation.getArgument(2);
+            consumer.accept(new ModelStreamEvent(ModelStreamEventType.DELTA, "request-1", "sensitive-output", null, null));
+            consumer.accept(new ModelStreamEvent(ModelStreamEventType.COMPLETED, "request-1", null,
+                    new ModelUsage(20, 4, 24), null));
+            return null;
+        }).when(deepseek).stream(eq(profile), any(), any());
+        ModelCallExecutor executor = executor(List.of(profile), List.of(deepseek), audits::add);
+
+        executor.stream(
+                ModelTaskType.MEMORY_EXTRACTION,
+                Set.of(),
+                request(),
+                2_000,
+                events::add
+        );
+        assertThat(events).hasSize(2);
+        assertThat(audits).singleElement().satisfies(audit -> {
+            assertThat(audit.operationType()).isEqualTo(ModelCallAudit.OperationType.STREAM);
+            assertThat(audit.outcome()).isEqualTo(ModelCallAudit.Outcome.SUCCESS);
+            assertThat(audit.providerRequestId()).isNull();
+            assertThat(audit.usage()).isEqualTo(new ModelUsage(20, 4, 24));
+        });
     }
 
     @Test
@@ -141,7 +188,9 @@ class ModelCallExecutorTest {
                 circuitBreaker,
                 new ModelCallBulkhead(new ModelCallBulkheadProperties(1)),
                 properties,
-                metrics
+                metrics,
+                ObservationRegistry.NOOP,
+                audit -> { }
         );
 
         for (int invocation = 0; invocation < 3; invocation++) {
@@ -167,6 +216,12 @@ class ModelCallExecutorTest {
 
     private static ModelCallExecutor executor(List<ModelExecutionProfile> profiles,
                                               List<ProviderModelClient> clients) {
+        return executor(profiles, clients, audit -> { });
+    }
+
+    private static ModelCallExecutor executor(List<ModelExecutionProfile> profiles,
+                                               List<ProviderModelClient> clients,
+                                               ModelCallAuditRepository auditRepository) {
         ModelReliabilityProperties properties = new ModelReliabilityProperties(
                 1, Duration.ofMillis(1), Duration.ofMillis(1), 1.0,
                 Duration.ofSeconds(1), 10, 10, 100.0F,
@@ -176,12 +231,10 @@ class ModelCallExecutorTest {
         TaskAwareModelRouter router = new TaskAwareModelRouter(
                 Map.of(ModelTaskType.MEMORY_EXTRACTION, profiles), "routing-v1");
         return new ModelCallExecutor(
-                router,
-                clients,
+                router, clients,
                 new ModelCircuitBreaker(properties, Clock.systemUTC(), metrics),
                 new ModelCallBulkhead(new ModelCallBulkheadProperties(4)),
-                properties,
-                metrics
+                properties, metrics, ObservationRegistry.NOOP, auditRepository
         );
     }
 

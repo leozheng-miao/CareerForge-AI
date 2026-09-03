@@ -19,6 +19,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import io.micrometer.observation.ObservationRegistry;
 
 /**
  * @program: CareerForge-AI
@@ -74,9 +75,11 @@ public class AgentRuntimeConfiguration {
             JsonMapper jsonMapper,
             Validator validator,
             @Qualifier("agentToolExecutorService") ExecutorService executorService,
-            Clock agentClock
+            Clock agentClock,
+            ObservationRegistry observationRegistry
     ) {
-        return new SafeToolExecutor(toolRegistry, jsonMapper, validator, executorService, agentClock);
+        return new SafeToolExecutor(
+                toolRegistry, jsonMapper, validator, executorService, agentClock, observationRegistry);
     }
 
     /** 创建使用原生Tool Calling Gateway的手写Agent Loop。 */

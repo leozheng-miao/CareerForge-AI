@@ -1,5 +1,7 @@
 package com.leo.careerforgeai.interview.config;
 
+import io.micrometer.context.ContextExecutorService;
+import io.micrometer.context.ContextSnapshotFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,10 +19,12 @@ import java.util.concurrent.Executors;
 @ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
 public class InterviewSseConfiguration {
 
+    private static final ContextSnapshotFactory CONTEXT_SNAPSHOT_FACTORY = ContextSnapshotFactory.builder().clearMissing(true).build();
+
     @Bean(name = "interviewSseExecutor", destroyMethod = "shutdownNow")
     public ExecutorService interviewSseExecutor() {
-        return Executors.newThreadPerTaskExecutor(
-                Thread.ofVirtual().name("careerforge-interview-sse-", 0).factory()
-        );
+        ExecutorService delegate = Executors.newThreadPerTaskExecutor(
+                Thread.ofVirtual().name("careerforge-interview-sse-", 0).factory());
+        return ContextExecutorService.wrap(delegate, CONTEXT_SNAPSHOT_FACTORY);
     }
 }

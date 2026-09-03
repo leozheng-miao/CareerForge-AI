@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import io.micrometer.context.ContextSnapshotFactory;
 
 /**
  * @program: CareerForge-AI
@@ -31,6 +32,7 @@ public final class CoachingRunTaskExecutor implements AutoCloseable {
     private final Clock clock;
     private final Duration shutdownGracePeriod;
     private final AtomicBoolean accepting = new AtomicBoolean(true);
+    private static final ContextSnapshotFactory CONTEXT_SNAPSHOT_FACTORY = ContextSnapshotFactory.builder().clearMissing(true).build();
 
     public CoachingRunTaskExecutor(
             ExecutorService executorService,
@@ -72,10 +74,9 @@ public final class CoachingRunTaskExecutor implements AutoCloseable {
             );
         }
 
-        DeadlineFutureTask futureTask = new DeadlineFutureTask(
-                () -> executeTask(context, task),
-                lease
-        );
+        Runnable propagatedTask = CONTEXT_SNAPSHOT_FACTORY.captureAll()
+                .wrap(() -> executeTask(context, task));
+        DeadlineFutureTask futureTask = new DeadlineFutureTask(propagatedTask, lease);
 
         try {
             executorService.execute(futureTask);

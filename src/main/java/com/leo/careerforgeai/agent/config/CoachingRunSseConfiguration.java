@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import io.micrometer.context.ContextExecutorService;
+import io.micrometer.context.ContextSnapshotFactory;
 
 /**
  * @program: CareerForge-AI
@@ -17,12 +19,12 @@ import java.util.concurrent.Executors;
 @ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
 public class CoachingRunSseConfiguration {
 
+    private static final ContextSnapshotFactory CONTEXT_SNAPSHOT_FACTORY = ContextSnapshotFactory.builder().clearMissing(true).build();
+
     @Bean(name = "coachingRunSseExecutor", destroyMethod = "shutdownNow")
     public ExecutorService coachingRunSseExecutor() {
-        return Executors.newThreadPerTaskExecutor(
-                Thread.ofVirtual()
-                        .name("careerforge-run-sse-", 0)
-                        .factory()
-        );
+        ExecutorService delegate = Executors.newThreadPerTaskExecutor(
+                Thread.ofVirtual().name("careerforge-run-sse-", 0).factory());
+        return ContextExecutorService.wrap(delegate, CONTEXT_SNAPSHOT_FACTORY);
     }
 }

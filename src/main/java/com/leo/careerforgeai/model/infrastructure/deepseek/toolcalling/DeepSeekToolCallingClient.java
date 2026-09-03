@@ -49,6 +49,10 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import com.leo.careerforgeai.model.application.ProviderToolCallingClient;
+import com.leo.careerforgeai.model.domain.routing.ModelCapability;
+import com.leo.careerforgeai.model.domain.routing.ModelExecutionProfile;
+import com.leo.careerforgeai.model.domain.routing.ReasoningMode;
 
 /**
  * 负责公共 Tool Calling 协议与 DeepSeek HTTP 协议之间的双向转换，并拒绝结构异常或无法安全归类的响应。
@@ -56,7 +60,9 @@ import java.util.concurrent.TimeoutException;
 @Component
 @Profile("!performance-stub")
 @Slf4j
-public class DeepSeekToolCallingClient implements ToolCallingGateway {
+public class DeepSeekToolCallingClient implements ProviderToolCallingClient {
+
+    private static final String PROVIDER_ID = "deepseek";
 
     private static final String FUNCTION_TYPE = "function";
     private static final String ASSISTANT_ROLE = "assistant";
@@ -73,13 +79,28 @@ public class DeepSeekToolCallingClient implements ToolCallingGateway {
         this.clock = clock;
     }
 
+    @Override
+    public String providerId() {
+        return PROVIDER_ID;
+    }
 
     @Override
+    public ToolCallingModelResult call(ModelExecutionProfile profile,
+                                       ToolCallingRequest request) {
+        validateProfile(profile);
+        return executeCall(profile.model(), request);
+    }
+
+    /** 仅保留既有协议测试兼容入口，正式业务由RoutingToolCallingGateway调用。 */
     public ToolCallingModelResult call(ToolCallingRequest request) {
+        return executeCall(properties.getName(), request);
+    }
+
+    private ToolCallingModelResult executeCall(String model, ToolCallingRequest request) {
         if (request == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "Tool Calling 请求不能为空");
 
         long startNanos = System.nanoTime();
-        DeepSeekToolCallingRequest providerRequest = toProviderRequest(request);
+        DeepSeekToolCallingRequest providerRequest = toProviderRequest(model, request);
         try {
             DeepSeekToolCallingResponse providerResponse = execute(providerRequest, request.timeout());
             long durationMs = Duration.ofNanos(System.nanoTime() - startNanos).toMillis();
@@ -101,7 +122,7 @@ public class DeepSeekToolCallingClient implements ToolCallingGateway {
         }
     }
 
-    private DeepSeekToolCallingRequest toProviderRequest(ToolCallingRequest request) {
+    private DeepSeekToolCallingRequest toProviderRequest(String model, ToolCallingRequest request) {
         return new DeepSeekToolCallingRequest(
                 properties.getName(),
                 request.messages().stream().map(this::toProviderMessage).toList(),
@@ -115,6 +136,22 @@ public class DeepSeekToolCallingClient implements ToolCallingGateway {
                         request.outputFormat() == ModelOutputFormat.JSON_OBJECT ? "json_object" : "text"
                 )
         );
+    }
+
+    private static void validateProfile(ModelExecutionProfile profile) {
+        if (profile == null) throw new IllegalArgumentException("profile不能为空");
+        if (!PROVIDER_ID.equals(profile.provider())) {
+            throw new ModelException(ModelErrorType.CONFIGURATION_ERROR,
+                    "DeepSeek Tool Calling收到其他供应商Profile");
+        }
+        if (!profile.capabilities().contains(ModelCapability.TOOL_CALLING)) {
+            throw new ModelException(ModelErrorType.CONFIGURATION_ERROR,
+                    "当前Profile未声明Tool Calling能力");
+        }
+        if (profile.reasoningMode() != ReasoningMode.DISABLED) {
+            throw new ModelException(ModelErrorType.CONFIGURATION_ERROR,
+                    "当前DeepSeek Tool Calling适配器只支持关闭Thinking");
+        }
     }
 
     private DeepSeekToolCallingRequest.Message toProviderMessage(ToolCallingMessage message) {

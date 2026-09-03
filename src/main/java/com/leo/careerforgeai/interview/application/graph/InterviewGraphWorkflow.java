@@ -17,6 +17,10 @@ import static org.bsc.langgraph4j.StateGraph.END;
 import static org.bsc.langgraph4j.StateGraph.START;
 import static org.bsc.langgraph4j.action.AsyncEdgeAction.edge_async;
 import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
+import org.bsc.langgraph4j.action.NodeAction;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * @program: CareerForge-AI
@@ -54,6 +58,7 @@ public class InterviewGraphWorkflow {
     private final InterviewSupervisionGraphNode supervisionNode;
     private final InterviewRouteGraphNodes routeNodes;
     private final InterviewReportGraphNode reportNode;
+    private final ObservationRegistry observationRegistry;
 
     public InterviewGraphWorkflow(
             InterviewGraphNodes nodes,
@@ -62,29 +67,42 @@ public class InterviewGraphWorkflow {
             InterviewRouteGraphNodes routeNodes,
             InterviewReportGraphNode reportNode
     ) {
+        this(nodes, reviewNodes, supervisionNode, routeNodes, reportNode, ObservationRegistry.NOOP);
+    }
+
+    @Autowired
+    public InterviewGraphWorkflow(
+            InterviewGraphNodes nodes,
+            InterviewReviewGraphNodes reviewNodes,
+            InterviewSupervisionGraphNode supervisionNode,
+            InterviewRouteGraphNodes routeNodes,
+            InterviewReportGraphNode reportNode,
+            ObservationRegistry observationRegistry
+    ) {
         this.nodes = Objects.requireNonNull(nodes, "nodes不能为空");
         this.reviewNodes = Objects.requireNonNull(reviewNodes, "reviewNodes不能为空");
         this.supervisionNode = Objects.requireNonNull(supervisionNode, "supervisionNode不能为空");
         this.routeNodes = Objects.requireNonNull(routeNodes, "routeNodes不能为空");
         this.reportNode = Objects.requireNonNull(reportNode, "reportNode不能为空");
+        this.observationRegistry = Objects.requireNonNull(observationRegistry, "observationRegistry不能为空");
     }
 
     public CompiledGraph<InterviewGraphState> compile(BaseCheckpointSaver checkpointSaver) throws GraphStateException {
         Objects.requireNonNull(checkpointSaver, "checkpointSaver不能为空");
         StateGraph<InterviewGraphState> graph = new StateGraph<>(InterviewGraphState::new);
 
-        graph.addNode(LOAD_FROZEN_CONTEXT, node_async(nodes::loadFrozenContext));
-        graph.addNode(GENERATE_AND_PERSIST_QUESTION, node_async(nodes::generateAndPersistQuestion));
-        graph.addNode(VALIDATE_ANSWER_RESUME, node_async(nodes::validateAnswerResume));
-        graph.addNode(PREPARE_REVIEWS, node_async(reviewNodes::prepareReviews));
-        graph.addNode(TECHNICAL_REVIEW, node_async(reviewNodes::technicalReview));
-        graph.addNode(EVIDENCE_REVIEW, node_async(reviewNodes::evidenceReview));
-        graph.addNode(JOIN_REVIEWS, node_async(reviewNodes::joinReviews));
-        graph.addNode(SUPERVISE_ROUND, node_async(supervisionNode::superviseRound));
-        graph.addNode(CONTINUE_QUESTIONING, node_async(routeNodes::continueQuestioning));
-        graph.addNode(START_REPORT_GENERATION, node_async(routeNodes::startReportGeneration));
-        graph.addNode(GENERATE_AND_PERSIST_REPORT, node_async(reportNode::generateAndPersistReport));
-        graph.addNode(FINALIZE_FAILURE, node_async(routeNodes::finalizeFailure));
+        graph.addNode(LOAD_FROZEN_CONTEXT, node_async(observeNode(LOAD_FROZEN_CONTEXT, nodes::loadFrozenContext)));
+        graph.addNode(GENERATE_AND_PERSIST_QUESTION, node_async(observeNode(GENERATE_AND_PERSIST_QUESTION, nodes::generateAndPersistQuestion)));
+        graph.addNode(VALIDATE_ANSWER_RESUME, node_async(observeNode(VALIDATE_ANSWER_RESUME, nodes::validateAnswerResume)));
+        graph.addNode(PREPARE_REVIEWS, node_async(observeNode(PREPARE_REVIEWS, reviewNodes::prepareReviews)));
+        graph.addNode(TECHNICAL_REVIEW, node_async(observeNode(TECHNICAL_REVIEW, reviewNodes::technicalReview)));
+        graph.addNode(EVIDENCE_REVIEW, node_async(observeNode(EVIDENCE_REVIEW, reviewNodes::evidenceReview)));
+        graph.addNode(JOIN_REVIEWS, node_async(observeNode(JOIN_REVIEWS, reviewNodes::joinReviews)));
+        graph.addNode(SUPERVISE_ROUND, node_async(observeNode(SUPERVISE_ROUND, supervisionNode::superviseRound)));
+        graph.addNode(CONTINUE_QUESTIONING, node_async(observeNode(CONTINUE_QUESTIONING, routeNodes::continueQuestioning)));
+        graph.addNode(START_REPORT_GENERATION, node_async(observeNode(START_REPORT_GENERATION, routeNodes::startReportGeneration)));
+        graph.addNode(GENERATE_AND_PERSIST_REPORT, node_async(observeNode(GENERATE_AND_PERSIST_REPORT, reportNode::generateAndPersistReport)));
+        graph.addNode(FINALIZE_FAILURE, node_async(observeNode(FINALIZE_FAILURE, routeNodes::finalizeFailure)));
 
         graph.addEdge(START, LOAD_FROZEN_CONTEXT);
         graph.addEdge(LOAD_FROZEN_CONTEXT, GENERATE_AND_PERSIST_QUESTION);
@@ -124,5 +142,30 @@ public class InterviewGraphWorkflow {
         return state.routeDecision()
                 .orElseThrow(() -> new IllegalStateException("Supervisor没有返回routeDecision"))
                 .name();
+    }
+
+    private NodeAction<InterviewGraphState> observeNode(
+            String nodeName, NodeAction<InterviewGraphState> action) {
+        return state -> {
+            Observation observation = Observation.createNotStarted(
+                            "careerforge.interview.graph.node", observationRegistry)
+                    .contextualName("interview " + nodeName)
+                    .lowCardinalityKeyValue("graph.id", GRAPH_ID)
+                    .lowCardinalityKeyValue("node", nodeName)
+                    .start();
+            try (Observation.Scope ignored = observation.openScope()) {
+                Map<String, Object> update = action.apply(state);
+                observation.lowCardinalityKeyValue("outcome", "success")
+                        .lowCardinalityKeyValue("error.category", "none");
+                return update;
+            } catch (Exception exception) {
+                observation.lowCardinalityKeyValue("outcome", "failure")
+                        .lowCardinalityKeyValue("error.category", "execution")
+                        .error(exception);
+                throw exception;
+            } finally {
+                observation.stop();
+            }
+        };
     }
 }

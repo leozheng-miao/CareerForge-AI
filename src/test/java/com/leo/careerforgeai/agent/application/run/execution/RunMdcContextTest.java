@@ -93,6 +93,27 @@ class RunMdcContextTest {
                 .isEqualTo("trace-run-2");
     }
 
+    @Test
+    void shouldPreserveActiveTracingFieldsAndRemoveUntrustedMdcInsideRun() {
+        MDC.put(RunMdcContext.TRACE_ID, "0123456789abcdef0123456789abcdef");
+        MDC.put(RunMdcContext.SPAN_ID, "0123456789abcdef");
+        MDC.put("unsafeField", "untrusted");
+
+        RunMdcContext.from(new RunExecutionContext(
+                OWNER, RUN_ID, "fallback-trace", NOW, NOW.plusSeconds(60)
+        )).run(() -> {
+            assertThat(MDC.get(RunMdcContext.TRACE_ID))
+                    .isEqualTo("0123456789abcdef0123456789abcdef");
+            assertThat(MDC.get(RunMdcContext.SPAN_ID)).isEqualTo("0123456789abcdef");
+            assertThat(MDC.get("unsafeField")).isNull();
+            assertThat(MDC.get(RunMdcContext.RUN_ID)).isEqualTo(RUN_ID.toString());
+        });
+
+        assertThat(MDC.get(RunMdcContext.TRACE_ID))
+                .isEqualTo("0123456789abcdef0123456789abcdef");
+        assertThat(MDC.get("unsafeField")).isEqualTo("untrusted");
+    }
+
     /**
      * @program: CareerForge-AI
      * @description: 保存MDC传播测试读取到的日志字段

@@ -1,12 +1,9 @@
 package com.leo.careerforgeai.model.application.reliability;
 
 import com.leo.careerforgeai.model.application.ToolCallingGateway;
-import com.leo.careerforgeai.model.application.reliability.ModelCallBulkhead;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolCallingModelResult;
 import com.leo.careerforgeai.model.domain.toolcalling.ToolCallingRequest;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.annotation.Primary;
-import org.springframework.stereotype.Component;
 
 import java.util.Objects;
 
@@ -16,7 +13,6 @@ import java.util.Objects;
  * @author: Miao Zheng
  * @date: 2026-08-24
  */
-@Component
 public class BulkheadToolCallingGateway implements ToolCallingGateway {
 
     private final ToolCallingGateway delegate;

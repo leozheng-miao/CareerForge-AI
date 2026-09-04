@@ -45,8 +45,9 @@ public class TrainingPlanGenerationInputReader {
 
     public static final String INPUT_POLICY_VERSION = "training-plan-input-v1";
     private static final Pattern NUMBER_PATTERN = Pattern.compile("\\d+(?:\\.\\d+)?");
-    private static final Pattern HOURS_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(?:小时|hours?|hrs?)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern HOURS_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(?:个\\s*)?(?:小时|hours?|hrs?)", Pattern.CASE_INSENSITIVE);
     private static final Pattern WEEK_MARKER_PATTERN = Pattern.compile("每周|weekly|per\\s+week|/\\s*week", Pattern.CASE_INSENSITIVE);
+    private static final Pattern DAY_MARKER_PATTERN = Pattern.compile("每天|每日|daily|per\\s+day|/\\s*day", Pattern.CASE_INSENSITIVE);
 
     private final CurrentActorProvider currentActorProvider;
     private final CareerPlanningRepository repository;
@@ -161,17 +162,18 @@ public class TrainingPlanGenerationInputReader {
                 .filter(memory -> memory.type() == MemoryType.TIME_CONSTRAINT
                         && memory.normalizedKey().value().equals(TimeConstraintKey.WEEKLY_HOURS.value()))
                 .toList();
-
         if (weeklyConstraints.isEmpty()) {
-            throw failure(ErrorType.TIME_CONSTRAINT_MISSING, "缺少已确认的每周可用学习时间");
+            throw failure(ErrorType.TIME_CONSTRAINT_MISSING, "缺少已确认的可用学习时间");
         }
         if (weeklyConstraints.size() != 1) {
-            throw failure(ErrorType.TIME_CONSTRAINT_INVALID, "每周可用学习时间存在冲突");
+            throw failure(ErrorType.TIME_CONSTRAINT_INVALID, "可用学习时间存在冲突");
         }
 
         String content = weeklyConstraints.getFirst().content();
-        if (!WEEK_MARKER_PATTERN.matcher(content).find()) {
-            throw failure(ErrorType.TIME_CONSTRAINT_INVALID, "每周可用学习时间缺少明确的每周语义");
+        boolean weekly = WEEK_MARKER_PATTERN.matcher(content).find();
+        boolean daily = DAY_MARKER_PATTERN.matcher(content).find();
+        if (weekly == daily) {
+            throw failure(ErrorType.TIME_CONSTRAINT_INVALID, "可用学习时间必须明确且只能使用每天或每周语义");
         }
 
         List<String> allNumbers = NUMBER_PATTERN.matcher(content)
@@ -179,27 +181,27 @@ public class TrainingPlanGenerationInputReader {
                 .map(result -> result.group())
                 .toList();
         Matcher hoursMatcher = HOURS_PATTERN.matcher(content);
-
         if (allNumbers.size() != 1 || !hoursMatcher.find()) {
-            throw failure(ErrorType.TIME_CONSTRAINT_INVALID, "每周可用学习时间无法唯一解析");
+            throw failure(ErrorType.TIME_CONSTRAINT_INVALID, "可用学习时间无法唯一解析");
         }
 
         String hoursText = hoursMatcher.group(1);
         if (hoursMatcher.find() || !hoursText.equals(allNumbers.getFirst())) {
-            throw failure(ErrorType.TIME_CONSTRAINT_INVALID, "每周可用学习时间包含多个候选值");
+            throw failure(ErrorType.TIME_CONSTRAINT_INVALID, "可用学习时间包含多个候选值");
         }
 
         try {
-            int minutes = new BigDecimal(hoursText).multiply(BigDecimal.valueOf(60)).intValueExact();
+            BigDecimal hours = new BigDecimal(hoursText);
+            if (daily) hours = hours.multiply(BigDecimal.valueOf(7));
+            int minutes = hours.multiply(BigDecimal.valueOf(60)).intValueExact();
             if (minutes < 1 || minutes > TrainingPlanItem.MAX_ESTIMATED_MINUTES) {
                 throw new ArithmeticException("分钟数超出范围");
             }
             return minutes;
         } catch (ArithmeticException exception) {
-            throw failure(ErrorType.TIME_CONSTRAINT_INVALID, "每周可用学习时间超出允许范围", exception);
+            throw failure(ErrorType.TIME_CONSTRAINT_INVALID, "可用学习时间超出允许范围", exception);
         }
     }
-
     private List<ControlledResource> loadControlledResources() {
         List<SourceDocument> documents;
         try {

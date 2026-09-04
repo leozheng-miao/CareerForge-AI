@@ -10,10 +10,17 @@ spring:
         model: performance-stub
 
 careerforge:
-  model:
-    base-url: http://127.0.0.1
-    api-key: performance-stub-unused
-    name: performance-stub
+  model-routing:
+    providers:
+      deepseek:
+        base-url: http://127.0.0.1
+        api-key: performance-stub-unused
+        enabled: true
+    profiles:
+      deepseek-standard:
+        model: performance-stub
+      deepseek-thinking:
+        model: performance-stub
   performance:
     model-stub:
       latency: ${PERFORMANCE_STUB_MODEL_LATENCY:200ms}

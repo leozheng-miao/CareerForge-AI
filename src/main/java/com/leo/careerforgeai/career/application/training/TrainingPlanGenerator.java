@@ -111,10 +111,7 @@ public class TrainingPlanGenerator {
         ModelRequest request = new ModelRequest(
                 List.of(
                         new ModelMessage(ModelRole.SYSTEM, SYSTEM_PROMPT),
-                        new ModelMessage(
-                                ModelRole.USER,
-                                serializeInput(input, normalizedAdjustments)
-                        )
+                        new ModelMessage(ModelRole.USER, serializeInput(input, normalizedAdjustments))
                 ),
                 ModelOutputFormat.JSON_OBJECT
         );

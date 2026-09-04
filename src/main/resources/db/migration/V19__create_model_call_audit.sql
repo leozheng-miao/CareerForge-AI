@@ -25,7 +25,7 @@ CREATE TABLE model_call_audit
     PRIMARY KEY (audit_id),
 
     CONSTRAINT chk_model_call_audit_operation
-        CHECK (operation_type IN ('CHAT', 'STREAM', 'TOOL_CALLING'))
+        CHECK (operation_type IN ('CHAT', 'STREAM', 'TOOL_CALLING')),
 
     CONSTRAINT chk_model_call_audit_fallback
         CHECK (fallback_call IN (0, 1)),

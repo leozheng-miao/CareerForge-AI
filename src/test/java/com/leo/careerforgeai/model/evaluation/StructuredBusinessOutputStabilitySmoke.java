@@ -12,6 +12,7 @@ import com.leo.careerforgeai.memory.domain.conversation.ConversationTurnRole;
 import com.leo.careerforgeai.memory.domain.profile.*;
 import com.leo.careerforgeai.model.application.ModelGateway;
 import com.leo.careerforgeai.model.config.ModelProperties;
+import com.leo.careerforgeai.model.config.ModelTaskPolicyProperties;
 import com.leo.careerforgeai.model.domain.*;
 import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.model.domain.stream.ModelStreamEvent;
@@ -156,13 +157,15 @@ class StructuredBusinessOutputStabilitySmoke {
         printSummary(caseId, successes, failures, 0, providerCalls, totalTokens, durations);
         assertThat(failures).isZero();
     }
+
     private ModelGateway capturingGateway(List<ModelResponse> calls) {
+        ModelTaskPolicyProperties policies = evaluationTaskPolicies();
         return new ModelGateway() {
             @Override
-            public ModelResponse chat(ModelTaskType taskType,
-                                      ModelRequest request) {
-                ModelResponse response =
-                        realGateway.chat(evaluationProfile, request);
+            public ModelResponse chat(ModelTaskType taskType, ModelRequest request) {
+                ModelResponse response = realGateway.chat(
+                        evaluationProfile, policies.apply(taskType, request)
+                );
                 calls.add(response);
                 return response;
             }
@@ -170,11 +173,21 @@ class StructuredBusinessOutputStabilitySmoke {
             @Override
             public void stream(ModelTaskType taskType, ModelRequest request,
                                Consumer<ModelStreamEvent> consumer) {
-                realGateway.stream(evaluationProfile, request, consumer);
+                realGateway.stream(
+                        evaluationProfile, policies.apply(taskType, request), consumer
+                );
             }
         };
     }
 
+    private static ModelTaskPolicyProperties evaluationTaskPolicies() {
+        return new ModelTaskPolicyProperties(Map.of(
+                ModelTaskType.MEMORY_EXTRACTION,
+                new ModelTaskPolicyProperties.Policy(2_000, 1.0, TIMEOUT, true),
+                ModelTaskType.TRAINING_PLAN_GENERATION,
+                new ModelTaskPolicyProperties.Policy(4_000, 0.2, TIMEOUT, true)
+        ));
+    }
     private static List<MemoryExtractionTurnInput> memoryInput() {
         return List.of(new MemoryExtractionTurnInput(
                 TURN_ID,

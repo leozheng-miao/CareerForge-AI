@@ -134,10 +134,58 @@ careerforge:
       INTERVIEW_EVIDENCE_REVIEW: [ deepseek-standard ]
       INTERVIEW_REPORT: [ deepseek-standard ]
       STRUCTURED_OUTPUT_REPAIR: [ deepseek-standard ]
-  model:
-    base-url: ${AI_MODEL_BASE_URL}
-    api-key: ${AI_MODEL_API_KEY}
-    name: ${AI_MODEL_NAME}
+  model-task-policy:
+    tasks:
+      JOB_REQUIREMENTS_EXTRACTION:
+        max-output-tokens: 2000
+        temperature: 1.0
+        timeout: 60s
+        fallback-allowed: true
+      CAREER_COACH:
+        max-output-tokens: 2000
+        temperature: 1.0
+        timeout: 60s
+        fallback-allowed: true
+      MEMORY_EXTRACTION:
+        max-output-tokens: 2000
+        temperature: 1.0
+        timeout: 60s
+        fallback-allowed: true
+      TRAINING_PLAN_GENERATION:
+        max-output-tokens: 4000
+        temperature: 0.2
+        timeout: 60s
+        fallback-allowed: true
+      RAG_ANSWER:
+        max-output-tokens: 2000
+        temperature: 1.0
+        timeout: 60s
+        fallback-allowed: true
+      INTERVIEW_QUESTION:
+        max-output-tokens: 1200
+        temperature: 0.0
+        timeout: 60s
+        fallback-allowed: true
+      INTERVIEW_TECHNICAL_REVIEW:
+        max-output-tokens: 1800
+        temperature: 0.0
+        timeout: 60s
+        fallback-allowed: true
+      INTERVIEW_EVIDENCE_REVIEW:
+        max-output-tokens: 1200
+        temperature: 0.0
+        timeout: 60s
+        fallback-allowed: true
+      INTERVIEW_REPORT:
+        max-output-tokens: 4000
+        temperature: 0.0
+        timeout: 60s
+        fallback-allowed: true
+      STRUCTURED_OUTPUT_REPAIR:
+        max-output-tokens: 2200
+        temperature: 0.0
+        timeout: 30s
+        fallback-allowed: true
   model-call-bulkhead:
     max-concurrent-calls: ${MODEL_MAX_CONCURRENT_CALLS:4}
   model-reliability:

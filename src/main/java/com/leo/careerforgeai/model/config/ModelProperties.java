@@ -1,34 +1,27 @@
 package com.leo.careerforgeai.model.config;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.validation.annotation.Validated;
 
 import java.net.URI;
+import java.util.Objects;
 
 /**
  * @program: CareerForge-AI
- * @description:
+ * @description: 保存从统一模型路由配置派生的DeepSeek适配器连接参数，不直接绑定外部配置
  * @author: Miao Zheng
- * @date: 2026-07-28 16:21
- **/
-@ConfigurationProperties(prefix = "careerforge.model", ignoreUnknownFields = false)
-@Validated
+ * @date: 2026-07-28
+ */
 @Getter
 public final class ModelProperties {
-
-    @NotNull
     private final URI baseUrl;
-    @NotBlank
     private final String apiKey;
-    @NotBlank
     private final String name;
 
     public ModelProperties(URI baseUrl, String apiKey, String name) {
-        this.baseUrl = baseUrl;
-        this.apiKey = apiKey;
-        this.name = name;
+        this.baseUrl = Objects.requireNonNull(baseUrl, "baseUrl不能为空");
+        if (apiKey == null || apiKey.isBlank()) throw new IllegalArgumentException("apiKey不能为空");
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("name不能为空");
+        this.apiKey = apiKey.strip();
+        this.name = name.strip();
     }
 }

@@ -2,8 +2,6 @@ package com.leo.careerforgeai.career.application.training;
 
 import com.leo.careerforgeai.career.application.port.CareerPlanningRepository;
 import com.leo.careerforgeai.career.application.skillgap.DeterministicSkillGapMatcher;
-import com.leo.careerforgeai.career.application.training.TrainingPlanGenerationException;
-import com.leo.careerforgeai.career.application.training.TrainingPlanGenerationInputReader;
 import com.leo.careerforgeai.career.domain.JobRequirements;
 import com.leo.careerforgeai.career.domain.SkillGapSnapshot;
 import com.leo.careerforgeai.career.domain.TargetRole;
@@ -177,6 +175,15 @@ class TrainingPlanGenerationInputReaderTest {
                 () -> reader.read(SNAPSHOT_ID),
                 CONTROLLED_RESOURCE_INVALID
         );
+    }
+
+    @Test
+    void shouldNormalizeDailyHoursToWeeklyMinutes() {
+        stubBaseInput("我每天能够学习5个小时");
+
+        var input = reader.read(SNAPSHOT_ID);
+
+        assertThat(input.weeklyAvailableMinutes()).isEqualTo(2100);
     }
 
     private void stubBaseInput(String weeklyContent) {

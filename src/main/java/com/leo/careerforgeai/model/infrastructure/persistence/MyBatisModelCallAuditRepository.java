@@ -18,7 +18,7 @@ import java.util.Objects;
  */
 @Repository
 @ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
-public final class MyBatisModelCallAuditRepository implements ModelCallAuditRepository {
+public class MyBatisModelCallAuditRepository implements ModelCallAuditRepository {
     private final ModelCallAuditMapper mapper;
 
     public MyBatisModelCallAuditRepository(ModelCallAuditMapper mapper) {

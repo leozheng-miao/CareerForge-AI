@@ -156,14 +156,14 @@ public class AuthApplicationService {
     }
 
     public void logout(String rawRefreshToken) {
-        ActorId currentActor = currentActorProvider.currentActor();
         String tokenHash;
         try {
             tokenHash = tokenService.hashRefreshToken(rawRefreshToken);
         } catch (IllegalArgumentException exception) {
             return;
         }
-        repository.revokeActiveToken(currentActor, tokenHash, clock.instant());
+        repository.findRefreshTokenByHash(tokenHash).ifPresent(token ->
+                repository.revokeActiveToken(token.userId(), tokenHash, clock.instant()));
     }
 
     public CurrentUser me() {

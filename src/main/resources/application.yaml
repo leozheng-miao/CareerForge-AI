@@ -70,6 +70,11 @@ careerforge:
     access-token-ttl: ${CAREERFORGE_ACCESS_TOKEN_TTL:15m}
     refresh-token-ttl: ${CAREERFORGE_REFRESH_TOKEN_TTL:30d}
     refresh-token-bytes: ${CAREERFORGE_REFRESH_TOKEN_BYTES:32}
+  refresh-token-cookie:
+    name: ${CAREERFORGE_REFRESH_COOKIE_NAME:careerforge_refresh}
+    path: ${CAREERFORGE_REFRESH_COOKIE_PATH:/api/auth}
+    secure: ${CAREERFORGE_REFRESH_COOKIE_SECURE:true}
+    same-site: ${CAREERFORGE_REFRESH_COOKIE_SAME_SITE:Strict}
   login-rate-limit:
     max-attempts: ${CAREERFORGE_AUTH_LOGIN_MAX_ATTEMPTS:10}
     window: ${CAREERFORGE_AUTH_LOGIN_WINDOW:10m}

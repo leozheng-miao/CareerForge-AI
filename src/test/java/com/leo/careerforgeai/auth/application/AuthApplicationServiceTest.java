@@ -183,23 +183,55 @@ class AuthApplicationServiceTest {
 
     /**
      * @program: CareerForge-AI
-     * @description: 验证退出和GET me始终使用认证上下文中的用户而非客户端ownerId
+     * @description: 验证退出根据Refresh Token持久化归属撤销Token而不依赖Access Token
      * @author: Miao Zheng
-     * @date: 2026-09-03
+     * @date: 2026-09-08
      **/
     @Test
-    void shouldUseCurrentActorForLogoutAndCurrentUserQuery() {
-        when(currentActorProvider.currentActor()).thenReturn(USER_ID);
+    void shouldRevokeRefreshTokenUsingPersistedOwner() {
+        RefreshToken token = activeToken(TOKEN_ID, null, HASH_A);
         when(tokenService.hashRefreshToken("owned-refresh")).thenReturn(HASH_A);
-        when(repository.findAccountById(USER_ID)).thenReturn(Optional.of(account()));
+        when(repository.findRefreshTokenByHash(HASH_A)).thenReturn(Optional.of(token));
 
         service.logout("owned-refresh");
-        AuthApplicationService.CurrentUser currentUser = service.me();
 
         verify(repository).revokeActiveToken(USER_ID, HASH_A, NOW);
+        verifyNoInteractions(currentActorProvider);
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 验证当前账户查询始终使用Spring Security认证上下文
+     * @author: Miao Zheng
+     * @date: 2026-09-08
+     **/
+    @Test
+    void shouldReadCurrentUserFromSecurityContext() {
+        when(currentActorProvider.currentActor()).thenReturn(USER_ID);
+        when(repository.findAccountById(USER_ID)).thenReturn(Optional.of(account()));
+
+        AuthApplicationService.CurrentUser currentUser = service.me();
+
         verify(repository).findAccountById(USER_ID);
         assertThat(currentUser.userId()).isEqualTo(USER_ID);
         assertThat(currentUser.email()).isEqualTo("user@example.com");
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 验证未知Refresh Token退出时保持幂等且不撤销其他Token
+     * @author: Miao Zheng
+     * @date: 2026-09-08
+     **/
+    @Test
+    void shouldIgnoreUnknownRefreshTokenDuringLogout() {
+        when(tokenService.hashRefreshToken("unknown-refresh")).thenReturn(HASH_A);
+        when(repository.findRefreshTokenByHash(HASH_A)).thenReturn(Optional.empty());
+
+        service.logout("unknown-refresh");
+
+        verify(repository, never()).revokeActiveToken(any(), anyString(), any());
+        verifyNoInteractions(currentActorProvider);
     }
 
     private void stubInitialSession() {

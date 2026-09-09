@@ -34,6 +34,9 @@ import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.leo.careerforgeai.auth.application.AuthException;
+import com.leo.careerforgeai.auth.config.RefreshTokenCookieProperties;
+import jakarta.servlet.http.Cookie;
 
 /**
  * @program: CareerForge-AI
@@ -70,34 +73,41 @@ class AuthSecurityBoundaryTest {
 
     /**
      * @program: CareerForge-AI
-     * @description: 验证注册入口无需Access Token且只返回前端认证契约
+     * @description: 验证公开注册签发HttpOnly Cookie且响应不暴露Refresh Token
      * @author: Miao Zheng
-     * @date: 2026-09-03
+     * @date: 2026-09-08
      **/
     @Test
-    void shouldAllowPublicRegistration() throws Exception {
+    void shouldAllowPublicRegistrationAndIssueRefreshCookie() throws Exception {
         when(service.register("user@example.com", "User", "safe-password"))
-                .thenReturn(authResult());
+                .thenReturn(authResult("refresh-token"));
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {
-                                  "email":"user@example.com",
-                                  "displayName":"User",
-                                  "password":"safe-password"
-                                }
-                                """))
+                            {
+                              "email":"user@example.com",
+                              "displayName":"User",
+                              "password":"safe-password"
+                            }
+                            """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.userId").value(USER_ID.value()))
                 .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.data.accessToken").value("access-token"))
-                .andExpect(content().string(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.containsString("passwordHash")
-                )));
+                .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
+                .andExpect(cookie().value("careerforge_refresh", "refresh-token"))
+                .andExpect(cookie().httpOnly("careerforge_refresh", true))
+                .andExpect(cookie().secure("careerforge_refresh", false))
+                .andExpect(cookie().path("careerforge_refresh", "/api/auth"))
+                .andExpect(cookie().sameSite("careerforge_refresh", "Strict"))
+                .andExpect(cookie().maxAge("careerforge_refresh", 2_592_000))
+                .andExpect(header().string(
+                        "Cache-Control",
+                        org.hamcrest.Matchers.containsString("no-store")
+                ));
     }
-
     /**
      * @program: CareerForge-AI
      * @description: 验证GET me缺少Bearer Token时返回稳定未登录错误
@@ -169,6 +179,87 @@ class AuthSecurityBoundaryTest {
         verifyNoInteractions(service);
     }
 
+    /**
+     * @program: CareerForge-AI
+     * @description: 验证刷新接口从Cookie读取Refresh Token并轮换Cookie
+     * @author: Miao Zheng
+     * @date: 2026-09-08
+     **/
+    @Test
+    void shouldRefreshSessionFromCookieAndRotateCookie() throws Exception {
+        when(service.refresh("current-refresh"))
+                .thenReturn(authResult("replacement-refresh"));
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie("careerforge_refresh", "current-refresh")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
+                .andExpect(cookie().value("careerforge_refresh", "replacement-refresh"))
+                .andExpect(cookie().httpOnly("careerforge_refresh", true))
+                .andExpect(cookie().maxAge("careerforge_refresh", 2_592_000));
+
+        verify(service).refresh("current-refresh");
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 验证缺少Refresh Token Cookie时返回稳定未授权错误
+     * @author: Miao Zheng
+     * @date: 2026-09-08
+     **/
+    @Test
+    void shouldRejectRefreshWithoutCookie() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(40111))
+                .andExpect(jsonPath("$.message").value("Refresh Token无效或已过期"));
+
+        verifyNoInteractions(service);
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 验证Refresh Token失效时立即清除浏览器Cookie
+     * @author: Miao Zheng
+     * @date: 2026-09-08
+     **/
+    @Test
+    void shouldClearCookieWhenRefreshTokenIsInvalid() throws Exception {
+        when(service.refresh("invalid-refresh"))
+                .thenThrow(new AuthException(AuthException.Reason.REFRESH_TOKEN_INVALID));
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie("careerforge_refresh", "invalid-refresh")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(40111))
+                .andExpect(cookie().value("careerforge_refresh", ""))
+                .andExpect(cookie().maxAge("careerforge_refresh", 0));
+
+        verify(service).refresh("invalid-refresh");
+    }
+
+    /**
+     * @program: CareerForge-AI
+     * @description: 验证Access Token过期后仍能通过Refresh Token退出并清除Cookie
+     * @author: Miao Zheng
+     * @date: 2026-09-08
+     **/
+    @Test
+    void shouldLogoutWithoutAccessTokenAndClearCookie() throws Exception {
+        mockMvc.perform(post("/api/auth/logout")
+                        .cookie(new Cookie("careerforge_refresh", "current-refresh")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(cookie().value("careerforge_refresh", ""))
+                .andExpect(cookie().httpOnly("careerforge_refresh", true))
+                .andExpect(cookie().path("careerforge_refresh", "/api/auth"))
+                .andExpect(cookie().maxAge("careerforge_refresh", 0));
+
+        verify(service).logout("current-refresh");
+    }
+
     private String validAccessToken() {
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
@@ -186,12 +277,17 @@ class AuthSecurityBoundaryTest {
                 .getTokenValue();
     }
 
-    private AuthApplicationService.AuthResult authResult() {
+    private AuthApplicationService.AuthResult authResult(String refreshToken) {
         Instant now = Instant.now();
         return new AuthApplicationService.AuthResult(
-                USER_ID, "user@example.com", "User", "Bearer",
-                "access-token", now.plusSeconds(900),
-                "refresh-token", now.plus(Duration.ofDays(30))
+                USER_ID,
+                "user@example.com",
+                "User",
+                "Bearer",
+                "access-token",
+                now.plusSeconds(900),
+                refreshToken,
+                now.plus(Duration.ofDays(30))
         );
     }
 
@@ -228,12 +324,30 @@ class AuthSecurityBoundaryTest {
         }
 
         @Bean
+        RefreshTokenCookieProperties refreshTokenCookieProperties() {
+            return new RefreshTokenCookieProperties(
+                    "careerforge_refresh",
+                    "/api/auth",
+                    false,
+                    "Strict"
+            );
+        }
+
+        @Bean
+        RefreshTokenCookieManager refreshTokenCookieManager(
+                AuthProperties authProperties,
+                RefreshTokenCookieProperties cookieProperties) {
+            return new RefreshTokenCookieManager(authProperties, cookieProperties);
+        }
+
+        @Bean
         AuthController authController(
                 AuthApplicationService service,
-                AuthLoginRateLimiter loginRateLimiter
-        ) {
-            return new AuthController(service, loginRateLimiter);
+                AuthLoginRateLimiter loginRateLimiter,
+                RefreshTokenCookieManager cookieManager) {
+            return new AuthController(service, loginRateLimiter, cookieManager);
         }
+
         @Bean
         AuthLoginRateLimiter authLoginRateLimiter() {
             return mock(AuthLoginRateLimiter.class);

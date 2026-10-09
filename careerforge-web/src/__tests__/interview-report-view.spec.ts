@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest';import {mount} from '@vue/test-utils';import InterviewReportSection from '@/features/interview/components/InterviewReportSection.vue'
+describe('formal report',()=>{it('shows evidence quote without a numeric score or partial label',()=>{const wrapper=mount(InterviewReportSection,{props:{title:'做得好的地方',items:[{title:'可靠性意识',description:'说明了幂等与有界重试',quote:'我使用幂等键'}]}});expect(wrapper.text()).toContain('我使用幂等键');expect(wrapper.text()).not.toMatch(/\d+\s*(?:分|%)/);expect(wrapper.text()).not.toContain('部分报告')})})

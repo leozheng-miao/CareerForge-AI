@@ -62,6 +62,13 @@ spring:
     deserialization:
       fail-on-unknown-properties: true
 careerforge:
+  interview:
+    legacy-api-enabled: false
+    supervisor:
+      next-round-model-calls: ${INTERVIEW_NEXT_ROUND_MODEL_CALLS:3}
+      next-round-tokens: ${INTERVIEW_NEXT_ROUND_TOKENS:4000}
+      report-model-calls: ${INTERVIEW_REPORT_MODEL_CALLS:1}
+      report-tokens: ${INTERVIEW_REPORT_TOKENS:4000}
   auth:
     enabled: ${CAREERFORGE_AUTH_ENABLED:true}
     issuer: ${CAREERFORGE_AUTH_ISSUER:careerforge-api}
@@ -78,12 +85,28 @@ careerforge:
   login-rate-limit:
     max-attempts: ${CAREERFORGE_AUTH_LOGIN_MAX_ATTEMPTS:10}
     window: ${CAREERFORGE_AUTH_LOGIN_WINDOW:10m}
-  interview:
-    supervisor:
-      next-round-model-calls: ${INTERVIEW_NEXT_ROUND_MODEL_CALLS:3}
-      next-round-tokens: ${INTERVIEW_NEXT_ROUND_TOKENS:4000}
-      report-model-calls: ${INTERVIEW_REPORT_MODEL_CALLS:1}
-      report-tokens: ${INTERVIEW_REPORT_TOKENS:4000}
+  interview-flow:
+    resume-parsing:
+      temp-directory: ${INTERVIEW_RESUME_TEMP_DIRECTORY:${java.io.tmpdir}/careerforge-resume}
+      max-upload-size: ${INTERVIEW_RESUME_MAX_UPLOAD_SIZE:5MB}
+      max-docx-entries: ${INTERVIEW_RESUME_MAX_DOCX_ENTRIES:256}
+      max-docx-expanded-size: ${INTERVIEW_RESUME_MAX_EXPANDED_SIZE:25MB}
+      max-text-characters: ${INTERVIEW_RESUME_MAX_TEXT_CHARACTERS:100000}
+      timeout: ${INTERVIEW_RESUME_PARSE_TIMEOUT:10s}
+    timer:
+      heartbeat-interval: ${INTERVIEW_HEARTBEAT_INTERVAL:10s}
+      lease-duration: ${INTERVIEW_ACTIVITY_LEASE_DURATION:30s}
+      sweep-interval: ${INTERVIEW_LEASE_SWEEP_INTERVAL:15s}
+      sweep-batch-size: ${INTERVIEW_LEASE_SWEEP_BATCH_SIZE:100}
+    task-executor:
+      enabled: ${INTERVIEW_TASK_EXECUTOR_ENABLED:true}
+      poll-batch-size: ${INTERVIEW_TASK_POLL_BATCH_SIZE:8}
+      max-concurrent-tasks: ${INTERVIEW_TASK_MAX_CONCURRENT:8}
+      max-concurrent-tasks-per-owner: ${INTERVIEW_TASK_MAX_PER_OWNER:2}
+      poll-interval: ${INTERVIEW_TASK_POLL_INTERVAL:1s}
+      lease-duration: ${INTERVIEW_TASK_LEASE_DURATION:90s}
+      task-timeout: ${INTERVIEW_TASK_TIMEOUT:60s}
+      retry-delay: ${INTERVIEW_TASK_RETRY_DELAY:5s}
   actor:
     fixed-id: ${CAREERFORGE_ACTOR_ID:actor-dev}
   persistence:
@@ -135,6 +158,8 @@ careerforge:
       TRAINING_PLAN_GENERATION: [ deepseek-standard ]
       RAG_ANSWER: [ deepseek-standard ]
       INTERVIEW_QUESTION: [ deepseek-standard ]
+      INTERVIEW_BLUEPRINT: [ deepseek-standard ]
+      INTERVIEW_TURN_DECISION: [ deepseek-standard ]
       INTERVIEW_TECHNICAL_REVIEW: [ deepseek-standard ]
       INTERVIEW_EVIDENCE_REVIEW: [ deepseek-standard ]
       INTERVIEW_REPORT: [ deepseek-standard ]
@@ -170,6 +195,16 @@ careerforge:
         max-output-tokens: 1200
         temperature: 0.0
         timeout: 60s
+        fallback-allowed: true
+      INTERVIEW_BLUEPRINT:
+        max-output-tokens: 600
+        temperature: 0.0
+        timeout: 30s
+        fallback-allowed: true
+      INTERVIEW_TURN_DECISION:
+        max-output-tokens: 1200
+        temperature: 0.0
+        timeout: 45s
         fallback-allowed: true
       INTERVIEW_TECHNICAL_REVIEW:
         max-output-tokens: 1800

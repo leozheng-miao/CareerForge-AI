@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -23,7 +23,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/mock-interviews")
 @Tag(name = "Mock Interview Event")
-@ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
+@ConditionalOnExpression("${careerforge.persistence.enabled:false} && ${careerforge.interview.legacy-api-enabled:false}")
 public class InterviewEventController {
 
     private final InterviewSseService sseService;

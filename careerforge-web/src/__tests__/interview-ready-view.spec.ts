@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest';import {mount} from '@vue/test-utils';import InterviewWaitingState from '@/features/interview/components/InterviewWaitingState.vue'
+describe('interview ready and waiting states',()=>{it('explains that analysis time is paused without disclosing topics',()=>{const wrapper=mount(InterviewWaitingState);expect(wrapper.text()).toContain('不计入 60 分钟');expect(wrapper.text()).not.toContain('内部考查目标')})})

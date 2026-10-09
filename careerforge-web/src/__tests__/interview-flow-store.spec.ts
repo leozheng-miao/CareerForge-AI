@@ -1,0 +1,8 @@
+import { beforeEach,describe,expect,it,vi } from 'vitest';import {createPinia,setActivePinia} from 'pinia'
+const api=vi.hoisted(()=>({getResumableInterview:vi.fn(),getInterview:vi.fn(),getCurrentQuestion:vi.fn(),heartbeat:vi.fn(),createQuickInterview:vi.fn(),enterInterview:vi.fn(),resumeInterview:vi.fn(),saveDraft:vi.fn(),submitAnswer:vi.fn(),skipQuestion:vi.fn(),pauseInterview:vi.fn(),finishInterview:vi.fn(),getInterviewReport:vi.fn()}))
+vi.mock('@/features/interview/api/interview-flow-api',()=>api)
+import {useInterviewFlowStore} from '@/features/interview/store/interview-flow-store'
+describe('interview flow store',()=>{beforeEach(()=>{setActivePinia(createPinia());vi.clearAllMocks()})
+  it('restores MySQL truth and current question after losing SSE',async()=>{api.getInterview.mockResolvedValue({interviewId:'i',mode:'QUICK',stage:'INTERVIEWING',version:3});api.getCurrentQuestion.mockResolvedValue({questionId:'q',draft:'saved',answerVersion:2,sessionVersion:3});api.heartbeat.mockResolvedValue({remainingSeconds:120,version:3});const store=useInterviewFlowStore();await store.restore('i');expect(store.question?.draft).toBe('saved');expect(api.getCurrentQuestion).toHaveBeenCalledWith('i')})
+  it('freezes local question after accepted submission',async()=>{const store=useInterviewFlowStore();store.session={interviewId:'i',mode:'QUICK',stage:'INTERVIEWING',version:3};store.question={questionId:'q',type:'MAIN',displayOrder:10,content:'q',draft:'a',answerVersion:2,sessionVersion:3};api.submitAnswer.mockResolvedValue({sessionStage:'INTERVIEWING',sessionVersion:4});await store.submit('answer');expect(store.question).toBeNull();expect(store.waiting).toBe(true)})
+})

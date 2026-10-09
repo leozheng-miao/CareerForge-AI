@@ -1,15 +1,19 @@
 package com.leo.careerforgeai.agent.domain.tool;
 
 import com.leo.careerforgeai.knowledge.domain.retrieval.RetrievalScope;
+import com.leo.careerforgeai.shared.actor.ActorId;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 
 /** 保存工具执行时由服务端提供、模型无法覆盖的受信任上下文。 */
 public record ToolExecutionContext(
         String agentRunId,
         Instant deadline,
-        RetrievalScope retrievalScope
+        RetrievalScope retrievalScope,
+        ActorId ownerId,
+        UUID interviewId
 ) {
 
     public ToolExecutionContext {
@@ -18,5 +22,13 @@ public record ToolExecutionContext(
         }
         Objects.requireNonNull(deadline, "deadline 不能为空");
         Objects.requireNonNull(retrievalScope, "retrievalScope 不能为空");
+    }
+
+    public ToolExecutionContext(
+            String agentRunId,
+            Instant deadline,
+            RetrievalScope retrievalScope
+    ) {
+        this(agentRunId, deadline, retrievalScope, null, null);
     }
 }

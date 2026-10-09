@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest';import router from '@/router'
+describe('interview flow routes',()=>{it('publishes start records ready session and report routes',()=>{const names=router.getRoutes().map(r=>r.name);expect(names).toEqual(expect.arrayContaining(['interviews','interview-records','interview-ready','interview-session','interview-report']));expect(names).not.toContain('interview-detail')})})

@@ -6,7 +6,7 @@ import com.leo.careerforgeai.shared.web.BaseResponse;
 import com.leo.careerforgeai.shared.web.ResultUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Objects;
@@ -21,7 +21,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/mock-interviews")
 @Tag(name = "Mock Interview Question")
-@ConditionalOnProperty(prefix = "careerforge.persistence", name = "enabled", havingValue = "true")
+@ConditionalOnExpression("${careerforge.persistence.enabled:false} && ${careerforge.interview.legacy-api-enabled:false}")
 public class InterviewQuestionController {
 
     private final CurrentInterviewQuestionQueryApplicationService queryService;

@@ -1,0 +1,3 @@
+<script setup lang="ts">import { Tag } from 'ant-design-vue'; import type { CurrentQuestion } from '@/features/interview/api/interview-flow-api'; defineProps<{ question: CurrentQuestion }>()</script>
+<template><section class="question"><Tag color="geekblue">{{ question.type === 'FOLLOW_UP' ? '追问' : '当前问题' }}</Tag><h2>{{ question.content }}</h2></section></template>
+<style scoped>.question{padding:28px;border:1px solid var(--cf-color-border);border-radius:16px;background:#fff;box-shadow:var(--cf-shadow-card)}h2{margin:18px 0 0;white-space:pre-wrap;color:#0b1740;font-size:24px;line-height:1.65}</style>

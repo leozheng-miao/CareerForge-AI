@@ -39,6 +39,17 @@ public class CareerForgeRedisKeyFactory {
         return ownerPrefix(ownerId) + ":interview:" + interviewId + ":events";
     }
 
+    public String interviewActivityLeaseKey(
+            ActorId ownerId,
+            UUID interviewId
+    ) {
+        Objects.requireNonNull(interviewId, "interviewId不能为null");
+        return ownerPrefix(ownerId)
+                + ":interview:"
+                + interviewId
+                + ":activity";
+    }
+
     public String ownerRateLimitKey(ActorId ownerId, String operation) {
         requireOperation(operation);
         return ownerPrefix(ownerId) + ":rate:" + operation;

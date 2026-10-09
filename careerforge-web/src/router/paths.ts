@@ -1,0 +1,15 @@
+export const ROUTE_PATHS = {
+  home: '/',
+  login: '/login',
+  register: '/register',
+  app: '/app',
+  targetRole: '/app/target-role',
+  skillGaps: '/app/skill-gaps',
+  trainingPlans: '/app/training-plans',
+  coach: '/app/coach',
+  knowledge: '/app/knowledge',
+  memories: '/app/memories',
+  evidence: '/app/evidence',
+  interviews: '/app/interviews',
+  interviewRecords: '/app/interview-records',
+} as const

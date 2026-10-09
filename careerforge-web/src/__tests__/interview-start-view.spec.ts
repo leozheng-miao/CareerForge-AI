@@ -1,0 +1,5 @@
+import {beforeEach,describe,expect,it,vi} from 'vitest';import {mount,flushPromises} from '@vue/test-utils';import {createPinia,setActivePinia} from 'pinia'
+const api=vi.hoisted(()=>({getResumableInterview:vi.fn(),createQuickInterview:vi.fn()}));vi.mock('@/features/interview/api/interview-flow-api',async original=>({...await original<typeof import('@/features/interview/api/interview-flow-api')>(),...api}));vi.mock('vue-router',()=>({useRouter:()=>({push:vi.fn()})}))
+import InterviewsView from '@/views/app/InterviewsView.vue'
+describe('quick interview start',()=>{beforeEach(()=>{setActivePinia(createPinia());api.getResumableInterview.mockResolvedValue(null)})
+it('shows quick choice and keeps comprehensive in second delivery',async()=>{const wrapper=mount(InterviewsView,{global:{plugins:[createPinia()]}});await flushPromises();expect(wrapper.text()).toContain('快速面试');expect(wrapper.text()).toContain('AI Agent 开发方向');expect(wrapper.text()).toContain('第二交付');expect(wrapper.text()).not.toContain('数据结构与算法')})})

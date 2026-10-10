@@ -76,4 +76,16 @@ public interface InterviewFlowTopicMapper
             @Param("interviewId") String interviewId,
             @Param("expectedVersion") long expectedVersion
     );
+
+    @Update("""
+            UPDATE interview_flow_topic
+            SET topic_status = 'INVALIDATED', version = version + 1,
+                updated_at = CURRENT_TIMESTAMP(6)
+            WHERE owner_id = #{ownerId} AND session_id = #{interviewId}
+              AND plan_version = #{planVersion}
+              AND topic_status IN ('PLANNED', 'ACTIVE')
+            """)
+    int invalidateForReplanning(@Param("ownerId") String ownerId,
+            @Param("interviewId") String interviewId,
+            @Param("planVersion") long planVersion);
 }

@@ -47,6 +47,11 @@ public record InterviewSession(
         );
     }
 
+    public static InterviewSession createComprehensive(UUID interviewId, ActorId ownerId) {
+        return new InterviewSession(interviewId, ownerId, InterviewMode.COMPREHENSIVE,
+                SessionStage.PREPARING, 0);
+    }
+
     InterviewSession moveTo(SessionStage nextStage) {
         Objects.requireNonNull(nextStage, "nextStage不能为空");
         if (stage.isTerminal()) {

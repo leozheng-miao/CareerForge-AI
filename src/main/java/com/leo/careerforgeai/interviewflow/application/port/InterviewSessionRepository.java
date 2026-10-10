@@ -46,6 +46,12 @@ public interface InterviewSessionRepository {
             long expectedVersion
     );
 
+    default boolean reconfigureBeforeStart(ActorId ownerId, UUID interviewId,
+            long expectedSessionVersion, long inputVersion, long planVersion,
+            long durationSeconds) {
+        return false;
+    }
+
     default List<InterviewAggregate> findRunningStartedBefore(
             Instant cutoff,
             int limit

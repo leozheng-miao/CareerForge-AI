@@ -62,6 +62,13 @@ public record InterviewAggregate(
         );
     }
 
+    public static InterviewAggregate createComprehensive(UUID interviewId, ActorId ownerId,
+            Instant createdAt, ComprehensiveInterviewPolicy policy) {
+        Objects.requireNonNull(policy, "policy不能为空");
+        return new InterviewAggregate(InterviewSession.createComprehensive(interviewId, ownerId),
+                InterviewTimer.notStarted(policy.duration()), 0, 0, 0, createdAt);
+    }
+
     InterviewAggregate changeStage(
             SessionStage nextStage,
             InterviewTimer nextTimer

@@ -8,7 +8,7 @@ import java.time.Duration;
  * @author: Miao Zheng
  * @date: 2026-09-30
  */
-public final class QuickInterviewPolicy {
+public final class QuickInterviewPolicy implements InterviewPolicy {
 
     private static final Duration DURATION = Duration.ofMinutes(60);
     private static final int TOPIC_COUNT = 8;
@@ -31,25 +31,4 @@ public final class QuickInterviewPolicy {
         return MAX_CONSECUTIVE_FOLLOW_UPS;
     }
 
-    public boolean allowsAnotherFollowUp(
-            int usedFollowUps,
-            int consecutiveFollowUps
-    ) {
-        requireNonNegative(usedFollowUps, "usedFollowUps");
-        requireNonNegative(consecutiveFollowUps, "consecutiveFollowUps");
-
-        return usedFollowUps < MAX_FOLLOW_UPS
-                && consecutiveFollowUps < MAX_CONSECUTIVE_FOLLOW_UPS;
-    }
-
-    public boolean shouldGenerateReport(int submittedAnswerCount) {
-        requireNonNegative(submittedAnswerCount, "submittedAnswerCount");
-        return submittedAnswerCount > 0;
-    }
-
-    private static void requireNonNegative(int value, String fieldName) {
-        if (value < 0) {
-            throw new IllegalArgumentException(fieldName + "不能小于0");
-        }
-    }
 }

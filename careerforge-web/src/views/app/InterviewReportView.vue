@@ -9,6 +9,7 @@ import {
   getInterviewReport,
   retryInterviewReport,
   type InterviewReport,
+  type InterviewMode,
 } from '@/features/interview/api/interview-flow-api'
 import InterviewReportSection from '@/features/interview/components/InterviewReportSection.vue'
 import { toApiError } from '@/shared/api/errors'
@@ -30,6 +31,7 @@ const route = useRoute()
 const router = useRouter()
 const id = computed(() => String(route.params.interviewId))
 const report = ref<InterviewReport | null>(null)
+const mode = ref<InterviewMode>('QUICK')
 const body = ref<ReportBody | null>(null)
 const noReport = ref(false)
 const history = ref<
@@ -50,6 +52,7 @@ async function load() {
 
   try {
     const session = await getInterview(id.value)
+    mode.value = session.mode
     let currentReport: InterviewReport | null = null
 
     try {
@@ -97,5 +100,5 @@ async function retry() {
   }
 }
 </script>
-<template><section class="report"><header><div><p class="eyebrow">FORMAL INTERVIEW REPORT</p><h1>快速面试报告</h1></div><Button @click="router.push('/app/interview-records')">返回面试记录</Button></header><section v-if="noReport" class="state"><h2>本场面试已结束</h2><p>没有可用的已提交回答，因此不生成正式报告。</p></section><section v-else-if="!body && report?.status==='FAILED'" class="state"><h2>报告生成未完成</h2><p>题目和已冻结回答不会改变，只重试报告任务。</p><Button type="primary" @click="retry">重试生成</Button></section><section v-else-if="!body" class="state"><Spin size="large"/><h2>正在生成正式面试报告…</h2><p>你可以离开此页，后台任务会继续执行。</p></section><template v-else><section class="summary"><h2>总结</h2><p>{{ body.summary }}</p></section><InterviewReportSection title="做得好的地方" :items="body.strengths"/><InterviewReportSection title="可以继续提升" :items="body.improvements"/><section class="summary"><h2>考查回顾</h2><article v-for="topic in body.topicReviews" :key="topic.sequenceNo"><strong>考查项 {{ topic.sequenceNo }}</strong><p>{{ topic.conclusion }}</p></article></section><section class="summary"><h2>完整问答记录</h2><article v-for="turn in history" :key="turn.question.questionId"><h3>{{ turn.question.content }}</h3><p>{{ turn.answer?.submittedContent || '已跳过' }}</p></article></section></template></section></template>
+<template><section class="report"><header><div><p class="eyebrow">FORMAL INTERVIEW REPORT</p><h1>{{ mode==='COMPREHENSIVE' ? '综合面试报告' : '快速面试报告' }}</h1></div><Button @click="router.push('/app/interview-records')">返回面试记录</Button></header><section v-if="noReport" class="state"><h2>本场面试已结束</h2><p>没有可用的已提交回答，因此不生成正式报告。</p></section><section v-else-if="!body && report?.status==='FAILED'" class="state"><h2>报告生成未完成</h2><p>题目和已冻结回答不会改变，只重试报告任务。</p><Button type="primary" @click="retry">重试生成</Button></section><section v-else-if="!body" class="state"><Spin size="large"/><h2>正在生成正式面试报告…</h2><p>你可以离开此页，后台任务会继续执行。</p></section><template v-else><section class="summary"><h2>总结</h2><p>{{ body.summary }}</p></section><InterviewReportSection title="做得好的地方" :items="body.strengths"/><InterviewReportSection title="可以继续提升" :items="body.improvements"/><section class="summary"><h2>考查回顾</h2><article v-for="topic in body.topicReviews" :key="topic.sequenceNo"><strong>{{ mode==='COMPREHENSIVE' ? '主题' : '考查项' }} {{ topic.sequenceNo }}</strong><p>{{ topic.conclusion }}</p></article></section><section class="summary"><h2>完整问答记录</h2><article v-for="turn in history" :key="turn.question.questionId"><h3>{{ turn.question.content }}</h3><p>{{ turn.answer?.submittedContent || '已跳过' }}</p></article></section></template></section></template>
 <style scoped>.report{display:grid;gap:20px;max-width:980px;margin:auto}.report>header{display:flex;justify-content:space-between;align-items:flex-start}.eyebrow{color:var(--cf-color-primary);font-weight:750}h1{margin:3px 0;color:#0b1740}.state,.summary{padding:30px;border:1px solid var(--cf-color-border);border-radius:16px;background:#fff;text-align:center}.summary{text-align:left}.summary p{line-height:1.8;color:var(--cf-color-text-secondary)}.summary article+article{margin-top:20px;padding-top:20px;border-top:1px solid var(--cf-color-border)}</style>

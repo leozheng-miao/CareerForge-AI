@@ -181,7 +181,8 @@ public class InterviewReportApplicationService {
             return new TopicEvidence(topic.topicId(), topic.sequenceNo(), topic.objective(),
                     !turns.isEmpty(), turns);
         }).toList();
-        return new InterviewEvidencePack(interviewId, evidence);
+        return new InterviewEvidencePack(interviewId, evidence,
+                owned(owner, interviewId).session().mode());
     }
 
     private void fail(ActorId owner, ReportSnapshot report, String code) {
@@ -206,7 +207,11 @@ public class InterviewReportApplicationService {
             throw new IllegalStateException("报告已就绪但会话状态不允许完成");
         }
         Instant now = clock.instant();
-        InterviewAggregate completed = new InterviewStateMachine(new QuickInterviewPolicy())
+        InterviewAggregate completed = new InterviewStateMachine(
+                aggregate.session().mode() == InterviewMode.COMPREHENSIVE
+                        ? new ComprehensiveInterviewPolicy(
+                                aggregate.timer().duration().toSeconds())
+                        : new QuickInterviewPolicy())
                 .transition(aggregate, InterviewEvent.REPORT_GENERATED, now).aggregate();
         if (!sessions.updateIfVersionMatches(
                 owner, completed, aggregate.session().version()
@@ -245,9 +250,12 @@ public class InterviewReportApplicationService {
     private void enqueueReport(InterviewAggregate aggregate, String fingerprint,
                                String suffix, Instant now) {
         String key = "report:" + aggregate.session().interviewId() + ":" + suffix;
+        var versions = sessions.findVersions(aggregate.session().ownerId(),
+                aggregate.session().interviewId()).orElseThrow();
         boolean enqueued = tasks.enqueue(new TaskDefinition(UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8)),
                 aggregate.session().interviewId(), aggregate.session().ownerId(),
-                TaskType.GENERATE_REPORT, key, 3, 1, 1, fingerprint, now));
+                TaskType.GENERATE_REPORT, key, 3, versions.inputVersion(),
+                versions.planVersion(), fingerprint, now));
         if (!enqueued) {
             throw new IllegalStateException("面试报告重试任务入队失败");
         }

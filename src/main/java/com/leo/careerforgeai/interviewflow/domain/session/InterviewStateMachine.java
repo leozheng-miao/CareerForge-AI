@@ -14,9 +14,9 @@ import java.util.Objects;
  */
 public final class InterviewStateMachine {
 
-    private final QuickInterviewPolicy policy;
+    private final InterviewPolicy policy;
 
-    public InterviewStateMachine(QuickInterviewPolicy policy) {
+    public InterviewStateMachine(InterviewPolicy policy) {
         this.policy = Objects.requireNonNull(policy, "policy不能为null");
     }
 
@@ -244,7 +244,7 @@ public final class InterviewStateMachine {
                 aggregate.followUpCount(),
                 aggregate.consecutiveFollowUpCount()
         )) {
-            throw new IllegalStateException("快速面试追问预算已经耗尽");
+            throw new IllegalStateException("面试追问预算已经耗尽");
         }
         return TransitionResult.withoutReport(aggregate.recordFollowUp());
     }

@@ -9,6 +9,7 @@ import com.leo.careerforgeai.model.domain.routing.ModelTaskType;
 import com.leo.careerforgeai.model.domain.stream.ModelStreamEvent;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
+import java.util.ArrayDeque;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -30,7 +31,28 @@ class InterviewReportEngineTest {
     }
     @Test void rejectsNumericScore() {
         model.respond(validJson().replace("实现可靠", "95分"));
+        model.respond(validJson().replace("实现可靠", "95分"));
         assertThatThrownBy(() -> engine.generate(evidence())).hasMessageContaining("评分");
+        assertThat(model.callCount()).isEqualTo(2);
+    }
+    @Test void retriesOnceWhenModelReturnsNumericScore() {
+        model.respond(validJson().replace("实现可靠", "95分"));
+        model.respond(validJson());
+
+        var result = engine.generate(evidence());
+
+        assertThat(result.strengths()).singleElement()
+                .extracting(InterviewReportEngine.Finding::title)
+                .isEqualTo("实现可靠");
+        assertThat(model.callCount()).isEqualTo(2);
+    }
+    @Test void allowsFactualDurationsAndPercentagesInsteadOfTreatingThemAsScores() {
+        model.respond(validJson()
+                .replace("回答聚焦可靠性", "将处理耗时从5分钟降至1分钟，失败率降低30%"));
+
+        var result = engine.generate(evidence());
+
+        assertThat(result.summary()).contains("5分钟", "30%");
     }
     @Test void rejectsUnknownCitationReference() {
         model.respond(validJson().replace(ANSWER+":1", ANSWER+":99"));
@@ -63,12 +85,12 @@ class InterviewReportEngineTest {
     private String validJson(){return "{\"summary\":\"回答聚焦可靠性\",\"strengths\":[{\"title\":\"实现可靠\",\"description\":\"说明了关键机制\",\"citationId\":\""+ANSWER+":1\"}],\"improvements\":[],\"topicReviews\":[{\"sequenceNo\":1,\"conclusion\":\"有明确实现依据\",\"answerIds\":[\""+ANSWER+"\"]}]}";}
     private String jsonWithUncoveredTopicReview(){return "{\"summary\":\"回答聚焦可靠性\",\"strengths\":[{\"title\":\"实现可靠\",\"description\":\"说明了关键机制\",\"citationId\":\""+ANSWER+":1\"}],\"improvements\":[],\"topicReviews\":[{\"sequenceNo\":1,\"conclusion\":\"有明确实现依据\",\"answerIds\":[\""+ANSWER+"\"]},{\"sequenceNo\":2,\"conclusion\":\"未说明消息队列\",\"answerIds\":[]}]}";}
     private static final class RecordingModelGateway implements ModelGateway {
-        private String content;
+        private final ArrayDeque<String> responses = new ArrayDeque<>();
         private ModelTaskType lastTaskType;
         private ModelRequest lastRequest;
         private int callCount;
 
-        void respond(String content) { this.content=content; }
+        void respond(String content) { responses.addLast(content); }
         int callCount() { return callCount; }
         ModelTaskType lastTaskType() { return lastTaskType; }
         ModelRequest lastRequest() { return lastRequest; }
@@ -77,7 +99,7 @@ class InterviewReportEngineTest {
             callCount++;
             lastTaskType=taskType;
             lastRequest=request;
-            return new ModelResponse("r","m",content,null);
+            return new ModelResponse("r","m",responses.removeFirst(),null);
         }
 
         @Override public void stream(ModelTaskType taskType, ModelRequest request,

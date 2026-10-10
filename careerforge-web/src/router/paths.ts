@@ -11,5 +11,6 @@ export const ROUTE_PATHS = {
   memories: '/app/memories',
   evidence: '/app/evidence',
   interviews: '/app/interviews',
+  comprehensiveInterviewSetup: '/app/interviews/comprehensive/setup',
   interviewRecords: '/app/interview-records',
 } as const

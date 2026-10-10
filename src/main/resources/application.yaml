@@ -158,6 +158,7 @@ careerforge:
       TRAINING_PLAN_GENERATION: [ deepseek-standard ]
       RAG_ANSWER: [ deepseek-standard ]
       INTERVIEW_QUESTION: [ deepseek-standard ]
+      RESUME_PROFILE_EXTRACTION: [ deepseek-standard ]
       INTERVIEW_BLUEPRINT: [ deepseek-standard ]
       INTERVIEW_TURN_DECISION: [ deepseek-standard ]
       INTERVIEW_TECHNICAL_REVIEW: [ deepseek-standard ]
@@ -201,6 +202,11 @@ careerforge:
         temperature: 0.0
         timeout: 30s
         fallback-allowed: true
+      RESUME_PROFILE_EXTRACTION:
+        max-output-tokens: 4000
+        temperature: 0.0
+        timeout: 45s
+        fallback-allowed: false
       INTERVIEW_TURN_DECISION:
         max-output-tokens: 1200
         temperature: 0.0

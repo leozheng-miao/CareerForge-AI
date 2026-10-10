@@ -1,6 +1,7 @@
 package com.leo.careerforgeai.interviewflow.application.context;
 
 import com.leo.careerforgeai.shared.actor.ActorId;
+import com.leo.careerforgeai.interviewflow.domain.session.InterviewMode;
 
 import java.util.List;
 import java.util.Objects;
@@ -20,8 +21,18 @@ public record InterviewModelContext(
         long inputVersion,
         long planVersion,
         ActiveTopicContext activeTopic,
-        List<ClosedTopicSummary> closedTopics
+        List<ClosedTopicSummary> closedTopics,
+        InterviewMode mode,
+        UntrustedProfileContext untrustedProfile
 ) {
+
+    public InterviewModelContext(ContextPurpose purpose, UUID interviewId,
+            ActorId ownerId, String direction, long inputVersion, long planVersion,
+            ActiveTopicContext activeTopic, List<ClosedTopicSummary> closedTopics) {
+        this(purpose, interviewId, ownerId, direction, inputVersion, planVersion,
+                activeTopic, closedTopics, InterviewMode.QUICK,
+                new UntrustedProfileContext(List.of(), true));
+    }
 
     public InterviewModelContext {
         Objects.requireNonNull(purpose, "purpose不能为空");
@@ -36,6 +47,19 @@ public record InterviewModelContext(
         Objects.requireNonNull(activeTopic, "activeTopic不能为空");
         Objects.requireNonNull(closedTopics, "closedTopics不能为空");
         closedTopics = List.copyOf(closedTopics);
+        Objects.requireNonNull(mode, "mode不能为空");
+        Objects.requireNonNull(untrustedProfile, "untrustedProfile不能为空");
+    }
+
+    /** 用户确认画像仍然只是待面试验证的主张，不能覆盖冻结回答。 */
+    public record UntrustedProfileContext(List<String> relevantClaims,
+            boolean answersHavePriority) {
+        public UntrustedProfileContext {
+            relevantClaims = relevantClaims == null ? List.of() : List.copyOf(relevantClaims);
+            if (!answersHavePriority) {
+                throw new IllegalArgumentException("冻结回答必须具有最高证据优先级");
+            }
+        }
     }
 
     public record ActiveTopicContext(

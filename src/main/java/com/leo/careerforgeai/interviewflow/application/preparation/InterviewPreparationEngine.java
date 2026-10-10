@@ -14,6 +14,8 @@ import com.leo.careerforgeai.interviewflow.application.port.InterviewSessionRepo
 import com.leo.careerforgeai.interviewflow.application.port.InterviewTopicRepository;
 import com.leo.careerforgeai.interviewflow.application.preparation.QuickInterviewBlueprintPlanner.PlannedTarget;
 import com.leo.careerforgeai.interviewflow.application.preparation.QuickInterviewBlueprintPlanner.QuickInterviewBlueprint;
+import com.leo.careerforgeai.interviewflow.application.preparation.ComprehensiveInterviewBlueprintPlanner.Blueprint;
+import com.leo.careerforgeai.interviewflow.application.preparation.ComprehensiveInterviewBlueprintPlanner.PlannedTheme;
 import com.leo.careerforgeai.interviewflow.application.session.CreateQuickInterviewCommand;
 import com.leo.careerforgeai.interviewflow.application.session.InterviewFlowNotFoundException;
 import com.leo.careerforgeai.interviewflow.domain.session.InterviewAggregate;
@@ -21,6 +23,7 @@ import com.leo.careerforgeai.interviewflow.domain.session.InterviewEvent;
 import com.leo.careerforgeai.interviewflow.domain.session.InterviewMode;
 import com.leo.careerforgeai.interviewflow.domain.session.InterviewStateMachine;
 import com.leo.careerforgeai.interviewflow.domain.session.QuickInterviewPolicy;
+import com.leo.careerforgeai.interviewflow.domain.session.ComprehensiveInterviewPolicy;
 import com.leo.careerforgeai.interviewflow.domain.session.SessionStage;
 import com.leo.careerforgeai.interviewflow.domain.turn.InterviewQuestion;
 import com.leo.careerforgeai.interviewflow.domain.turn.QuestionStatus;
@@ -28,6 +31,7 @@ import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
@@ -72,6 +76,8 @@ public class InterviewPreparationEngine {
     private final InterviewQuestionKnowledgePort knowledgePort;
     private final InterviewModelPort modelPort;
     private final QuickInterviewBlueprintPlanner blueprintPlanner;
+    private final ComprehensivePreparationCoordinator comprehensiveCoordinator;
+    private final ComprehensiveInterviewBlueprintPlanner comprehensivePlanner;
     private final JsonMapper jsonMapper;
 
     public InterviewPreparationEngine(
@@ -83,6 +89,25 @@ public class InterviewPreparationEngine {
             InterviewQuestionKnowledgePort knowledgePort,
             InterviewModelPort modelPort,
             QuickInterviewBlueprintPlanner blueprintPlanner,
+            JsonMapper jsonMapper
+    ) {
+        this(currentActorProvider, sessionRepository, inputSnapshotRepository,
+                topicRepository, questionRepository, knowledgePort, modelPort,
+                blueprintPlanner, null, null, jsonMapper);
+    }
+
+    @Autowired
+    public InterviewPreparationEngine(
+            CurrentActorProvider currentActorProvider,
+            InterviewSessionRepository sessionRepository,
+            InterviewInputSnapshotRepository inputSnapshotRepository,
+            InterviewTopicRepository topicRepository,
+            InterviewQuestionRepository questionRepository,
+            InterviewQuestionKnowledgePort knowledgePort,
+            InterviewModelPort modelPort,
+            QuickInterviewBlueprintPlanner blueprintPlanner,
+            ComprehensivePreparationCoordinator comprehensiveCoordinator,
+            ComprehensiveInterviewBlueprintPlanner comprehensivePlanner,
             JsonMapper jsonMapper
     ) {
         this.currentActorProvider = Objects.requireNonNull(
@@ -117,10 +142,103 @@ public class InterviewPreparationEngine {
                 blueprintPlanner,
                 "blueprintPlanner不能为空"
         );
+        this.comprehensiveCoordinator = comprehensiveCoordinator;
+        this.comprehensivePlanner = comprehensivePlanner;
         this.jsonMapper = Objects.requireNonNull(
                 jsonMapper,
                 "jsonMapper不能为空"
         );
+    }
+
+    @Transactional
+    public InterviewPreparationResult prepareComprehensive(UUID interviewId) {
+        Objects.requireNonNull(interviewId, "interviewId不能为空");
+        ActorId ownerId = currentActorProvider.currentActor();
+        InputSnapshot snapshot = findSnapshot(ownerId, interviewId);
+        var versions = sessionRepository.findVersions(ownerId, interviewId).orElseThrow();
+        return prepareComprehensive(ownerId, interviewId, snapshot.inputVersion(),
+                versions.planVersion());
+    }
+
+    @Transactional
+    public InterviewPreparationResult prepareComprehensive(ActorId ownerId,
+            UUID interviewId, long expectedInputVersion, long planVersion) {
+        if (comprehensiveCoordinator == null || comprehensivePlanner == null) {
+            throw new IllegalStateException("综合面试准备组件未配置");
+        }
+        InterviewAggregate aggregate = findInterview(ownerId, interviewId);
+        if (aggregate.session().mode() != InterviewMode.COMPREHENSIVE) {
+            throw new IllegalStateException("该准备入口只支持综合面试");
+        }
+        if (aggregate.session().stage() == SessionStage.READY) {
+            return existingComprehensiveReadyResult(ownerId, aggregate, planVersion);
+        }
+        if (aggregate.session().stage() != SessionStage.PREPARING) {
+            throw new IllegalStateException("只有PREPARING状态的综合面试可以执行准备");
+        }
+        InputSnapshot snapshot = findSnapshot(ownerId, interviewId);
+        var versions = sessionRepository.findVersions(ownerId, interviewId)
+                .orElseThrow(() -> new InterviewFlowNotFoundException(interviewId));
+        if (snapshot.inputVersion() != expectedInputVersion
+                || versions.inputVersion() != expectedInputVersion
+                || versions.planVersion() != planVersion) {
+            throw new IllegalStateException("准备任务输入版本已经过期");
+        }
+
+        Blueprint blueprint = comprehensivePlanner.plan(interviewId, planVersion,
+                comprehensiveCoordinator.collect(snapshot));
+        List<QuestionWrite> writes = prepareComprehensiveQuestions(blueprint, planVersion);
+        topicRepository.insertAll(ownerId, interviewId, planVersion,
+                blueprint.topics().stream()
+                        .map(topic -> topic.sequenceNo() == 1 ? topic.activate() : topic)
+                        .toList());
+        questionRepository.insertAll(ownerId, interviewId, writes);
+
+        InterviewAggregate ready = new InterviewStateMachine(
+                new ComprehensiveInterviewPolicy(snapshot.durationSeconds()))
+                .transition(aggregate, InterviewEvent.PREPARATION_COMPLETED).aggregate();
+        if (!sessionRepository.updateIfVersionMatches(ownerId, ready,
+                aggregate.session().version())) {
+            throw new IllegalStateException("面试状态已变化，准备结果不能发布");
+        }
+        return new InterviewPreparationResult(interviewId, SessionStage.READY,
+                writes.size(), ready.session().version());
+    }
+
+    private List<QuestionWrite> prepareComprehensiveQuestions(Blueprint blueprint,
+            long planVersion) {
+        List<QuestionWrite> writes = new ArrayList<>();
+        Set<String> fingerprints = new HashSet<>();
+        for (PlannedTheme theme : blueprint.themes()) {
+            PreparedQuestion prepared = qualified(theme.question(), theme.sources(), fingerprints);
+            if (prepared == null) {
+                throw new IllegalStateException("综合面试主题题目不合格或重复");
+            }
+            InterviewQuestion question = InterviewQuestion.reserved(
+                    deterministicUuid("comprehensive-question:" + theme.topic().topicId()),
+                    theme.topic().topicId(), InterviewQuestion.QuestionType.MAIN,
+                    theme.topic().sequenceNo() * 10, prepared.content());
+            if (theme.topic().sequenceNo() == 1) question = question.present();
+            writes.add(new QuestionWrite(question, null,
+                    serializeSources(prepared.sources()), prepared.fingerprint(), planVersion));
+        }
+        if (writes.size() != ComprehensiveInterviewPolicyPack.REQUIRED_THEME_COUNT) {
+            throw new IllegalStateException("综合面试未准备完整的六主题题目");
+        }
+        return List.copyOf(writes);
+    }
+
+    private InterviewPreparationResult existingComprehensiveReadyResult(ActorId ownerId,
+            InterviewAggregate aggregate, long planVersion) {
+        List<InterviewQuestion> current = questionRepository.findQuestions(ownerId,
+                aggregate.session().interviewId()).stream()
+                .filter(question -> question.status() != QuestionStatus.INVALIDATED)
+                .toList();
+        if (current.size() != ComprehensiveInterviewPolicyPack.REQUIRED_THEME_COUNT) {
+            throw new IllegalStateException("READY综合面试缺少完整六主题准备结果");
+        }
+        return new InterviewPreparationResult(aggregate.session().interviewId(),
+                SessionStage.READY, current.size(), aggregate.session().version());
     }
 
     @Transactional

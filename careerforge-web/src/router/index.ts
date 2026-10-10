@@ -102,6 +102,12 @@ const router = createRouter({
           meta: { title: '开始面试', requiresAuth: true },
         },
         {
+          path: 'interviews/comprehensive/setup',
+          name: 'comprehensive-interview-setup',
+          component: () => import('@/views/app/ComprehensiveInterviewSetupView.vue'),
+          meta: { title: '综合面试设置', requiresAuth: true },
+        },
+        {
           path: 'interviews/:interviewId/ready',
           name: 'interview-ready',
           component: () => import('@/views/app/InterviewReadyView.vue'),

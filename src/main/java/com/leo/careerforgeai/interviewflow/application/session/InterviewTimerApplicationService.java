@@ -8,6 +8,8 @@ import com.leo.careerforgeai.interviewflow.domain.session.InterviewAggregate;
 import com.leo.careerforgeai.interviewflow.domain.session.InterviewEvent;
 import com.leo.careerforgeai.interviewflow.domain.session.InterviewStateMachine;
 import com.leo.careerforgeai.interviewflow.domain.session.QuickInterviewPolicy;
+import com.leo.careerforgeai.interviewflow.domain.session.ComprehensiveInterviewPolicy;
+import com.leo.careerforgeai.interviewflow.domain.session.InterviewMode;
 import com.leo.careerforgeai.interviewflow.domain.session.SessionStage;
 import com.leo.careerforgeai.interviewflow.domain.timer.TimerState;
 import com.leo.careerforgeai.interviewflow.domain.turn.QuestionStatus;
@@ -192,7 +194,7 @@ public class InterviewTimerApplicationService {
                 interviewId,
                 properties.leaseDuration()
         );
-        InterviewAggregate resumed = STATE_MACHINE.transition(
+        InterviewAggregate resumed = stateMachineFor(aggregate).transition(
                 aggregate,
                 InterviewEvent.RESUME_REQUESTED,
                 clock.instant()
@@ -225,7 +227,7 @@ public class InterviewTimerApplicationService {
             return false;
         }
         InterviewAggregate aggregate = current.get();
-        InterviewAggregate paused = STATE_MACHINE.transition(
+        InterviewAggregate paused = stateMachineFor(aggregate).transition(
                 aggregate,
                 InterviewEvent.PAUSE_REQUESTED,
                 clock.instant()
@@ -242,7 +244,7 @@ public class InterviewTimerApplicationService {
             InterviewAggregate aggregate,
             Instant now
     ) {
-        InterviewAggregate paused = STATE_MACHINE.transition(
+        InterviewAggregate paused = stateMachineFor(aggregate).transition(
                 aggregate,
                 InterviewEvent.PAUSE_REQUESTED,
                 now
@@ -264,6 +266,13 @@ public class InterviewTimerApplicationService {
             );
         }
         return paused;
+    }
+
+    private static InterviewStateMachine stateMachineFor(InterviewAggregate aggregate) {
+        return aggregate.session().mode() == InterviewMode.COMPREHENSIVE
+                ? new InterviewStateMachine(new ComprehensiveInterviewPolicy(
+                        aggregate.timer().duration().toSeconds()))
+                : STATE_MACHINE;
     }
 
     private InterviewAggregate findOwned(

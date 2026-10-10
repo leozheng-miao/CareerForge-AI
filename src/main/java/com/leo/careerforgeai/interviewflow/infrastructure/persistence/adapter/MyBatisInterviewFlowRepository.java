@@ -284,6 +284,24 @@ public class MyBatisInterviewFlowRepository
     }
 
     @Override
+    @Transactional
+    public boolean reconfigureBeforeStart(ActorId ownerId, UUID interviewId,
+            long expectedSessionVersion, long inputVersion, long planVersion,
+            long durationSeconds) {
+        requireOwnerAndId(ownerId, interviewId, "interviewId");
+        int rows = sessionMapper.reconfigureBeforeStart(ownerId.value(),
+                interviewId.toString(), expectedSessionVersion, inputVersion,
+                planVersion, durationSeconds);
+        requireAtMostOne(rows, "面试重配置影响了多行数据");
+        if (rows == 1) {
+            long previousPlanVersion = planVersion - 1;
+            questionMapper.invalidateForReplanning(ownerId.value(), interviewId.toString(), previousPlanVersion);
+            topicMapper.invalidateForReplanning(ownerId.value(), interviewId.toString(), previousPlanVersion);
+        }
+        return rows == 1;
+    }
+
+    @Override
     public void insert(InputSnapshot snapshot) {
         Objects.requireNonNull(snapshot, "snapshot不能为空");
         requireNewVersion(snapshot.version(), "输入快照");
@@ -353,6 +371,14 @@ public class MyBatisInterviewFlowRepository
                     "考查目标插入失败"
             );
         }
+    }
+
+    @Override
+    public int invalidateTopicsForReplanning(ActorId ownerId, UUID interviewId,
+            long previousPlanVersion) {
+        requireOwnerAndId(ownerId, interviewId, "interviewId");
+        return topicMapper.invalidateForReplanning(ownerId.value(),
+                interviewId.toString(), previousPlanVersion);
     }
 
     @Override
@@ -451,6 +477,14 @@ public class MyBatisInterviewFlowRepository
                     "面试题插入失败"
             );
         }
+    }
+
+    @Override
+    public int invalidateQuestionsForReplanning(ActorId ownerId, UUID interviewId,
+            long previousPlanVersion) {
+        requireOwnerAndId(ownerId, interviewId, "interviewId");
+        return questionMapper.invalidateForReplanning(ownerId.value(),
+                interviewId.toString(), previousPlanVersion);
     }
 
     @Override

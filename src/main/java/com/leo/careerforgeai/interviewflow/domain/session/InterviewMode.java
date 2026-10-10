@@ -8,5 +8,6 @@ package com.leo.careerforgeai.interviewflow.domain.session;
  */
 public enum InterviewMode {
 
-    QUICK
+    QUICK,
+    COMPREHENSIVE
 }

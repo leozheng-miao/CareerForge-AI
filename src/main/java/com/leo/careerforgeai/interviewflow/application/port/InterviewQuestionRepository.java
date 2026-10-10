@@ -66,6 +66,11 @@ public interface InterviewQuestionRepository {
             long expectedVersion
     );
 
+    default int invalidateQuestionsForReplanning(ActorId ownerId, UUID interviewId,
+            long previousPlanVersion) {
+        return 0;
+    }
+
     /**
      * @param question 完整题目领域对象
      * @param parentQuestionId 追问的父问题ID，主问题为null

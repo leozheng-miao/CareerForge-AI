@@ -1,0 +1,49 @@
+:root {
+  color-scheme: light;
+
+  --cf-color-primary: #4f46e5;
+  --cf-color-primary-hover: #4338ca;
+  --cf-color-primary-soft: #eef2ff;
+  --cf-color-accent: #f59e0b;
+  --cf-color-accent-hover: #d97706;
+  --cf-color-success: #16a34a;
+  --cf-color-warning: #d97706;
+  --cf-color-error: #dc2626;
+
+  --cf-color-text: #0f172a;
+  --cf-color-text-secondary: #475569;
+  --cf-color-text-muted: #64748b;
+  --cf-color-border: #e2e8f0;
+  --cf-color-surface: #ffffff;
+  --cf-color-background: #f8fafc;
+  --cf-color-background-warm: #fffcf5;
+
+  --cf-font-sans:
+    Inter, 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+
+  --cf-space-1: 4px;
+  --cf-space-2: 8px;
+  --cf-space-3: 12px;
+  --cf-space-4: 16px;
+  --cf-space-6: 24px;
+  --cf-space-8: 32px;
+  --cf-space-12: 48px;
+  --cf-space-16: 64px;
+
+  --cf-radius-control: 8px;
+  --cf-radius-card: 12px;
+  --cf-radius-panel: 16px;
+
+  --cf-shadow-card: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --cf-shadow-panel: 0 16px 40px rgba(15, 23, 42, 0.08);
+
+  --cf-content-width: 1200px;
+  --cf-public-header-height: 72px;
+  --cf-app-header-height: 64px;
+  --cf-app-sidebar-width: 240px;
+
+  --cf-motion-fast: 150ms;
+  --cf-motion-normal: 200ms;
+  --cf-motion-slow: 240ms;
+}

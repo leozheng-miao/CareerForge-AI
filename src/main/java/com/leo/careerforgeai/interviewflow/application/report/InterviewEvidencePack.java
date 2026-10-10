@@ -3,16 +3,23 @@ package com.leo.careerforgeai.interviewflow.application.report;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import com.leo.careerforgeai.interviewflow.domain.session.InterviewMode;
 
 /** 仅由已冻结回答和持久化分析组成的报告证据包。 */
 public record InterviewEvidencePack(
         UUID interviewId,
-        List<TopicEvidence> topics
+        List<TopicEvidence> topics,
+        InterviewMode mode
 ) {
+    public InterviewEvidencePack(UUID interviewId, List<TopicEvidence> topics) {
+        this(interviewId, topics, InterviewMode.QUICK);
+    }
+
     public InterviewEvidencePack {
         Objects.requireNonNull(interviewId, "interviewId不能为null");
         Objects.requireNonNull(topics, "topics不能为null");
         topics = List.copyOf(topics);
+        Objects.requireNonNull(mode, "mode不能为null");
     }
 
     public int submittedAnswerCount() {

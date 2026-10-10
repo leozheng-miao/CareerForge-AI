@@ -94,4 +94,16 @@ public interface InterviewFlowQuestionMapper
             @Param("interviewId") String interviewId,
             @Param("expectedVersion") long expectedVersion
     );
+
+    @Update("""
+            UPDATE interview_flow_question
+            SET question_status = 'INVALIDATED', version = version + 1,
+                updated_at = CURRENT_TIMESTAMP(6)
+            WHERE owner_id = #{ownerId} AND session_id = #{interviewId}
+              AND plan_version = #{planVersion}
+              AND question_status IN ('RESERVED', 'PRESENTED')
+            """)
+    int invalidateForReplanning(@Param("ownerId") String ownerId,
+            @Param("interviewId") String interviewId,
+            @Param("planVersion") long planVersion);
 }

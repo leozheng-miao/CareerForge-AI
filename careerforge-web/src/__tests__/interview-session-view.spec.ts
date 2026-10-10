@@ -5,12 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import InterviewAnswerEditor from '@/features/interview/components/InterviewAnswerEditor.vue'
 import InterviewQuestionPanel from '@/features/interview/components/InterviewQuestionPanel.vue'
 import InterviewTopBar from '@/features/interview/components/InterviewTopBar.vue'
+import type { InterviewSession } from '@/features/interview/api/interview-flow-api'
 import InterviewDetailView from '@/views/app/InterviewDetailView.vue'
 
-const session = {
+const session: InterviewSession = {
   interviewId: 'interview-1',
-  mode: 'QUICK' as const,
-  stage: 'INTERVIEWING' as const,
+  mode: 'QUICK',
+  stage: 'INTERVIEWING',
   version: 8,
 }
 
@@ -131,6 +132,28 @@ describe('active interview', () => {
     await nextTick()
 
     expect(wrapper.findComponent(InterviewTopBar).props('progress')).toBe(4)
+    wrapper.unmount()
+  })
+
+  it('renders comprehensive mode with six-theme progress', async () => {
+    store.session = { ...session, mode: 'COMPREHENSIVE' }
+    store.question = {
+      questionId: 'comprehensive-topic-6',
+      type: 'MAIN',
+      displayOrder: 60,
+      content: '请说明你的架构权衡。',
+      draft: '',
+      answerVersion: 0,
+      sessionVersion: 8,
+    }
+    store.timer.remainingSeconds = 5_400
+
+    const wrapper = mount(InterviewDetailView)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('综合面试')
+    expect(wrapper.text()).toContain('6 / 6 个主题')
+    expect(wrapper.text()).not.toContain('8 个考查目标')
     wrapper.unmount()
   })
 })

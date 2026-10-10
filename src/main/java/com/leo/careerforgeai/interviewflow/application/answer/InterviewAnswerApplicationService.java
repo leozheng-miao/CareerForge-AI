@@ -14,6 +14,8 @@ import com.leo.careerforgeai.interviewflow.domain.session.InterviewAggregate;
 import com.leo.careerforgeai.interviewflow.domain.session.InterviewEvent;
 import com.leo.careerforgeai.interviewflow.domain.session.InterviewStateMachine;
 import com.leo.careerforgeai.interviewflow.domain.session.QuickInterviewPolicy;
+import com.leo.careerforgeai.interviewflow.domain.session.ComprehensiveInterviewPolicy;
+import com.leo.careerforgeai.interviewflow.domain.session.InterviewMode;
 import com.leo.careerforgeai.interviewflow.domain.session.SessionStage;
 import com.leo.careerforgeai.interviewflow.domain.session.TransitionResult;
 import com.leo.careerforgeai.interviewflow.domain.timer.TimerState;
@@ -56,8 +58,6 @@ public class InterviewAnswerApplicationService {
     private static final InterviewStateMachine STATE_MACHINE =
             new InterviewStateMachine(new QuickInterviewPolicy());
     private static final int TASK_MAX_ATTEMPTS = 3;
-    private static final long INPUT_VERSION = 1;
-    private static final long PLAN_VERSION = 1;
 
     private final CurrentActorProvider currentActorProvider;
     private final InterviewSessionRepository sessionRepository;
@@ -258,7 +258,7 @@ public class InterviewAnswerApplicationService {
                 );
 
         Instant now = clock.instant();
-        TransitionResult transition = STATE_MACHINE.transition(
+        TransitionResult transition = stateMachineFor(aggregate).transition(
                 aggregate,
                 skipped
                         ? InterviewEvent.ANSWER_SKIPPED
@@ -412,6 +412,8 @@ public class InterviewAnswerApplicationService {
                         Long.toString(aggregate.session().version())
                 )
                 : answer.submitRequestFingerprint();
+        var versions = sessionRepository.findVersions(ownerId,
+                aggregate.session().interviewId()).orElseThrow();
         boolean inserted = taskRepository.enqueue(new TaskDefinition(
                 UUID.randomUUID(),
                 aggregate.session().interviewId(),
@@ -419,14 +421,21 @@ public class InterviewAnswerApplicationService {
                 taskType,
                 businessKey,
                 TASK_MAX_ATTEMPTS,
-                INPUT_VERSION,
-                PLAN_VERSION,
+                versions.inputVersion(),
+                versions.planVersion(),
                 contextFingerprint,
                 now
         ));
         if (!inserted) {
             throw new IllegalStateException("面试后台任务已存在");
         }
+    }
+
+    private static InterviewStateMachine stateMachineFor(InterviewAggregate aggregate) {
+        return aggregate.session().mode() == InterviewMode.COMPREHENSIVE
+                ? new InterviewStateMachine(new ComprehensiveInterviewPolicy(
+                        aggregate.timer().duration().toSeconds()))
+                : STATE_MACHINE;
     }
 
     private QuestionRecord requireCurrentPresentedQuestion(

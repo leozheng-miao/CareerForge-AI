@@ -250,4 +250,23 @@ public interface InterviewFlowSessionMapper
             @Param("ownerId") String ownerId,
             @Param("expectedVersion") long expectedVersion
     );
+
+    @Update("""
+            UPDATE interview_flow_session
+            SET session_stage = 'PREPARING', timer_state = 'NOT_STARTED',
+                duration_seconds = #{durationSeconds},
+                accumulated_answer_seconds = 0, last_active_at = NULL,
+                current_topic_id = NULL, current_question_id = NULL,
+                input_version = #{inputVersion}, plan_version = #{planVersion},
+                version = version + 1, updated_at = CURRENT_TIMESTAMP(6)
+            WHERE interview_id = #{interviewId} AND owner_id = #{ownerId}
+              AND version = #{expectedVersion}
+              AND session_stage IN ('PREPARING', 'READY')
+            """)
+    int reconfigureBeforeStart(@Param("ownerId") String ownerId,
+            @Param("interviewId") String interviewId,
+            @Param("expectedVersion") long expectedVersion,
+            @Param("inputVersion") long inputVersion,
+            @Param("planVersion") long planVersion,
+            @Param("durationSeconds") long durationSeconds);
 }

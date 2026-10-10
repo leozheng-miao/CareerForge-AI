@@ -13,12 +13,15 @@ import com.leo.careerforgeai.interviewflow.domain.session.InterviewMode;
 import com.leo.careerforgeai.interviewflow.domain.session.InterviewSession;
 import com.leo.careerforgeai.interviewflow.domain.session.InterviewStateMachine;
 import com.leo.careerforgeai.interviewflow.domain.session.QuickInterviewPolicy;
+import com.leo.careerforgeai.interviewflow.domain.session.ComprehensiveInterviewPolicy;
+import com.leo.careerforgeai.interviewflow.domain.session.ConfirmedProfile;
 import com.leo.careerforgeai.interviewflow.domain.session.SessionStage;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -30,6 +33,8 @@ import java.util.HexFormat;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * @program: CareerForge-AI
@@ -58,6 +63,7 @@ public class InterviewSessionApplicationService {
     private final InterviewInputSnapshotRepository inputSnapshotRepository;
     private final InterviewTaskRepository taskRepository;
     private final Clock clock;
+    private final JsonMapper jsonMapper;
 
     public InterviewSessionApplicationService(
             CurrentActorProvider currentActorProvider,
@@ -65,6 +71,19 @@ public class InterviewSessionApplicationService {
             InterviewInputSnapshotRepository inputSnapshotRepository,
             InterviewTaskRepository taskRepository,
             Clock clock
+    ) {
+        this(currentActorProvider, sessionRepository, inputSnapshotRepository,
+                taskRepository, clock, JsonMapper.builder().build());
+    }
+
+    @Autowired
+    public InterviewSessionApplicationService(
+            CurrentActorProvider currentActorProvider,
+            InterviewSessionRepository sessionRepository,
+            InterviewInputSnapshotRepository inputSnapshotRepository,
+            InterviewTaskRepository taskRepository,
+            Clock clock,
+            JsonMapper jsonMapper
     ) {
         this.currentActorProvider = Objects.requireNonNull(
                 currentActorProvider,
@@ -83,6 +102,74 @@ public class InterviewSessionApplicationService {
                 "taskRepository不能为null"
         );
         this.clock = Objects.requireNonNull(clock, "clock不能为null");
+        this.jsonMapper = Objects.requireNonNull(jsonMapper, "jsonMapper不能为null");
+    }
+
+    @Transactional
+    public InterviewSession createComprehensive(CreateComprehensiveInterviewCommand command) {
+        Objects.requireNonNull(command, "command不能为null");
+        if (!CreateQuickInterviewCommand.AI_AGENT_DEVELOPMENT.equals(command.direction())) {
+            throw new IllegalArgumentException("首版仅支持AI Agent开发方向");
+        }
+        ActorId ownerId = currentActorProvider.currentActor();
+        Optional<InterviewAggregate> replay = sessionRepository.findByRequestId(ownerId, command.requestId());
+        if (replay.isPresent()) return replay.get().session();
+        sessionRepository.findInProgress(ownerId).ifPresent(active -> {
+            throw new InterviewInProgressException(recoveryFor(ownerId, active));
+        });
+        Instant now = clock.instant();
+        ComprehensiveInterviewPolicy policy = new ComprehensiveInterviewPolicy(command.durationSeconds());
+        InterviewAggregate candidate = InterviewAggregate.createComprehensive(
+                UUID.randomUUID(), ownerId, now, policy);
+        String fingerprint = comprehensiveFingerprint(command);
+        InterviewAggregate claimed = sessionRepository.claim(new SessionClaim(
+                command.requestId(), fingerprint, candidate));
+        if (!claimed.session().interviewId().equals(candidate.session().interviewId())) {
+            return claimed.session();
+        }
+        inputSnapshotRepository.insert(comprehensiveSnapshot(claimed, command, 1, 0, now));
+        enqueuePreparation(claimed, 1, 1, fingerprint, now);
+        return claimed.session();
+    }
+
+    @Transactional
+    public InterviewSession updateSetup(UpdateInterviewSetupCommand command) {
+        Objects.requireNonNull(command, "command不能为null");
+        ActorId ownerId = currentActorProvider.currentActor();
+        InterviewAggregate aggregate = findOwned(ownerId, command.interviewId());
+        if (aggregate.session().mode() != InterviewMode.COMPREHENSIVE) {
+            throw new IllegalStateException("只有综合面试可以修改综合设置");
+        }
+        if (aggregate.session().stage() != SessionStage.PREPARING
+                && aggregate.session().stage() != SessionStage.READY) {
+            throw new IllegalStateException("正式开始后不能修改面试设置");
+        }
+        if (aggregate.session().version() != command.expectedVersion()) {
+            throw new IllegalStateException("面试版本已变化，请刷新后重试");
+        }
+        InputSnapshot current = inputSnapshotRepository.findBySession(ownerId, command.interviewId())
+                .orElseThrow(() -> new IllegalStateException("综合面试缺少输入快照"));
+        var versions = sessionRepository.findVersions(ownerId, command.interviewId()).orElseThrow();
+        long nextInput = Math.addExact(versions.inputVersion(), 1);
+        long nextPlan = Math.addExact(versions.planVersion(), 1);
+        Instant now = clock.instant();
+        InputSnapshot updated = new InputSnapshot(current.inputSnapshotId(), current.interviewId(),
+                ownerId, current.direction(), command.jobDescription(), command.salaryRange(),
+                command.personalDescription(), serializeProfile(command.confirmedProfile()),
+                command.confirmedProfile() == null ? null : 1, command.difficulty().name(),
+                command.durationSeconds(), nextInput, current.version() + 1,
+                current.createdAt(), now);
+        if (!inputSnapshotRepository.updateIfVersionMatches(ownerId, updated, current.version())) {
+            throw new IllegalStateException("输入设置已变化，请刷新后重试");
+        }
+        if (!sessionRepository.reconfigureBeforeStart(ownerId, command.interviewId(),
+                command.expectedVersion(), nextInput, nextPlan, command.durationSeconds())) {
+            throw new IllegalStateException("面试状态已变化，请刷新后重试");
+        }
+        InterviewAggregate refreshed = findOwned(ownerId, command.interviewId());
+        String fingerprint = setupFingerprint(updated, nextPlan);
+        enqueuePreparation(refreshed, nextInput, nextPlan, fingerprint, now);
+        return refreshed.session();
     }
 
     @Transactional
@@ -169,7 +256,7 @@ public class InterviewSessionApplicationService {
             throw new IllegalStateException("面试版本已变化，请刷新后重试");
         }
         Instant now = clock.instant();
-        var transition = STATE_MACHINE.transition(
+        var transition = stateMachineFor(current).transition(
                 current, InterviewEvent.FINISH_REQUESTED, now
         );
         InterviewAggregate updated = transition.aggregate();
@@ -180,10 +267,11 @@ public class InterviewSessionApplicationService {
         }
         if (transition.shouldGenerateReport()) {
             String businessKey = "report:" + interviewId + ":finish:" + requestId;
+            var versions = sessionRepository.findVersions(ownerId, interviewId).orElseThrow();
             boolean enqueued = taskRepository.enqueue(new TaskDefinition(
                     deterministicUuid(businessKey), interviewId, ownerId,
                     TaskType.GENERATE_REPORT, businessKey,
-                    PREPARATION_MAX_ATTEMPTS, INPUT_VERSION, PLAN_VERSION,
+                    PREPARATION_MAX_ATTEMPTS, versions.inputVersion(), versions.planVersion(),
                     sha256("finish=" + interviewId + "\nversion="
                             + updated.session().version()), now
             ));
@@ -231,7 +319,7 @@ public class InterviewSessionApplicationService {
             );
         });
 
-        InterviewAggregate updated = STATE_MACHINE.transition(
+        InterviewAggregate updated = stateMachineFor(aggregate).transition(
                 aggregate,
                 InterviewEvent.FORMAL_START_REQUESTED,
                 clock.instant()
@@ -344,10 +432,15 @@ public class InterviewSessionApplicationService {
             String contextFingerprint,
             Instant now
     ) {
+        enqueuePreparation(aggregate, INPUT_VERSION, PLAN_VERSION, contextFingerprint, now);
+    }
+
+    private void enqueuePreparation(InterviewAggregate aggregate, long inputVersion,
+            long planVersion, String contextFingerprint, Instant now) {
         UUID interviewId = aggregate.session().interviewId();
         String businessKey = "prepare:" + interviewId
-                + ":input:" + INPUT_VERSION
-                + ":plan:" + PLAN_VERSION;
+                + ":input:" + inputVersion
+                + ":plan:" + planVersion;
         taskRepository.enqueue(new TaskDefinition(
                 deterministicUuid(businessKey),
                 interviewId,
@@ -355,8 +448,8 @@ public class InterviewSessionApplicationService {
                 TaskType.PREPARE_INTERVIEW,
                 businessKey,
                 PREPARATION_MAX_ATTEMPTS,
-                INPUT_VERSION,
-                PLAN_VERSION,
+                inputVersion,
+                planVersion,
                 contextFingerprint,
                 now
         ));
@@ -365,6 +458,51 @@ public class InterviewSessionApplicationService {
     private static String creationFingerprint(String direction) {
         return sha256("mode=QUICK\ndirection=" + direction
                 + "\ndurationSeconds=" + POLICY.duration().toSeconds());
+    }
+
+    private InputSnapshot comprehensiveSnapshot(InterviewAggregate aggregate,
+            CreateComprehensiveInterviewCommand command, long inputVersion,
+            long version, Instant now) {
+        return new InputSnapshot(deterministicUuid("input:" + aggregate.session().interviewId()),
+                aggregate.session().interviewId(), aggregate.session().ownerId(),
+                command.direction(), command.jobDescription(), command.salaryRange(),
+                command.personalDescription(), serializeProfile(command.confirmedProfile()),
+                command.confirmedProfile() == null ? null : 1,
+                command.difficulty().name(), command.durationSeconds(), inputVersion,
+                version, now, now);
+    }
+
+    private String serializeProfile(ConfirmedProfile profile) {
+        if (profile == null) return null;
+        try {
+            return jsonMapper.writeValueAsString(profile);
+        } catch (JacksonException exception) {
+            throw new IllegalArgumentException("确认画像无法序列化", exception);
+        }
+    }
+
+    private static String comprehensiveFingerprint(CreateComprehensiveInterviewCommand command) {
+        return sha256("mode=COMPREHENSIVE\ndirection=" + command.direction()
+                + "\njd=" + command.jobDescription() + "\nsalary=" + command.salaryRange()
+                + "\npersonal=" + Objects.toString(command.personalDescription(), "")
+                + "\nprofile=" + Objects.toString(command.confirmedProfile(), "")
+                + "\nduration=" + command.durationSeconds()
+                + "\ndifficulty=" + command.difficulty());
+    }
+
+    private static String setupFingerprint(InputSnapshot snapshot, long planVersion) {
+        return sha256("input=" + snapshot.inputVersion() + "\nplan=" + planVersion
+                + "\njd=" + snapshot.jobDescription() + "\nsalary=" + snapshot.salaryRange()
+                + "\nprofile=" + Objects.toString(snapshot.confirmedProfileJson(), "")
+                + "\nduration=" + snapshot.durationSeconds()
+                + "\ndifficulty=" + snapshot.difficulty());
+    }
+
+    private static InterviewStateMachine stateMachineFor(InterviewAggregate aggregate) {
+        return aggregate.session().mode() == InterviewMode.COMPREHENSIVE
+                ? new InterviewStateMachine(new ComprehensiveInterviewPolicy(
+                        aggregate.timer().duration().toSeconds()))
+                : STATE_MACHINE;
     }
 
     private static UUID deterministicUuid(String value) {

@@ -49,6 +49,11 @@ public interface InterviewTopicRepository {
             long expectedVersion
     );
 
+    default int invalidateTopicsForReplanning(ActorId ownerId, UUID interviewId,
+            long previousPlanVersion) {
+        return 0;
+    }
+
     record TopicRecord(InterviewTopic topic, long version) {
 
         public TopicRecord {

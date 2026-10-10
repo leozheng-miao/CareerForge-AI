@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import * as api from '@/features/interview/api/interview-flow-api'
-import type { CurrentQuestion, InterviewReport, InterviewSession, TimerStatus } from '@/features/interview/api/interview-flow-api'
+import type { ComprehensiveSetup, CurrentQuestion, InterviewReport, InterviewSession, ProfileExperience, TimerStatus } from '@/features/interview/api/interview-flow-api'
 
 export const useInterviewFlowStore = defineStore('interview-flow', () => {
   const session = ref<InterviewSession | null>(null)
@@ -10,6 +10,7 @@ export const useInterviewFlowStore = defineStore('interview-flow', () => {
   const report = ref<InterviewReport | null>(null)
   const waiting = ref(false)
   const loading = ref(false)
+  const comprehensiveSetup = ref<ComprehensiveSetup | null>(null)
   const currentId = computed(() => session.value?.interviewId ?? null)
 
   async function restore(interviewId?: string) {
@@ -32,6 +33,17 @@ export const useInterviewFlowStore = defineStore('interview-flow', () => {
   }
 
   async function createQuick() { session.value = await api.createQuickInterview(); return session.value }
+  async function createComprehensive(setup: ComprehensiveSetup) {
+    comprehensiveSetup.value = cloneComprehensiveSetup(setup)
+    session.value = await api.createComprehensiveInterview(setup)
+    return session.value
+  }
+  async function updateComprehensive(setup: ComprehensiveSetup) {
+    if (!session.value || session.value.mode !== 'COMPREHENSIVE') throw new Error('综合面试会话不存在')
+    comprehensiveSetup.value = cloneComprehensiveSetup(setup)
+    session.value = await api.updateComprehensiveSetup(session.value, setup)
+    return session.value
+  }
   async function enter() {
     if (!session.value) throw new Error('面试会话不存在')
     session.value = await api.enterInterview(session.value)
@@ -78,7 +90,27 @@ export const useInterviewFlowStore = defineStore('interview-flow', () => {
     question.value = null
   }
 
-  return { session, question, timer, report, waiting, loading, currentId,
-    restore, createQuick, enter, loadQuestionThenResume, saveDraft, submit, skip,
+  return { session, question, timer, report, waiting, loading, currentId, comprehensiveSetup,
+    restore, createQuick, createComprehensive, updateComprehensive, enter, loadQuestionThenResume, saveDraft, submit, skip,
     pause, resume, finish }
 })
+
+function cloneComprehensiveSetup(setup: ComprehensiveSetup): ComprehensiveSetup {
+  const profile = setup.confirmedProfile
+  return {
+    ...setup,
+    confirmedProfile: profile
+      ? {
+          personalSummary: profile.personalSummary,
+          coreSkills: [...profile.coreSkills],
+          projectExperiences: profile.projectExperiences.map(cloneExperience),
+          workExperiences: profile.workExperiences.map(cloneExperience),
+          internshipExperiences: profile.internshipExperiences.map(cloneExperience),
+        }
+      : undefined,
+  }
+}
+
+function cloneExperience(experience: ProfileExperience): ProfileExperience {
+  return { ...experience, technologies: [...experience.technologies] }
+}

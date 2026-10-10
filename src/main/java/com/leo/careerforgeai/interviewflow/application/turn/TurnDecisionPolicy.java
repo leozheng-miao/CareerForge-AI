@@ -3,6 +3,9 @@ package com.leo.careerforgeai.interviewflow.application.turn;
 import com.leo.careerforgeai.interviewflow.application.port.InterviewAnswerRepository.FinalDecision;
 import com.leo.careerforgeai.interviewflow.domain.session.InterviewAggregate;
 import com.leo.careerforgeai.interviewflow.domain.session.QuickInterviewPolicy;
+import com.leo.careerforgeai.interviewflow.domain.session.ComprehensiveInterviewPolicy;
+import com.leo.careerforgeai.interviewflow.domain.session.InterviewMode;
+import com.leo.careerforgeai.interviewflow.domain.session.InterviewPolicy;
 import com.leo.careerforgeai.interviewflow.domain.timer.TimerState;
 import com.leo.careerforgeai.interviewflow.domain.turn.AnswerStatus;
 import org.springframework.stereotype.Component;
@@ -15,8 +18,6 @@ public final class TurnDecisionPolicy {
 
     private static final int MIN_QUESTION_CHARS = 10;
     private static final int MAX_QUESTION_CHARS = 2_000;
-    private final QuickInterviewPolicy quickPolicy =
-            new QuickInterviewPolicy();
 
     public FinalDecision decide(
             TurnDecisionProposal proposal,
@@ -36,7 +37,7 @@ public final class TurnDecisionPolicy {
         }
         if (proposal.decision() == FinalDecision.FOLLOW_UP
                 && answerStatus != AnswerStatus.DISCARDED
-                && quickPolicy.allowsAnotherFollowUp(
+                && policyFor(aggregate).allowsAnotherFollowUp(
                         aggregate.followUpCount(),
                         aggregate.consecutiveFollowUpCount()
                 )
@@ -48,6 +49,12 @@ public final class TurnDecisionPolicy {
             return FinalDecision.NEXT_TOPIC;
         }
         return FinalDecision.NEXT_TOPIC;
+    }
+
+    private static InterviewPolicy policyFor(InterviewAggregate aggregate) {
+        return aggregate.session().mode() == InterviewMode.COMPREHENSIVE
+                ? new ComprehensiveInterviewPolicy(aggregate.timer().duration().toSeconds())
+                : new QuickInterviewPolicy();
     }
 
     private static boolean validQuestion(String question) {

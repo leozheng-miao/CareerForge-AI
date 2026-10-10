@@ -24,6 +24,8 @@ import com.leo.careerforgeai.interviewflow.domain.session.InterviewAggregate;
 import com.leo.careerforgeai.interviewflow.domain.session.InterviewEvent;
 import com.leo.careerforgeai.interviewflow.domain.session.InterviewStateMachine;
 import com.leo.careerforgeai.interviewflow.domain.session.QuickInterviewPolicy;
+import com.leo.careerforgeai.interviewflow.domain.session.ComprehensiveInterviewPolicy;
+import com.leo.careerforgeai.interviewflow.domain.session.InterviewMode;
 import com.leo.careerforgeai.interviewflow.domain.topic.InterviewTopic;
 import com.leo.careerforgeai.interviewflow.domain.topic.TopicStatus;
 import com.leo.careerforgeai.interviewflow.domain.turn.AnswerStatus;
@@ -182,7 +184,7 @@ public class AnalyzeTurnTaskHandler implements InterviewTaskHandler {
 
         InterviewAggregate updated;
         if (decision.decision() == FinalDecision.FOLLOW_UP) {
-            updated = STATE_MACHINE.transition(
+            updated = stateMachineFor(aggregate).transition(
                     aggregate, InterviewEvent.FOLLOW_UP_SELECTED)
                     .aggregate();
             insertFollowUp(task, currentQuestion, decision, updated);
@@ -190,7 +192,7 @@ public class AnalyzeTurnTaskHandler implements InterviewTaskHandler {
             if (nextTopic == null) {
                 updated = finish(task, aggregate, currentTopic);
             } else {
-                updated = STATE_MACHINE.transition(
+                updated = stateMachineFor(aggregate).transition(
                         aggregate, InterviewEvent.NEXT_TOPIC_SELECTED)
                         .aggregate();
                 completeTopic(task, currentTopic);
@@ -313,7 +315,7 @@ public class AnalyzeTurnTaskHandler implements InterviewTaskHandler {
     ) {
         completeTopic(task, currentTopic);
         Instant now = clock.instant();
-        var transition = STATE_MACHINE.transition(
+        var transition = stateMachineFor(aggregate).transition(
                 aggregate, InterviewEvent.FINISH_REQUESTED, now);
         InterviewAggregate updated = transition.aggregate();
         if (transition.shouldGenerateReport()) {
@@ -336,6 +338,13 @@ public class AnalyzeTurnTaskHandler implements InterviewTaskHandler {
             }
         }
         return updated;
+    }
+
+    private static InterviewStateMachine stateMachineFor(InterviewAggregate aggregate) {
+        return aggregate.session().mode() == InterviewMode.COMPREHENSIVE
+                ? new InterviewStateMachine(new ComprehensiveInterviewPolicy(
+                        aggregate.timer().duration().toSeconds()))
+                : STATE_MACHINE;
     }
 
     private String writeJson(Object value) {

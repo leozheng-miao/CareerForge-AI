@@ -13,10 +13,15 @@ import com.leo.careerforgeai.interviewflow.application.port.InterviewTopicReposi
 import com.leo.careerforgeai.interviewflow.application.session.InterviewFlowNotFoundException;
 import com.leo.careerforgeai.interviewflow.domain.topic.InterviewTopic;
 import com.leo.careerforgeai.interviewflow.domain.topic.TopicStatus;
+import com.leo.careerforgeai.interviewflow.domain.session.ConfirmedProfile;
+import com.leo.careerforgeai.interviewflow.application.resume.ProfileExperienceDraft;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +45,7 @@ public class InterviewContextAssembler {
     private final InterviewTopicRepository topicRepository;
     private final InterviewQuestionRepository questionRepository;
     private final InterviewAnswerRepository answerRepository;
+    private final JsonMapper json;
 
     public InterviewContextAssembler(
             InterviewSessionRepository sessionRepository,
@@ -47,6 +53,19 @@ public class InterviewContextAssembler {
             InterviewTopicRepository topicRepository,
             InterviewQuestionRepository questionRepository,
             InterviewAnswerRepository answerRepository
+    ) {
+        this(sessionRepository, inputRepository, topicRepository, questionRepository,
+                answerRepository, JsonMapper.builder().build());
+    }
+
+    @Autowired
+    public InterviewContextAssembler(
+            InterviewSessionRepository sessionRepository,
+            InterviewInputSnapshotRepository inputRepository,
+            InterviewTopicRepository topicRepository,
+            InterviewQuestionRepository questionRepository,
+            InterviewAnswerRepository answerRepository,
+            JsonMapper json
     ) {
         this.sessionRepository = Objects.requireNonNull(
                 sessionRepository,
@@ -68,6 +87,7 @@ public class InterviewContextAssembler {
                 answerRepository,
                 "answerRepository不能为空"
         );
+        this.json = Objects.requireNonNull(json, "json不能为空");
     }
 
     @Transactional(readOnly = true)
@@ -160,8 +180,49 @@ public class InterviewContextAssembler {
                         active.objective(),
                         activeTurns
                 ),
-                closed
+                closed,
+                aggregate.session().mode(),
+                new InterviewModelContext.UntrustedProfileContext(
+                        relevantProfileClaims(input.confirmedProfileJson(), active.objective()),
+                        true)
         );
+    }
+
+    private List<String> relevantProfileClaims(String profileJson, String objective) {
+        if (profileJson == null || profileJson.isBlank()) return List.of();
+        try {
+            ConfirmedProfile profile = json.readValue(profileJson, ConfirmedProfile.class);
+            List<String> claims = new ArrayList<>();
+            for (ProfileExperienceDraft experience : concat(profile)) {
+                String claim = String.join(" | ", experience.name(), experience.role(),
+                        experience.description(), String.join(",", experience.technologies()));
+                if (claims.size() < 4 && relevant(claim, objective)) claims.add(claim);
+            }
+            if (claims.isEmpty()) {
+                profile.coreSkills().stream().limit(4)
+                        .map(skill -> "用户确认技能主张: " + skill).forEach(claims::add);
+            }
+            return List.copyOf(claims);
+        } catch (JacksonException exception) {
+            return List.of();
+        }
+    }
+
+    private static List<ProfileExperienceDraft> concat(ConfirmedProfile profile) {
+        List<ProfileExperienceDraft> all = new ArrayList<>();
+        all.addAll(profile.projectExperiences());
+        all.addAll(profile.workExperiences());
+        all.addAll(profile.internshipExperiences());
+        return all;
+    }
+
+    private static boolean relevant(String claim, String objective) {
+        String normalizedClaim = claim.toLowerCase(java.util.Locale.ROOT);
+        for (String token : objective.toLowerCase(java.util.Locale.ROOT)
+                .split("[^a-z0-9\\p{IsHan}]+")) {
+            if (token.length() >= 2 && normalizedClaim.contains(token)) return true;
+        }
+        return false;
     }
 
     private TurnContext turnContext(

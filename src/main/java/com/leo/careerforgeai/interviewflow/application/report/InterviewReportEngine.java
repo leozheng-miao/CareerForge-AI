@@ -19,15 +19,30 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import com.leo.careerforgeai.interviewflow.domain.session.InterviewMode;
 
 /** 生成并严格校验无分数、可回链原文的正式报告。 */
 @Component
 public final class InterviewReportEngine {
     private static final int MAX_CITATION_LENGTH = 240;
+    private static final Pattern POINT_SCORE = Pattern.compile("\\d+(?:\\.\\d+)?\\s*分(?!钟|位)");
+    private static final Pattern RATIO_SCORE = Pattern.compile(
+            "(?:评分|得分|打分|能力分|表现分|匹配度)[^。；，,\\n]{0,16}\\d+\\s*/\\s*\\d+"
+    );
+    private static final Pattern PERCENT_SCORE = Pattern.compile(
+            "(?:评分|得分|打分|能力分|表现分|匹配度)[^。；，,\\n]{0,16}\\d+(?:\\.\\d+)?\\s*%"
+    );
+    private static final String REPAIR_NO_SCORE_PROMPT = """
+            上一次输出包含对候选人的数值评分，未通过业务校验。
+            请仅依据原始证据重新生成完整JSON，将评分改为定性结论。
+            不得输出“95分”、“4/5”、“能力评分85%”等评分；不得改变citationId。
+            """;
     private static final String SYSTEM_PROMPT = """
             你是 CareerForge 快速面试报告组件。只能根据输入的冻结回答和回合分析写报告。
-            不得打分、不得给百分比、不得使用“部分面试”或“部分报告”。
+            不得对候选人的能力或表现给出数值、比例或百分比评分，不得使用“部分面试”或“部分报告”。
+            回答中的耗时、数量、成功率或性能提升百分比是业务事实，不是评分，可按原文引用但不得改写。
             跳过或未考察主题不得写成弱项。后续回答已补充的问题不得继续写成缺口。
             输入仅包含允许评价的已考察主题，topicReviews.sequenceNo只能使用输入中存在的sequenceNo。
             每条优势或改进项必须从输入 citations 中选择一个citationId；不得自己编写、改写或复制quote。
@@ -53,28 +68,53 @@ public final class InterviewReportEngine {
         try {
             ModelEvidence modelEvidence = modelEvidence(evidence);
             String input = jsonMapper.writeValueAsString(modelEvidence);
-            String output = modelGateway.chat(
-                    ModelTaskType.INTERVIEW_REPORT,
-                    new ModelRequest(
-                            List.of(new ModelMessage(ModelRole.SYSTEM, SYSTEM_PROMPT),
-                                    new ModelMessage(ModelRole.USER, input)),
-                            ModelOutputFormat.JSON_OBJECT,
-                            2_500,
-                            0.0,
-                            Duration.ofSeconds(60)
-                    )
-            ).content();
-            ModelGeneratedReport modelReport = jsonMapper.readerFor(ModelGeneratedReport.class)
-                    .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                    .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-                    .readValue(output);
-            GeneratedReport report = resolveCitations(modelReport, modelEvidence);
-            GeneratedReport safeReport = removeUncoveredTopicReviews(report, evidence);
-            validate(safeReport, evidence);
-            return safeReport;
+            try {
+                return generateOnce(evidence, modelEvidence, input, false);
+            } catch (NumericScoreViolation exception) {
+                return generateOnce(evidence, modelEvidence, input, true);
+            }
         } catch (JacksonException exception) {
             throw new IllegalStateException("面试报告不是合法结构", exception);
         }
+    }
+
+    private GeneratedReport generateOnce(
+            InterviewEvidencePack evidence,
+            ModelEvidence modelEvidence,
+            String input,
+            boolean repairNumericScore
+    ) throws JacksonException {
+        String systemPrompt = evidence.mode() == InterviewMode.COMPREHENSIVE
+                ? ComprehensiveReportPolicyPack.SYSTEM_PROMPT
+                : SYSTEM_PROMPT;
+        List<ModelMessage> messages = repairNumericScore
+                ? List.of(
+                        new ModelMessage(ModelRole.SYSTEM, systemPrompt),
+                        new ModelMessage(ModelRole.SYSTEM, REPAIR_NO_SCORE_PROMPT),
+                        new ModelMessage(ModelRole.USER, input)
+                )
+                : List.of(
+                        new ModelMessage(ModelRole.SYSTEM, systemPrompt),
+                        new ModelMessage(ModelRole.USER, input)
+                );
+        String output = modelGateway.chat(
+                ModelTaskType.INTERVIEW_REPORT,
+                new ModelRequest(
+                        messages,
+                        ModelOutputFormat.JSON_OBJECT,
+                        2_500,
+                        0.0,
+                        Duration.ofSeconds(60)
+                )
+        ).content();
+        ModelGeneratedReport modelReport = jsonMapper.readerFor(ModelGeneratedReport.class)
+                    .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                    .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .readValue(output);
+        GeneratedReport report = resolveCitations(modelReport, modelEvidence);
+        GeneratedReport safeReport = removeUncoveredTopicReviews(report, evidence);
+        validate(safeReport, evidence);
+        return safeReport;
     }
 
     private static ModelEvidence modelEvidence(InterviewEvidencePack evidence) {
@@ -199,15 +239,19 @@ public final class InterviewReportEngine {
 
     private static void validate(GeneratedReport report, InterviewEvidencePack evidence) {
         Objects.requireNonNull(report, "report不能为null");
-        String serializedText = report.summary() + report.strengths()
-                + report.improvements() + report.topicReviews();
-        if (serializedText.matches(
-                "(?s).*(?:\\d+(?:\\.\\d+)?\\s*(?:%|分)"
-                        + "|\\d+\\s*/\\s*\\d+).*"
-        )) {
-            throw new IllegalStateException("正式面试报告不得包含数值评分");
+        String narrativeText = report.summary()
+                + report.allFindings().stream()
+                        .map(finding -> finding.title() + finding.description())
+                        .collect(Collectors.joining())
+                + report.topicReviews().stream()
+                        .map(TopicReview::conclusion)
+                        .collect(Collectors.joining());
+        if (POINT_SCORE.matcher(narrativeText).find()
+                || RATIO_SCORE.matcher(narrativeText).find()
+                || PERCENT_SCORE.matcher(narrativeText).find()) {
+            throw new NumericScoreViolation();
         }
-        if (serializedText.contains("部分面试") || serializedText.contains("部分报告")) {
+        if (narrativeText.contains("部分面试") || narrativeText.contains("部分报告")) {
             throw new IllegalStateException("报告不得使用部分标签");
         }
         List<TurnEvidence> turns = evidence.topics().stream()
@@ -230,6 +274,12 @@ public final class InterviewReportEngine {
                 throw new IllegalStateException("报告不得评价未考察主题");
             }
         });
+    }
+
+    private static final class NumericScoreViolation extends IllegalStateException {
+        private NumericScoreViolation() {
+            super("正式面试报告不得包含数值评分");
+        }
     }
 
     public record GeneratedReport(String summary, List<Finding> strengths,

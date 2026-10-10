@@ -12,6 +12,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -58,6 +59,23 @@ public class InterviewSessionController {
         return ResultUtils.success(InterviewSessionResponse.from(
                 service.createQuick(request.toCommand())
         ));
+    }
+
+    @PostMapping("/comprehensive")
+    @Operation(summary = "创建综合面试并开始个性化准备")
+    public BaseResponse<InterviewSessionResponse> createComprehensive(
+            @Valid @RequestBody CreateComprehensiveInterviewRequest request) {
+        return ResultUtils.success(InterviewSessionResponse.from(
+                service.createComprehensive(request.toCommand())));
+    }
+
+    @PutMapping("/{interviewId}/setup")
+    @Operation(summary = "正式开始前修改综合面试设置并使旧准备失效")
+    public BaseResponse<InterviewSessionResponse> updateSetup(
+            @PathVariable UUID interviewId,
+            @Valid @RequestBody UpdateInterviewSetupRequest request) {
+        return ResultUtils.success(InterviewSessionResponse.from(
+                service.updateSetup(request.toCommand(interviewId))));
     }
 
     @GetMapping("/resumable")

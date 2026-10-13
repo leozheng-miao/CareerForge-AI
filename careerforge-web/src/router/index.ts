@@ -1,7 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import AppLayout from '@/layouts/AppLayout.vue'
+import AuthLayout from '@/layouts/AuthLayout.vue'
 import PublicLayout from '@/layouts/PublicLayout.vue'
+
+import { ROUTE_PATHS } from './paths'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -14,19 +17,43 @@ const router = createRouter({
           path: '',
           name: 'home',
           component: () => import('@/views/HomeView.vue'),
-          meta: { title: 'CareerForge-AI｜证据驱动职业训练' },
+          meta: { title: '水水面｜技术面试练习' },
         },
         {
-          path: 'login',
+          path: 'terms',
+          name: 'terms',
+          component: () => import('@/views/TermsView.vue'),
+          meta: { title: '用户协议｜水水面' },
+        },
+        {
+          path: 'privacy',
+          name: 'privacy',
+          component: () => import('@/views/PrivacyView.vue'),
+          meta: { title: '隐私政策｜水水面' },
+        },
+      ],
+    },
+    {
+      path: '/login',
+      component: AuthLayout,
+      children: [
+        {
+          path: '',
           name: 'login',
           component: () => import('@/views/auth/LoginView.vue'),
-          meta: { title: '登录｜CareerForge-AI', guestOnly: true },
+          meta: { title: '登录｜水水面', guestOnly: true },
         },
+      ],
+    },
+    {
+      path: '/register',
+      component: AuthLayout,
+      children: [
         {
-          path: 'register',
+          path: '',
           name: 'register',
           component: () => import('@/views/auth/RegisterView.vue'),
-          meta: { title: '注册｜CareerForge-AI', guestOnly: true },
+          meta: { title: '注册｜水水面', guestOnly: true },
         },
       ],
     },
@@ -38,62 +65,62 @@ const router = createRouter({
         {
           path: '',
           name: 'dashboard',
-          component: () => import('@/views/app/DashboardView.vue'),
-          meta: { title: '成长总览', requiresAuth: true },
+          redirect: ROUTE_PATHS.interviews,
+          meta: { requiresAuth: true },
         },
         {
           path: 'target-role',
           name: 'target-role',
-          component: () => import('@/views/app/TargetRoleView.vue'),
-          meta: { title: '目标岗位', requiresAuth: true },
+          redirect: ROUTE_PATHS.interviews,
+          meta: { requiresAuth: true },
         },
         {
           path: 'skill-gaps',
           name: 'skill-gaps',
-          component: () => import('@/views/app/SkillGapsView.vue'),
-          meta: { title: '能力差距', requiresAuth: true },
+          redirect: ROUTE_PATHS.interviews,
+          meta: { requiresAuth: true },
         },
         {
           path: 'memories',
           name: 'memories',
-          component: () => import('@/views/app/MemoriesView.vue'),
-          meta: { title: '长期记忆', requiresAuth: true },
+          redirect: ROUTE_PATHS.interviews,
+          meta: { requiresAuth: true },
         },
         {
           path: 'training-plans',
           name: 'training-plans',
-          component: () => import('@/views/app/TrainingPlansView.vue'),
-          meta: { title: '训练计划', requiresAuth: true },
+          redirect: ROUTE_PATHS.interviews,
+          meta: { requiresAuth: true },
         },
         {
           path: 'training-plans/:planId',
           name: 'training-plan-detail',
-          component: () => import('@/views/app/TrainingPlanDetailView.vue'),
-          meta: { title: '训练计划详情', requiresAuth: true },
+          redirect: ROUTE_PATHS.interviews,
+          meta: { requiresAuth: true },
         },
         {
           path: 'coach',
           name: 'coach',
-          component: () => import('@/views/app/CoachSessionsView.vue'),
-          meta: { title: 'Career Coach', requiresAuth: true },
+          redirect: ROUTE_PATHS.interviews,
+          meta: { requiresAuth: true },
         },
         {
           path: 'coach/:sessionId',
           name: 'coach-session',
-          component: () => import('@/views/app/CoachSessionDetailView.vue'),
-          meta: { title: 'Career Coach 对话', requiresAuth: true },
+          redirect: ROUTE_PATHS.interviews,
+          meta: { requiresAuth: true },
         },
         {
           path: 'knowledge',
           name: 'knowledge',
-          component: () => import('@/views/app/KnowledgeView.vue'),
-          meta: { title: '知识问答', requiresAuth: true },
+          redirect: ROUTE_PATHS.interviews,
+          meta: { requiresAuth: true },
         },
         {
           path: 'evidence',
           name: 'evidence',
-          component: () => import('@/views/app/EvidenceView.vue'),
-          meta: { title: '个人证据', requiresAuth: true },
+          redirect: ROUTE_PATHS.interviews,
+          meta: { requiresAuth: true },
         },
         {
           path: 'interviews',
@@ -105,19 +132,19 @@ const router = createRouter({
           path: 'interviews/comprehensive/setup',
           name: 'comprehensive-interview-setup',
           component: () => import('@/views/app/ComprehensiveInterviewSetupView.vue'),
-          meta: { title: '综合面试设置', requiresAuth: true },
+          meta: { title: '综合面试设置', requiresAuth: true, immersive: true },
         },
         {
           path: 'interviews/:interviewId/ready',
           name: 'interview-ready',
           component: () => import('@/views/app/InterviewReadyView.vue'),
-          meta: { title: '面试就绪', requiresAuth: true },
+          meta: { title: '面试就绪', requiresAuth: true, immersive: true },
         },
         {
           path: 'interviews/:interviewId/session',
           name: 'interview-session',
           component: () => import('@/views/app/InterviewDetailView.vue'),
-          meta: { title: '快速面试', requiresAuth: true },
+          meta: { title: '快速面试', requiresAuth: true, immersive: true },
         },
         {
           path: 'interviews/:interviewId/report',
@@ -132,6 +159,12 @@ const router = createRouter({
           meta: { title: '面试记录', requiresAuth: true },
         },
       ],
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('@/views/NotFoundView.vue'),
+      meta: { title: '页面未找到｜水水面' },
     },
   ],
   scrollBehavior(to, _from, savedPosition) {
@@ -154,7 +187,7 @@ const router = createRouter({
 router.afterEach((to) => {
   document.title = typeof to.meta.title === 'string'
     ? to.meta.title
-    : 'CareerForge-AI'
+    : '水水面'
 })
 
 export default router

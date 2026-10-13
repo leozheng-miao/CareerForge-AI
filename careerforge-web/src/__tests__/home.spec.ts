@@ -14,6 +14,8 @@ async function mountHome() {
       { path: '/', component: HomeView },
       { path: '/login', component: EmptyView },
       { path: '/register', component: EmptyView },
+      { path: '/terms', component: EmptyView },
+      { path: '/privacy', component: EmptyView },
     ],
   })
 
@@ -28,29 +30,29 @@ async function mountHome() {
 }
 
 describe('HomeView', () => {
-  it('presents the three frozen product lines and working entry links', async () => {
+  it('presents the selected editorial direction and two interview modes', async () => {
     const wrapper = await mountHome()
 
-    expect(wrapper.get('h1').text()).toContain('练成能拿 Offer 的能力')
-    expect(wrapper.findAll('.capability-card')).toHaveLength(3)
-    expect(wrapper.text()).toContain('岗位能力诊断')
-    expect(wrapper.text()).toContain('个性化成长训练')
-    expect(wrapper.text()).toContain('多 Agent 模拟面试')
-    expect(wrapper.get('a[href="/register"]').text()).toContain('从一份 JD 开始职业诊断')
-    expect(wrapper.get('a[href="/#interview"]').text()).toContain('体验 AI 模拟面试')
+    expect(wrapper.get('h1').text()).toContain('面试前，先认真面一次。')
+    expect(wrapper.text()).toContain('会根据回答继续追问的技术面试。')
+    expect(wrapper.text()).toContain('Java 后端 · AI Agent 开发')
+    expect(wrapper.findAll('.home-mode-entry')).toHaveLength(2)
+    expect(wrapper.text()).toContain('快速面试')
+    expect(wrapper.text()).toContain('综合面试')
+    expect(wrapper.text()).toContain('60 分钟 · 8 个考查目标')
+    expect(wrapper.text()).toContain('结合岗位与真实经历')
+    expect(wrapper.get('a[href="/register"]').text()).toContain('开始面试')
+    expect(wrapper.find('.interview-preview').exists()).toBe(true)
   })
 
-  it('switches the interview preview without inventing a backend session', async () => {
+  it('does not advertise retired growth-product capabilities', async () => {
     const wrapper = await mountHome()
-    const tabs = wrapper.findAll('[role="tab"]')
 
-    expect(tabs).toHaveLength(2)
-    expect(tabs[0]?.attributes('aria-selected')).toBe('true')
-
-    await tabs[1]?.trigger('click')
-
-    expect(tabs[1]?.attributes('aria-selected')).toBe('true')
-    expect(wrapper.text()).toContain('幂等键、超时与人工接管')
-    expect(wrapper.text()).toContain('产品预览 · 示例')
+    expect(wrapper.text()).not.toContain('岗位能力诊断')
+    expect(wrapper.text()).not.toContain('个性化成长训练')
+    expect(wrapper.text()).not.toContain('Career Coach')
+    expect(wrapper.text()).not.toContain('长期记忆')
+    expect(wrapper.text()).not.toContain('AI 赋能')
+    expect(wrapper.text()).not.toContain('精准洞察')
   })
 })

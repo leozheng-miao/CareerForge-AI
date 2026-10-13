@@ -83,7 +83,12 @@ describe('active interview', () => {
       sessionVersion: 8,
     }
     store.waiting = false
+    store.timer.timerState = 'RUNNING'
+    store.timer.remainingSeconds = 2_400
     store.restore.mockClear()
+    store.loadQuestionThenResume.mockClear()
+    store.pause.mockClear()
+    store.resume.mockClear()
   })
 
   afterEach(() => {
@@ -119,6 +124,7 @@ describe('active interview', () => {
     expect(
       wrapper.findAll('button').every((button) => button.attributes('disabled') !== undefined),
     ).toBe(true)
+    expect(wrapper.text()).toContain('回答已提交并冻结')
   })
 
   it('keeps the current objective progress while the next question is loading', async () => {
@@ -154,6 +160,69 @@ describe('active interview', () => {
     expect(wrapper.text()).toContain('综合面试')
     expect(wrapper.text()).toContain('6 / 6 个主题')
     expect(wrapper.text()).not.toContain('8 个考查目标')
+    wrapper.unmount()
+  })
+
+  it('keeps the interview running when the browser tab becomes hidden', async () => {
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    const wrapper = mount(InterviewDetailView)
+    await flushPromises()
+
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+
+    expect(store.pause).not.toHaveBeenCalled()
+    expect(store.resume).not.toHaveBeenCalled()
+    hidden.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('keeps the answer read-only until a paused interview is resumed', async () => {
+    store.timer.timerState = 'PAUSED'
+    const wrapper = mount(InterviewDetailView)
+    await flushPromises()
+
+    expect(wrapper.get('textarea').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('面试已暂停，继续后可以作答')
+    const resumeButton = wrapper.findAll('button')
+      .find((button) => button.text().includes('继续面试'))
+    await resumeButton?.trigger('click')
+
+    expect(store.resume).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+
+  it('keeps the timer stopped while the next question is being prepared', async () => {
+    store.question = null
+    store.waiting = true
+    const wrapper = mount(InterviewDetailView)
+    await flushPromises()
+
+    const initialRemaining = wrapper.findComponent(InterviewTopBar).props('remainingSeconds')
+    await vi.advanceTimersByTimeAsync(5_000)
+
+    expect(wrapper.findComponent(InterviewTopBar).props('remainingSeconds')).toBe(initialRemaining)
+    expect(wrapper.text()).toContain('等待期间不计入 60 分钟有效作答时间')
+    expect(wrapper.text()).toContain('已提交内容保持冻结')
+    const waitingButton = wrapper.findAll('button')
+      .find((button) => button.text().includes('等待下一题'))
+    expect(waitingButton?.attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+
+  it('allows the current answer to be completed after effective time reaches zero', async () => {
+    store.timer.timerState = 'EXHAUSTED'
+    store.timer.remainingSeconds = 0
+    const wrapper = mount(InterviewDetailView)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('处理本题后面试结束')
+    expect(wrapper.get('textarea').attributes('disabled')).toBeUndefined()
+    await wrapper.get('textarea').setValue('这是当前题的最后回答')
+    const submit = wrapper.findAll('button').find((button) => button.text().includes('提交回答'))
+
+    expect(submit?.attributes('disabled')).toBeUndefined()
+    expect(wrapper.findComponent(InterviewTopBar).props('timeExhausted')).toBe(true)
     wrapper.unmount()
   })
 })

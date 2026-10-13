@@ -7,9 +7,9 @@
 html {
   min-width: 320px;
   min-height: 100%;
-  background: var(--cf-color-background);
-  color: var(--cf-color-text);
-  font-family: var(--cf-font-sans);
+  background: var(--ssm-color-paper);
+  color: var(--ssm-color-ink);
+  font-family: var(--ssm-font-sans);
   line-height: 1.5;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -20,7 +20,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background: var(--cf-color-background);
+  background: var(--ssm-color-paper);
 }
 
 body,
@@ -28,7 +28,7 @@ button,
 input,
 textarea,
 select {
-  font-family: var(--cf-font-sans);
+  font-family: var(--ssm-font-sans);
 }
 
 button,
@@ -55,26 +55,28 @@ svg {
 }
 
 #app,
-.careerforge-app {
+.shuishuimian-app {
   min-height: 100vh;
 }
 
 ::selection {
-  background: var(--cf-color-primary-soft);
-  color: var(--cf-color-primary-hover);
+  background: var(--ssm-color-brand-soft);
+  color: var(--ssm-color-brand-hover);
 }
 
 :focus-visible {
-  outline: 3px solid rgba(79, 70, 229, 0.28);
+  outline: 3px solid rgba(47, 120, 170, 0.28);
   outline-offset: 2px;
 }
 
-.cf-container {
-  width: min(calc(100% - 48px), var(--cf-content-width));
+.cf-container,
+.ssm-container {
+  width: min(calc(100% - 48px), var(--ssm-content-width));
   margin-inline: auto;
 }
 
-.cf-visually-hidden {
+.cf-visually-hidden,
+.ssm-visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -87,8 +89,9 @@ svg {
 }
 
 @media (max-width: 767px) {
-  .cf-container {
-    width: min(calc(100% - 32px), var(--cf-content-width));
+  .cf-container,
+  .ssm-container {
+    width: min(calc(100% - 32px), var(--ssm-content-width));
   }
 }
 

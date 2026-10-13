@@ -14,7 +14,7 @@ export function installAuthGuard(router: Router, pinia: Pinia) {
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
       return { path: ROUTE_PATHS.login, query: { redirect: to.fullPath } }
     }
-    if (to.meta.guestOnly && authStore.isAuthenticated) return ROUTE_PATHS.app
+    if (to.meta.guestOnly && authStore.isAuthenticated) return ROUTE_PATHS.interviews
     return true
   })
 }

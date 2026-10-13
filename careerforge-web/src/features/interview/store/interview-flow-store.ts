@@ -82,6 +82,29 @@ export const useInterviewFlowStore = defineStore('interview-flow', () => {
     timer.value = await api.pauseInterview(session.value.interviewId, session.value.version)
     session.value = { ...session.value, version: timer.value.version }
   }
+  async function heartbeat() {
+    if (!session.value || session.value.stage !== 'INTERVIEWING') return null
+    timer.value = await api.heartbeat(session.value.interviewId)
+    session.value = { ...session.value, version: timer.value.version }
+    return timer.value
+  }
+  async function pauseActiveBeforeLogout() {
+    let activeSession = session.value
+    if (!activeSession) {
+      const resumable = await api.getResumableInterview()
+      if (!resumable) return
+      activeSession = await api.getInterview(resumable.interviewId)
+      session.value = activeSession
+    }
+    if (activeSession.stage !== 'INTERVIEWING') return
+    timer.value = await api.pauseInterview(activeSession.interviewId, activeSession.version)
+    session.value = { ...activeSession, version: timer.value.version }
+  }
+  function pauseForPageExit() {
+    if (!session.value || session.value.stage !== 'INTERVIEWING') return
+    if (timer.value && timer.value.timerState !== 'RUNNING') return
+    api.pauseInterviewOnPageExit(session.value.interviewId, session.value.version)
+  }
   async function resume() { await loadQuestionThenResume() }
   async function finish() {
     if (!session.value) return
@@ -92,7 +115,7 @@ export const useInterviewFlowStore = defineStore('interview-flow', () => {
 
   return { session, question, timer, report, waiting, loading, currentId, comprehensiveSetup,
     restore, createQuick, createComprehensive, updateComprehensive, enter, loadQuestionThenResume, saveDraft, submit, skip,
-    pause, resume, finish }
+    heartbeat, pause, pauseActiveBeforeLogout, pauseForPageExit, resume, finish }
 })
 
 function cloneComprehensiveSetup(setup: ComprehensiveSetup): ComprehensiveSetup {

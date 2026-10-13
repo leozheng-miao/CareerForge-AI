@@ -1,45 +1,57 @@
 .auth-alert {
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 
 .auth-form {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .auth-form label {
   margin-top: 6px;
-  color: #24304d;
+  color: var(--ssm-color-ink);
   font-size: 14px;
   font-weight: 650;
 }
 
 .auth-form :deep(.ant-input),
 .auth-form :deep(.ant-input-affix-wrapper) {
-  min-height: 46px;
+  min-height: 48px;
 }
 
 .auth-form :deep(.ant-btn) {
-  min-height: 48px;
-  margin-top: 12px;
-  font-weight: 700;
+  min-height: 50px;
+  margin-top: 18px;
+  font-weight: 650;
 }
 
 .auth-switch {
   margin: 24px 0 0;
-  color: var(--cf-color-text-secondary);
+  color: var(--ssm-color-text-secondary);
   text-align: center;
 }
 
 .auth-switch a {
-  color: var(--cf-color-primary);
-  font-weight: 700;
+  color: var(--ssm-color-brand);
+  font-weight: 650;
 }
 
 .auth-security {
   margin: 14px 0 0;
-  color: var(--cf-color-text-muted);
+  color: var(--ssm-color-text-secondary);
   font-size: 12px;
   line-height: 1.6;
   text-align: center;
+}
+
+.auth-legal {
+  margin: 12px 0 0;
+  color: var(--ssm-color-text-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.auth-legal a {
+  border-bottom: 1px solid var(--ssm-color-line);
 }

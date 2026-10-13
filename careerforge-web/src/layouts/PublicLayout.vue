@@ -10,10 +10,9 @@ import { ROUTE_PATHS } from '@/router/paths'
 const mobileMenuOpen = ref(false)
 
 const navigation = [
-  { label: '产品能力', hash: '#capabilities' },
-  { label: '成长路径', hash: '#growth-path' },
-  { label: '模拟面试', hash: '#interview' },
-  { label: '关于我们', hash: '#about' },
+  { label: '面试模式', to: { path: ROUTE_PATHS.home, hash: '#modes' } },
+  { label: '怎么进行', to: { path: ROUTE_PATHS.home, hash: '#process' } },
+  { label: '面试记录', to: ROUTE_PATHS.interviewRecords },
 ] as const
 
 function closeMobileMenu() {
@@ -30,9 +29,9 @@ function closeMobileMenu() {
         <nav class="public-nav" aria-label="主要导航">
           <RouterLink
             v-for="item in navigation"
-            :key="item.hash"
+            :key="item.label"
             class="public-nav__link"
-            :to="{ path: ROUTE_PATHS.home, hash: item.hash }"
+            :to="item.to"
           >
             {{ item.label }}
           </RouterLink>
@@ -40,7 +39,7 @@ function closeMobileMenu() {
 
         <div class="public-header__actions">
           <RouterLink class="public-header__login" :to="ROUTE_PATHS.login">登录</RouterLink>
-          <RouterLink class="public-header__start" :to="ROUTE_PATHS.register">免费开始</RouterLink>
+          <RouterLink class="public-header__start" :to="ROUTE_PATHS.register">开始面试</RouterLink>
         </div>
 
         <Button
@@ -64,9 +63,9 @@ function closeMobileMenu() {
       >
         <RouterLink
           v-for="item in navigation"
-          :key="item.hash"
+          :key="item.label"
           class="public-mobile-nav__link"
-          :to="{ path: ROUTE_PATHS.home, hash: item.hash }"
+          :to="item.to"
           @click="closeMobileMenu"
         >
           {{ item.label }}
@@ -78,7 +77,7 @@ function closeMobileMenu() {
             :to="ROUTE_PATHS.register"
             @click="closeMobileMenu"
           >
-            免费开始
+            开始面试
           </RouterLink>
         </div>
       </nav>
@@ -90,21 +89,20 @@ function closeMobileMenu() {
       </slot>
     </main>
 
-    <footer id="about" class="public-footer">
+    <footer class="public-footer">
       <div class="cf-container public-footer__inner">
         <div>
           <BrandLogo />
-          <p class="public-footer__description">面向 AI Agent 岗位的证据驱动职业训练平台</p>
+          <p class="public-footer__description">面试前，先认真面一次。</p>
         </div>
         <nav class="public-footer__links" aria-label="页脚导航">
-          <RouterLink :to="{ path: ROUTE_PATHS.home, hash: '#capabilities' }">产品能力</RouterLink>
-          <RouterLink :to="{ path: ROUTE_PATHS.home, hash: '#growth-path' }">成长路径</RouterLink>
-          <RouterLink :to="{ path: ROUTE_PATHS.home, hash: '#interview' }">模拟面试</RouterLink>
+          <RouterLink :to="ROUTE_PATHS.terms">用户协议</RouterLink>
+          <RouterLink :to="ROUTE_PATHS.privacy">隐私政策</RouterLink>
+          <RouterLink :to="ROUTE_PATHS.login">登录</RouterLink>
         </nav>
         <div class="public-footer__legal">
-          <span>© {{ new Date().getFullYear() }} CareerForge-AI</span>
-          <span>用户协议</span>
-          <span>隐私政策</span>
+          <span>© {{ new Date().getFullYear() }} 水水面</span>
+          <span>Java 后端 · AI Agent 开发</span>
         </div>
       </div>
     </footer>
@@ -114,7 +112,7 @@ function closeMobileMenu() {
 <style scoped>
 .public-layout {
   min-height: 100vh;
-  background: var(--cf-color-surface);
+  background: var(--ssm-color-paper);
 }
 
 .public-header {
@@ -122,9 +120,8 @@ function closeMobileMenu() {
   z-index: 100;
   top: 0;
   min-height: var(--cf-public-header-height);
-  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--ssm-color-line);
+  background: rgba(247, 245, 240, 0.96);
 }
 
 .public-header__inner {
@@ -144,14 +141,14 @@ function closeMobileMenu() {
 
 .public-nav__link,
 .public-header__login {
-  color: var(--cf-color-text-secondary);
-  font-weight: 550;
-  transition: color var(--cf-motion-fast) ease;
+  color: var(--ssm-color-text-secondary);
+  font-weight: 500;
+  transition: color var(--ssm-motion-fast) ease;
 }
 
 .public-nav__link:hover,
 .public-header__login:hover {
-  color: var(--cf-color-primary);
+  color: var(--ssm-color-brand);
 }
 
 .public-header__actions {
@@ -167,18 +164,15 @@ function closeMobileMenu() {
   justify-content: center;
   padding: 0 22px;
   border-radius: var(--cf-radius-control);
-  background: var(--cf-color-accent);
-  color: #422006;
-  font-weight: 700;
-  transition:
-    background var(--cf-motion-fast) ease,
-    transform var(--cf-motion-fast) ease;
+  background: var(--ssm-color-brand);
+  color: #fff;
+  font-weight: 650;
+  transition: background var(--ssm-motion-fast) ease;
 }
 
 .public-header__start:hover {
-  background: #fbbf24;
-  color: #422006;
-  transform: translateY(-1px);
+  background: var(--ssm-color-brand-hover);
+  color: #fff;
 }
 
 .public-header__menu-button,
@@ -191,8 +185,8 @@ function closeMobileMenu() {
 }
 
 .public-footer {
-  border-top: 1px solid var(--cf-color-border);
-  background: var(--cf-color-surface);
+  border-top: 1px solid var(--ssm-color-line);
+  background: var(--ssm-color-paper);
   padding: var(--cf-space-12) 0 var(--cf-space-8);
 }
 
@@ -205,24 +199,24 @@ function closeMobileMenu() {
 
 .public-footer__description {
   margin: var(--cf-space-3) 0 0;
-  color: var(--cf-color-text-muted);
+  color: var(--ssm-color-text-secondary);
 }
 
 .public-footer__links {
   display: flex;
   gap: var(--cf-space-6);
-  color: var(--cf-color-text-secondary);
+  color: var(--ssm-color-text-secondary);
 }
 
 .public-footer__links a:hover {
-  color: var(--cf-color-primary);
+  color: var(--ssm-color-brand);
 }
 
 .public-footer__legal {
   display: grid;
   justify-items: end;
   gap: var(--cf-space-2);
-  color: var(--cf-color-text-muted);
+  color: var(--ssm-color-text-secondary);
   font-size: 13px;
 }
 
@@ -249,20 +243,20 @@ function closeMobileMenu() {
     display: grid;
     gap: var(--cf-space-2);
     padding: var(--cf-space-3) var(--cf-space-4) var(--cf-space-6);
-    border-top: 1px solid var(--cf-color-border);
-    background: var(--cf-color-surface);
+    border-top: 1px solid var(--ssm-color-line);
+    background: var(--ssm-color-paper);
   }
 
   .public-mobile-nav__link {
     padding: var(--cf-space-3) var(--cf-space-2);
     border-radius: var(--cf-radius-control);
-    color: var(--cf-color-text-secondary);
+    color: var(--ssm-color-text-secondary);
     font-weight: 600;
   }
 
   .public-mobile-nav__link:hover {
-    background: var(--cf-color-primary-soft);
-    color: var(--cf-color-primary);
+    background: var(--ssm-color-brand-soft);
+    color: var(--ssm-color-brand);
   }
 
   .public-mobile-nav__actions {

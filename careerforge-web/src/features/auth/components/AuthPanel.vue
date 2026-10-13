@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { CheckCircleFilled, SafetyCertificateOutlined } from '@ant-design/icons-vue'
-
 defineProps<{
   eyebrow: string
   title: string
@@ -10,136 +8,56 @@ defineProps<{
 
 <template>
   <section class="auth-panel" :aria-labelledby="`${$attrs.id}-title`">
-    <div class="auth-panel__benefits">
-      <p class="auth-panel__eyebrow"><SafetyCertificateOutlined />证据驱动的职业成长</p>
-      <h1 :id="`${$attrs.id}-title`">从一个清晰目标开始，建立能被验证的能力</h1>
-      <p>诊断、训练和面试使用同一套岗位目标与个人证据，避免割裂的功能堆叠。</p>
-      <ul>
-        <li><CheckCircleFilled />岗位要求与能力差距可追溯</li>
-        <li><CheckCircleFilled />训练结果沉淀为个人证据</li>
-        <li><CheckCircleFilled />多 Agent 面试反馈驱动下一轮计划</li>
-      </ul>
-    </div>
-
-    <div class="auth-panel__form-card">
-      <p class="auth-panel__eyebrow">{{ eyebrow }}</p>
-      <h2>{{ title }}</h2>
-      <p class="auth-panel__description">{{ description }}</p>
-      <slot />
-    </div>
+    <header class="auth-panel__header">
+      <p>{{ eyebrow }}</p>
+      <h1 :id="`${$attrs.id}-title`">{{ title }}</h1>
+      <span>{{ description }}</span>
+    </header>
+    <slot />
   </section>
 </template>
 
 <style scoped>
 .auth-panel {
-  display: grid;
-  min-height: calc(100vh - var(--cf-public-header-height));
-  grid-template-columns: minmax(0, 1fr) minmax(420px, 0.82fr);
-  align-items: stretch;
-  background: #fbfdff;
+  width: min(calc(100% - 40px), 460px);
+  margin: 0 auto;
+  padding: 72px 0 96px;
 }
 
-.auth-panel__benefits,
-.auth-panel__form-card {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 80px max(7vw, 48px);
+.auth-panel__header {
+  margin-bottom: 34px;
 }
 
-.auth-panel__benefits {
-  background: #f5f7ff;
+.auth-panel__header p {
+  margin: 0 0 14px;
+  color: var(--ssm-color-brand);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
 }
 
-.auth-panel__benefits h1 {
-  max-width: 620px;
+.auth-panel__header h1 {
   margin: 0;
-  color: #0b1740;
-  font-size: clamp(36px, 3.5vw, 54px);
+  font-family: var(--ssm-font-serif);
+  font-size: 46px;
+  font-weight: 600;
   letter-spacing: -0.045em;
-  line-height: 1.18;
 }
 
-.auth-panel__benefits > p:not(.auth-panel__eyebrow) {
-  max-width: 620px;
-  margin: 22px 0 0;
-  color: var(--cf-color-text-muted);
-  font-size: 17px;
-  line-height: 1.75;
-}
-
-.auth-panel__benefits ul {
-  display: grid;
-  gap: 14px;
-  margin: 34px 0 0;
-  padding: 0;
-  color: var(--cf-color-text-secondary);
-  list-style: none;
-}
-
-.auth-panel__benefits li {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-}
-
-.auth-panel__benefits li :deep(svg) {
-  color: var(--cf-color-success);
-}
-
-.auth-panel__eyebrow {
-  display: inline-flex;
-  width: fit-content;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 20px;
-  color: var(--cf-color-primary);
-  font-size: 14px;
-  font-weight: 750;
-}
-
-.auth-panel__form-card {
-  max-width: 620px;
-  background: #fff;
-}
-
-.auth-panel__form-card h2 {
-  margin: 0;
-  color: #0b1740;
-  font-size: 32px;
-  letter-spacing: -0.035em;
-}
-
-.auth-panel__description {
-  margin: 12px 0 28px;
-  color: var(--cf-color-text-muted);
+.auth-panel__header span {
+  display: block;
+  margin-top: 14px;
+  color: var(--ssm-color-text-secondary);
   line-height: 1.7;
 }
 
-@media (max-width: 960px) {
-  .auth-panel {
-    min-height: auto;
-    grid-template-columns: 1fr;
-  }
-
-  .auth-panel__benefits {
-    padding-block: 64px;
-  }
-
-  .auth-panel__form-card {
-    width: 100%;
-    max-width: none;
-  }
-}
-
 @media (max-width: 600px) {
-  .auth-panel__benefits,
-  .auth-panel__form-card {
-    padding: 48px 24px;
+  .auth-panel {
+    padding-top: 54px;
   }
 
-  .auth-panel__benefits h1 {
-    font-size: 36px;
+  .auth-panel__header h1 {
+    font-size: 40px;
   }
 }
 </style>

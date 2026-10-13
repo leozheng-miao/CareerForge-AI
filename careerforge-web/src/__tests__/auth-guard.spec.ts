@@ -21,6 +21,12 @@ function createTestRouter() {
         component: { template: '<div />' },
         meta: { requiresAuth: true },
       },
+      {
+        path: '/app/interviews',
+        name: 'interviews',
+        component: { template: '<div />' },
+        meta: { requiresAuth: true },
+      },
     ],
   })
 }
@@ -52,7 +58,7 @@ describe('authentication guard', () => {
 
     await router.push('/login')
 
-    expect(router.currentRoute.value.path).toBe('/app')
+    expect(router.currentRoute.value.path).toBe('/app/interviews')
     expect(store.restoreSession).toHaveBeenCalledTimes(1)
   })
 

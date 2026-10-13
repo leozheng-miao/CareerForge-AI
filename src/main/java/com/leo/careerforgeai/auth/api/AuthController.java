@@ -113,7 +113,7 @@ public class AuthController {
     }
 
     @PostMapping("/auth/logout")
-    @Operation(summary = "撤销Refresh Token并清除登录Cookie")
+    @Operation(summary = "暂停进行中面试、撤销Refresh Token并清除登录Cookie")
     @SecurityRequirements
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "退出完成，重复调用仍视为成功"),

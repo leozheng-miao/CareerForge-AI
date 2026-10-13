@@ -29,7 +29,7 @@ async function submit() {
       displayName: form.displayName.trim(),
       password: form.password,
     })
-    await router.replace(ROUTE_PATHS.app)
+    await router.replace(ROUTE_PATHS.interviews)
   } catch (error) {
     errorMessage.value = toApiError(error).message
   } finally {
@@ -50,9 +50,9 @@ function validate() {
 <template>
   <AuthPanel
     id="register"
-    eyebrow="免费开始"
-    title="创建你的成长档案"
-    description="先建立账户，再从一份真实 JD 开始能力诊断。"
+    eyebrow="开始第一场面试"
+    title="创建账户"
+    description="注册后可以开始面试，并在中断后恢复进度。"
   >
     <Alert v-if="errorMessage" class="auth-alert" type="error" show-icon :message="errorMessage" />
     <Alert
@@ -108,7 +108,11 @@ function validate() {
     </form>
 
     <p class="auth-switch">已有账号？<RouterLink :to="ROUTE_PATHS.login">直接登录</RouterLink></p>
-    <p class="auth-security">注册即表示你同意仅使用自己有权处理的岗位与个人材料。</p>
+    <p class="auth-security">请只提交你有权处理的岗位和个人材料。</p>
+    <p class="auth-legal">
+      注册即表示你同意<RouterLink :to="ROUTE_PATHS.terms">用户协议</RouterLink>和
+      <RouterLink :to="ROUTE_PATHS.privacy">隐私政策</RouterLink>。
+    </p>
   </AuthPanel>
 </template>
 

@@ -1,381 +1,237 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
 import {
-  AimOutlined,
   ArrowRightOutlined,
-  BarChartOutlined,
-  BookOutlined,
-  CheckCircleFilled,
-  CodeOutlined,
-  CompassOutlined,
-  FileSearchOutlined,
-  MessageOutlined,
-  ReadOutlined,
-  RobotOutlined,
-  SafetyCertificateOutlined,
+  ClockCircleOutlined,
+  FileTextOutlined,
+  PauseOutlined,
   SendOutlined,
-  SolutionOutlined,
-  TeamOutlined,
 } from '@ant-design/icons-vue'
 import { RouterLink } from 'vue-router'
 
 import { ROUTE_PATHS } from '@/router/paths'
 
-const interviewMode = ref<'TARGETED_MOCK' | 'GAP_DRILL'>('TARGETED_MOCK')
+const modes = [
+  {
+    title: '快速面试',
+    meta: '60 分钟 · 8 个考查目标',
+    description: '不需要准备材料，直接检验 AI Agent 开发的通用能力。',
+  },
+  {
+    title: '综合面试',
+    meta: '结合岗位与真实经历',
+    description: '确认岗位和个人材料后，完成一场更贴近目标岗位的面试。',
+  },
+] as const
 
-const capabilityCards = [
+const processSteps = [
   {
     number: '01',
-    title: '岗位能力诊断',
-    description: '输入目标 JD，看清岗位要求、已有能力和真实差距。',
-    icon: FileSearchOutlined,
-    facts: ['结构化岗位要求', '关联个人证据', '生成差距快照'],
-    meta: 'JD 解析 · Target Role · Skill Gap',
-    action: '从 JD 开始诊断',
-    to: ROUTE_PATHS.register,
+    title: '选一种面试',
+    description: '直接开始快速面试，或先填写岗位和个人材料。',
   },
   {
     number: '02',
-    title: '个性化成长训练',
-    description: '根据差距和时间约束生成计划，并持续向 Career Coach 复盘。',
-    icon: CompassOutlined,
-    facts: ['确认训练计划', '完成针对性任务', '沉淀可验证证据'],
-    meta: 'Training Plan · Career Coach · Memory',
-    action: '查看训练方式',
-    to: { path: ROUTE_PATHS.home, hash: '#growth-path' },
+    title: '按题认真作答',
+    description: '回答提交后保存并冻结；面试会根据回答决定是否继续追问。',
   },
   {
     number: '03',
-    title: '多 Agent 模拟面试',
-    description: '围绕目标岗位或能力短板连续追问，并获得多维复盘。',
-    icon: TeamOutlined,
-    facts: ['岗位定向或差距专项', '四角色协同评审', '形成可执行复盘'],
-    meta: 'TARGETED_MOCK · GAP_DRILL · Report',
-    action: '体验模拟面试',
-    to: { path: ROUTE_PATHS.home, hash: '#interview' },
+    title: '拿到完整复盘',
+    description: '结束后异步生成报告，保留总结、改进项和完整问答。',
   },
 ] as const
 
-const growthSteps = [
-  {
-    title: '定目标',
-    description: '粘贴目标岗位或真实 JD',
-    outcome: 'Target Role',
-    icon: AimOutlined,
-  },
-  {
-    title: '找差距',
-    description: '关联经历与项目证据',
-    outcome: 'Skill Gap',
-    icon: BarChartOutlined,
-  },
-  {
-    title: '做训练',
-    description: '完成针对性实战任务',
-    outcome: '个人技能证据',
-    icon: CodeOutlined,
-  },
-  {
-    title: '接受辅导',
-    description: '与 Career Coach 持续复盘',
-    outcome: '下一步训练计划',
-    icon: MessageOutlined,
-  },
-  {
-    title: '面试与复盘',
-    description: '进行目标面试或短板专项',
-    outcome: '多维 Report',
-    icon: SolutionOutlined,
-  },
+const comparisonRows = [
+  { label: '开始前', quick: '无需上传材料', comprehensive: '填写岗位，可选上传简历' },
+  { label: '时长', quick: '固定 60 分钟', comprehensive: '60 或 90 分钟' },
+  { label: '考查方式', quick: '8 个固定考查目标', comprehensive: '6 个岗位相关主题' },
 ] as const
-
-const preview = computed(() =>
-  interviewMode.value === 'TARGETED_MOCK'
-    ? {
-        label: '目标岗位面试',
-        title: 'AI Agent 应用开发 · 系统设计面试',
-        question: '你会如何为一个需要工具调用的 Agent 设计可靠的执行流程？',
-        followUp: '如果外部工具连续失败，你会如何避免 Agent 陷入循环？',
-        focus: ['架构合理性', '工具调用风险', '失败恢复边界'],
-      }
-    : {
-        label: '能力短板专项',
-        title: '可靠性工程 · GAP_DRILL',
-        question: '如何设计一个可重试、可追踪且不会重复写入的 Agent 工具？',
-        followUp: '请说明幂等键、超时与人工接管分别在哪一层生效。',
-        focus: ['幂等设计', '超时与重试', '人工接管条件'],
-      },
-)
 
 const faqItems = [
   {
-    question: 'CareerForge-AI 会自动替我确认能力或长期记忆吗？',
-    answer:
-      '不会。模型可以提出候选结论，但长期记忆、训练计划和面试报告中的关键确认都由用户显式决定。',
+    question: '切换到其他浏览器标签页会暂停吗？',
+    answer: '不会。只有主动点击暂停、关闭或离开页面、退出登录时，系统才会进入暂停收敛流程。',
   },
   {
-    question: '为什么强调“证据驱动”？',
-    answer:
-      '岗位判断、训练建议和面试追问都应回到可追溯的项目经历、练习产出与系统记录，避免只有漂亮但无法验证的描述。',
+    question: '时间结束会直接打断回答吗？',
+    answer: '不会。时间用尽后仍可答完当前题，提交后面试正常结束，不再进入下一题。',
   },
   {
-    question: '它是刷题网站吗？',
-    answer:
-      '不是。平台围绕你的目标岗位与真实能力差距组织诊断、训练、辅导和面试，让每一轮反馈更新下一步行动。',
+    question: '回答和个人材料会进入公共题库吗？',
+    answer: '不会。公共题库只由管理员维护，用户提交的岗位材料、简历和回答不会写入公共题库。',
+  },
+  {
+    question: '报告需要一直等在页面上吗？',
+    answer: '不需要。面试结束后报告在后台生成，你可以先离开，稍后从面试记录中查看。',
   },
 ] as const
 </script>
 
 <template>
   <div class="home-page">
-    <section class="hero-section" aria-labelledby="hero-title">
-      <div class="cf-container hero-section__inner">
-        <p class="section-eyebrow">为 Java 开发者打造的 AI Agent 转型路径</p>
-        <h1 id="hero-title">从看懂目标岗位，到练成能拿 Offer 的能力</h1>
-        <p class="hero-section__lead">
-          输入目标岗位或 JD，获得可追溯的能力诊断、训练计划和模拟面试反馈。
-        </p>
-
-        <div class="hero-section__actions" aria-label="开始使用 CareerForge-AI">
-          <RouterLink class="cf-action cf-action--primary" :to="ROUTE_PATHS.register">
-            从一份 JD 开始职业诊断
-            <ArrowRightOutlined />
-          </RouterLink>
-          <RouterLink
-            class="cf-action cf-action--secondary"
-            :to="{ path: ROUTE_PATHS.home, hash: '#interview' }"
-          >
-            <RobotOutlined />
-            体验 AI 模拟面试
-          </RouterLink>
-        </div>
-
-        <p class="hero-section__trust">
-          <SafetyCertificateOutlined />
-          每条建议都有依据，每次练习都有下一步
-        </p>
-        <div class="hero-section__tags" aria-label="适合的职业方向">
-          <span>AI Agent 应用开发</span>
-          <span>Java 后端转型</span>
-          <span>大模型应用工程师</span>
-        </div>
-      </div>
-    </section>
-
-    <section
-      id="capabilities"
-      class="section-block capability-section"
-      aria-labelledby="capability-title"
-    >
-      <div class="cf-container">
-        <header class="section-heading">
-          <p class="section-eyebrow">三条核心业务线</p>
-          <h2 id="capability-title">从发现差距，到形成能被验证的岗位能力</h2>
-          <p>诊断决定练什么，训练沉淀能力证据，模拟面试检验是否真正掌握。</p>
-        </header>
-
-        <div class="capability-grid">
-          <article v-for="card in capabilityCards" :key="card.number" class="capability-card">
-            <div class="capability-card__topline">
-              <span class="capability-card__number">{{ card.number }}</span>
-              <component :is="card.icon" class="capability-card__icon" />
-            </div>
-            <h3>{{ card.title }}</h3>
-            <p>{{ card.description }}</p>
-            <ul>
-              <li v-for="fact in card.facts" :key="fact">
-                <CheckCircleFilled />
-                <span>{{ fact }}</span>
-              </li>
-            </ul>
-            <p class="capability-card__meta">{{ card.meta }}</p>
-            <RouterLink class="capability-card__link" :to="card.to">
-              {{ card.action }}
-              <ArrowRightOutlined />
+    <section class="home-hero" aria-labelledby="home-hero-title">
+      <div class="ssm-container home-hero__grid">
+        <div class="home-hero__copy">
+          <p class="home-kicker">Java 后端 · AI Agent 开发</p>
+          <h1 id="home-hero-title">面试前，<br>先认真面一次。</h1>
+          <p class="home-hero__lead">会根据回答继续追问的技术面试。</p>
+          <div class="home-hero__actions">
+            <RouterLink class="home-button home-button--primary" :to="ROUTE_PATHS.register">
+              开始面试
             </RouterLink>
-          </article>
+            <RouterLink
+              class="home-text-link"
+              :to="{ path: ROUTE_PATHS.home, hash: '#process' }"
+            >
+              看看怎么进行
+              <ArrowRightOutlined aria-hidden="true" />
+            </RouterLink>
+          </div>
         </div>
 
-        <div class="convergence-line" aria-label="产品闭环">
-          <span><AimOutlined />诊断定位差距</span>
-          <ArrowRightOutlined class="convergence-line__arrow" />
-          <span><CodeOutlined />训练形成证据</span>
-          <ArrowRightOutlined class="convergence-line__arrow" />
-          <span><SafetyCertificateOutlined />面试验证能力</span>
-        </div>
+        <aside class="interview-preview" aria-label="正式面试界面示例">
+          <div class="interview-preview__rail">
+            <strong>水水面</strong>
+            <span class="interview-preview__rail-item interview-preview__rail-item--active">
+              快速面试
+            </span>
+            <span class="interview-preview__rail-item">综合面试</span>
+            <span class="interview-preview__rail-divider"></span>
+            <span class="interview-preview__rail-item">
+              <FileTextOutlined aria-hidden="true" />
+              面试记录
+            </span>
+          </div>
+          <div class="interview-preview__body">
+            <header class="interview-preview__topbar">
+              <strong>快速面试</strong>
+              <div>
+                <span><ClockCircleOutlined aria-hidden="true" />60:00</span>
+                <span>3 / 8</span>
+                <span class="interview-preview__progress" aria-label="考查进度 3/8">
+                  <i></i>
+                </span>
+              </div>
+            </header>
+            <div class="interview-preview__question">
+              <span>当前问题 3</span>
+              <h2>如果 Agent 任务执行到一半失败，你会怎样保证它能够继续？</h2>
+            </div>
+            <div class="interview-preview__answer">
+              <span>请结合你的实际项目经验作答…</span>
+              <small>0 / 12000</small>
+            </div>
+            <div class="interview-preview__actions">
+              <button type="button" disabled><PauseOutlined />暂停</button>
+              <button type="button" disabled>跳过</button>
+              <button type="button" class="interview-preview__submit" disabled>
+                <SendOutlined />
+                提交回答
+              </button>
+            </div>
+            <p class="interview-preview__note">下一题会根据这次回答决定是否继续追问</p>
+          </div>
+        </aside>
+      </div>
+
+      <div id="modes" class="ssm-container home-modes" aria-label="面试模式">
+        <RouterLink
+          v-for="mode in modes"
+          :key="mode.title"
+          class="home-mode-entry"
+          :to="ROUTE_PATHS.register"
+        >
+          <h2>{{ mode.title }}</h2>
+          <div>
+            <strong>{{ mode.meta }}</strong>
+            <span>{{ mode.description }}</span>
+          </div>
+          <ArrowRightOutlined aria-hidden="true" />
+        </RouterLink>
       </div>
     </section>
 
-    <section id="growth-path" class="section-block growth-section" aria-labelledby="growth-title">
-      <div class="cf-container">
-        <header class="section-heading">
-          <p class="section-eyebrow">五步职业成长路径</p>
-          <h2 id="growth-title">知道下一步做什么，也知道练完得到什么</h2>
-          <p>每一步都有明确行动、可保存的产出，并成为下一步判断的依据。</p>
+    <section id="process" class="home-section home-process" aria-labelledby="process-title">
+      <div class="ssm-container">
+        <header class="home-section__heading">
+          <p>怎么进行</p>
+          <h2 id="process-title">从开始到复盘，只有必要的步骤。</h2>
         </header>
-
-        <ol class="growth-path">
-          <li v-for="(step, index) in growthSteps" :key="step.title" class="growth-step">
-            <div class="growth-step__icon"><component :is="step.icon" /></div>
-            <span class="growth-step__number">{{ index + 1 }}</span>
+        <ol class="home-process__list">
+          <li v-for="step in processSteps" :key="step.number">
+            <span>{{ step.number }}</span>
             <h3>{{ step.title }}</h3>
             <p>{{ step.description }}</p>
-            <strong>得到：{{ step.outcome }}</strong>
           </li>
         </ol>
-
-        <p class="growth-section__loop">
-          <CompassOutlined />
-          面试反馈回到能力诊断，自动更新下一轮成长重点。
-        </p>
       </div>
     </section>
 
-    <section
-      id="interview"
-      class="section-block interview-section"
-      aria-labelledby="interview-title"
-    >
-      <div class="cf-container">
-        <header class="section-heading">
-          <p class="section-eyebrow">多 Agent 模拟面试</p>
-          <h2 id="interview-title">不是泛泛地练题，而是围绕你的目标岗位持续追问</h2>
-          <p>可针对完整岗位进行目标面试，或围绕能力短板进行专项训练。</p>
-        </header>
-
-        <div class="interview-tabs" role="tablist" aria-label="模拟面试模式">
-          <button
-            id="targeted-mock-tab"
-            type="button"
-            role="tab"
-            :aria-selected="interviewMode === 'TARGETED_MOCK'"
-            aria-controls="interview-preview-panel"
-            :class="{ 'interview-tabs__button--active': interviewMode === 'TARGETED_MOCK' }"
-            @click="interviewMode = 'TARGETED_MOCK'"
-          >
-            TARGETED_MOCK · 目标岗位面试
-          </button>
-          <button
-            id="gap-drill-tab"
-            type="button"
-            role="tab"
-            :aria-selected="interviewMode === 'GAP_DRILL'"
-            aria-controls="interview-preview-panel"
-            :class="{ 'interview-tabs__button--active': interviewMode === 'GAP_DRILL' }"
-            @click="interviewMode = 'GAP_DRILL'"
-          >
-            GAP_DRILL · 能力短板专项
-          </button>
+    <section id="report" class="home-section home-report" aria-labelledby="report-title">
+      <div class="ssm-container home-report__grid">
+        <div class="home-section__heading">
+          <p>面试报告</p>
+          <h2 id="report-title">复盘具体回答，不给你一个虚构分数。</h2>
+          <span>
+            报告会整理实际问答、做得好的地方和优先改进项。没有覆盖到的内容只标记为未评估。
+          </span>
         </div>
-
-        <article
-          id="interview-preview-panel"
-          class="interview-preview"
-          role="tabpanel"
-          :aria-labelledby="
-            interviewMode === 'TARGETED_MOCK' ? 'targeted-mock-tab' : 'gap-drill-tab'
-          "
-        >
-          <header class="interview-preview__header">
-            <span><RobotOutlined />{{ preview.title }}</span>
-            <span class="interview-preview__sample">产品预览 · 示例</span>
+        <article class="report-preview" aria-label="面试报告结构示例">
+          <header>
+            <p>快速面试报告</p>
+            <span>报告内容示例</span>
           </header>
-          <div class="interview-preview__content">
-            <div class="interview-conversation">
-              <p class="interview-conversation__role">主面试官 · {{ preview.label }}</p>
-              <div class="interview-conversation__question">{{ preview.question }}</div>
-              <div class="interview-conversation__answer">
-                我会把流程拆成规划、执行和校验三个阶段，并为每次工具调用设置超时、幂等键和结果验证。
-              </div>
-              <p class="interview-conversation__role">深挖面试官</p>
-              <div
-                class="interview-conversation__question interview-conversation__question--follow"
-              >
-                {{ preview.followUp }}
-              </div>
-              <div class="interview-conversation__composer">
-                <span>说出你的思路…</span>
-                <SendOutlined />
-              </div>
+          <section>
+            <small>总结</small>
+            <h3>先看这场面试暴露出的关键问题</h3>
+            <p>报告只基于本场已提交回答，不使用没有依据的能力标签。</p>
+          </section>
+          <section class="report-preview__columns">
+            <div>
+              <small>做得好的地方</small>
+              <p>说明具体观点，并引用对应回答。</p>
             </div>
-
-            <aside class="interview-feedback" aria-label="本轮反馈示例">
-              <p class="interview-feedback__title">本轮进度</p>
-              <div class="interview-feedback__steps">
-                <span class="is-complete"><CheckCircleFilled />提问</span>
-                <span class="is-active">2 回答</span>
-                <span>3 评审</span>
-                <span>4 复盘</span>
-              </div>
-              <p class="interview-feedback__title">四角色协同</p>
-              <ul class="interview-feedback__roles">
-                <li><RobotOutlined />主面试官 · 控制节奏</li>
-                <li><MessageOutlined />深挖面试官 · 追问细节</li>
-                <li><SafetyCertificateOutlined />证据核验员 · 检查依据</li>
-                <li><TeamOutlined />能力评审官 · 多维反馈</li>
-              </ul>
-              <p class="interview-feedback__title">即时能力反馈</p>
-              <ul class="interview-feedback__focus">
-                <li v-for="item in preview.focus" :key="item"><CheckCircleFilled />{{ item }}</li>
-              </ul>
-            </aside>
-          </div>
+            <div>
+              <small>优先改进项</small>
+              <p>指出缺失信息和下一次可以补充的内容。</p>
+            </div>
+          </section>
         </article>
       </div>
     </section>
 
-    <section class="trust-section" aria-labelledby="trust-title">
-      <div class="cf-container trust-section__grid">
-        <div>
-          <p class="section-eyebrow">可信能力贯穿全程</p>
-          <h2 id="trust-title">建议来自证据，进步沉淀为长期记忆</h2>
-          <p>个人证据库和长期记忆不是独立功能岛，而是诊断、训练与面试共同使用的可信基础。</p>
+    <section class="home-section home-comparison" aria-labelledby="comparison-title">
+      <div class="ssm-container">
+        <header class="home-section__heading">
+          <p>两种选择</p>
+          <h2 id="comparison-title">看你现在想准备到哪一步。</h2>
+        </header>
+        <div class="home-comparison__table" role="table" aria-label="快速面试与综合面试对比">
+          <div class="home-comparison__row home-comparison__row--head" role="row">
+            <span role="columnheader"></span>
+            <strong role="columnheader">快速面试</strong>
+            <strong role="columnheader">综合面试</strong>
+          </div>
+          <div v-for="row in comparisonRows" :key="row.label" class="home-comparison__row" role="row">
+            <span role="rowheader">{{ row.label }}</span>
+            <p role="cell">{{ row.quick }}</p>
+            <p role="cell">{{ row.comprehensive }}</p>
+          </div>
         </div>
-        <ul>
-          <li>
-            <BookOutlined /><span><strong>来源可追溯</strong>岗位判断与知识回答保留来源。</span>
-          </li>
-          <li>
-            <SafetyCertificateOutlined /><span
-              ><strong>用户做确认</strong>模型不能直接确认长期能力画像。</span
-            >
-          </li>
-          <li>
-            <ReadOutlined /><span><strong>结果可复盘</strong>训练和面试反馈更新下一步行动。</span>
-          </li>
-        </ul>
       </div>
     </section>
 
-    <section class="section-block faq-section" aria-labelledby="faq-title">
-      <div class="cf-container faq-section__grid">
-        <header>
-          <p class="section-eyebrow">常见问题</p>
-          <h2 id="faq-title">开始前，你可能还想知道</h2>
+    <section class="home-section home-faq" aria-labelledby="faq-title">
+      <div class="ssm-container home-faq__grid">
+        <header class="home-section__heading">
+          <p>开始前</p>
+          <h2 id="faq-title">你可能还想知道。</h2>
         </header>
-        <div class="faq-list">
-          <details v-for="(item, index) in faqItems" :key="item.question" :open="index === 0">
+        <div class="home-faq__list">
+          <details v-for="item in faqItems" :key="item.question">
             <summary>{{ item.question }}</summary>
             <p>{{ item.answer }}</p>
           </details>
-        </div>
-      </div>
-    </section>
-
-    <section class="final-cta" aria-labelledby="final-cta-title">
-      <div class="cf-container final-cta__inner">
-        <div>
-          <p class="section-eyebrow">把目标岗位变成今天可以开始的行动</p>
-          <h2 id="final-cta-title">先看清差距，再按自己的时间一步步练成</h2>
-        </div>
-        <div class="final-cta__actions">
-          <RouterLink class="cf-action cf-action--primary" :to="ROUTE_PATHS.register">
-            免费开始
-            <ArrowRightOutlined />
-          </RouterLink>
-          <RouterLink class="cf-action cf-action--secondary" :to="ROUTE_PATHS.login">
-            已有账号，登录
-          </RouterLink>
         </div>
       </div>
     </section>
@@ -384,872 +240,610 @@ const faqItems = [
 
 <style scoped>
 .home-page {
-  overflow: hidden;
-  background: var(--cf-color-surface);
+  background: var(--ssm-color-paper);
+  color: var(--ssm-color-ink);
 }
 
-.hero-section {
-  border-bottom: 1px solid #eef2ff;
-  background: #fbfdff;
+.home-hero {
+  padding: 92px 0 0;
 }
 
-.hero-section__inner {
-  display: flex;
-  min-height: 570px;
-  flex-direction: column;
+.home-hero__grid {
+  display: grid;
+  min-height: 610px;
+  grid-template-columns: minmax(360px, 0.78fr) minmax(600px, 1.22fr);
   align-items: center;
-  justify-content: center;
-  padding-block: 86px 76px;
-  text-align: center;
+  gap: clamp(48px, 6vw, 92px);
 }
 
-.section-eyebrow {
-  display: inline-flex;
-  width: fit-content;
-  align-items: center;
-  gap: var(--cf-space-2);
-  margin: 0 0 var(--cf-space-6);
-  padding: 7px 16px;
-  border: 1px solid #dbe4ff;
-  border-radius: 999px;
-  background: #f7f9ff;
-  color: var(--cf-color-primary);
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.hero-section h1 {
-  max-width: 1120px;
-  margin: 0;
-  color: #0b1740;
-  font-size: clamp(38px, 4.1vw, 58px);
-  font-weight: 760;
-  letter-spacing: -0.045em;
-  line-height: 1.18;
-}
-
-.hero-section__lead {
-  max-width: 780px;
-  margin: var(--cf-space-6) 0 0;
-  color: var(--cf-color-text-muted);
-  font-size: 19px;
-  line-height: 1.7;
-}
-
-.hero-section__actions,
-.final-cta__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--cf-space-4);
-  margin-top: var(--cf-space-8);
-}
-
-.cf-action {
-  display: inline-flex;
-  min-height: 50px;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 0 24px;
-  border: 1px solid transparent;
-  border-radius: var(--cf-radius-control);
-  font-size: 16px;
-  font-weight: 700;
-  transition:
-    border-color var(--cf-motion-fast) ease,
-    background var(--cf-motion-fast) ease,
-    transform var(--cf-motion-fast) ease;
-}
-
-.cf-action:hover {
-  transform: translateY(-1px);
-}
-
-.cf-action--primary {
-  background: var(--cf-color-primary);
-  color: #fff;
-}
-
-.cf-action--primary:hover {
-  background: var(--cf-color-primary-hover);
-  color: #fff;
-}
-
-.cf-action--secondary {
-  border-color: #aebcff;
-  background: #fff;
-  color: var(--cf-color-primary);
-}
-
-.cf-action--secondary:hover {
-  border-color: var(--cf-color-primary);
-  background: var(--cf-color-primary-soft);
-  color: var(--cf-color-primary-hover);
-}
-
-.hero-section__trust {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: var(--cf-space-6) 0 0;
-  color: var(--cf-color-text-secondary);
-  font-size: 14px;
-}
-
-.hero-section__tags {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--cf-space-3);
-  margin-top: var(--cf-space-5, 20px);
-}
-
-.hero-section__tags span {
-  padding: 7px 14px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  color: var(--cf-color-text-secondary);
+.home-kicker,
+.home-section__heading > p {
+  margin: 0 0 22px;
+  color: var(--ssm-color-brand);
   font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+}
+
+.home-hero h1,
+.home-section__heading h2 {
+  margin: 0;
+  font-family: var(--ssm-font-serif);
   font-weight: 600;
+  letter-spacing: -0.055em;
 }
 
-.section-block {
-  padding: 92px 0;
+.home-hero h1 {
+  font-size: clamp(58px, 6.1vw, 88px);
+  line-height: 1.12;
 }
 
-.section-heading {
+.home-hero__lead {
+  margin: 28px 0 0;
+  color: var(--ssm-color-text-secondary);
+  font-size: clamp(20px, 2vw, 28px);
+  line-height: 1.5;
+}
+
+.home-hero__actions {
   display: flex;
-  max-width: 880px;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
-  margin: 0 auto 48px;
-  text-align: center;
+  gap: 28px;
+  margin-top: 40px;
 }
 
-.section-heading .section-eyebrow {
-  margin-bottom: var(--cf-space-4);
-}
-
-.section-heading h2,
-.trust-section h2,
-.faq-section h2,
-.final-cta h2 {
-  margin: 0;
-  color: #0b1740;
-  font-size: clamp(30px, 3vw, 42px);
-  letter-spacing: -0.035em;
-  line-height: 1.25;
-}
-
-.section-heading > p:last-child,
-.trust-section__grid > div > p:last-child {
-  margin: var(--cf-space-4) 0 0;
-  color: var(--cf-color-text-muted);
-  font-size: 17px;
-  line-height: 1.7;
-}
-
-.capability-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--cf-space-4);
-}
-
-.capability-card {
-  display: flex;
-  min-height: 430px;
-  flex-direction: column;
-  padding: 28px;
-  border: 1px solid #dce4f5;
-  border-radius: var(--cf-radius-card);
-  background: #fff;
-  box-shadow: 0 1px 0 rgba(79, 70, 229, 0.03);
-  transition:
-    border-color var(--cf-motion-normal) ease,
-    box-shadow var(--cf-motion-normal) ease,
-    transform var(--cf-motion-normal) ease;
-}
-
-.capability-card:hover {
-  border-color: #bac7ff;
-  box-shadow: var(--cf-shadow-card);
-  transform: translateY(-3px);
-}
-
-.capability-card__topline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.capability-card__number {
+.home-button {
   display: inline-flex;
-  width: 42px;
-  height: 42px;
+  min-height: 52px;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: var(--cf-color-primary-soft);
-  color: var(--cf-color-primary);
-  font-weight: 700;
-}
-
-.capability-card__icon {
-  color: #8291e9;
-  font-size: 32px;
-}
-
-.capability-card h3 {
-  margin: 30px 0 10px;
-  color: #0b1740;
-  font-size: 25px;
-}
-
-.capability-card > p {
-  margin: 0;
-  color: var(--cf-color-text-muted);
-  line-height: 1.7;
-}
-
-.capability-card ul {
-  display: grid;
-  gap: var(--cf-space-3);
-  margin: 28px 0;
-  padding: 0;
-  list-style: none;
-}
-
-.capability-card li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--cf-color-text-secondary);
-}
-
-.capability-card li :deep(svg) {
-  color: var(--cf-color-success);
-}
-
-.capability-card .capability-card__meta {
-  margin-top: auto;
-  padding-top: var(--cf-space-4);
-  border-top: 1px solid #edf0f7;
-  color: #697595;
-  font-size: 13px;
-}
-
-.capability-card__link {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: var(--cf-space-5, 20px);
-  color: var(--cf-color-primary);
-  font-weight: 700;
-}
-
-.capability-card__link:hover {
-  color: var(--cf-color-primary-hover);
-}
-
-.convergence-line {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--cf-space-6);
-  margin-top: 42px;
-  color: #23304f;
+  padding: 0 28px;
+  border-radius: var(--ssm-radius-control);
   font-weight: 650;
 }
 
-.convergence-line span {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.convergence-line span :deep(svg) {
-  color: var(--cf-color-primary);
-  font-size: 22px;
-}
-
-.convergence-line__arrow {
-  color: #a7b3d7;
-}
-
-.growth-section {
-  border-block: 1px solid #eef2ff;
-  background: #fbfcff;
-}
-
-.growth-path {
-  display: grid;
-  margin: 0;
-  padding: 38px 26px;
-  border: 1px solid #dbe4f6;
-  border-radius: var(--cf-radius-panel);
-  background: #fff;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  list-style: none;
-}
-
-.growth-step {
-  position: relative;
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
-  text-align: center;
-  flex-direction: column;
-}
-
-.growth-step:not(:last-child)::after {
-  position: absolute;
-  top: 37px;
-  right: -18%;
-  width: 36%;
-  border-top: 2px dashed #c7d2fe;
-  content: '';
-}
-
-.growth-step__icon {
-  display: flex;
-  width: 72px;
-  height: 72px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #cdd7ff;
-  border-radius: 50%;
-  background: #f8faff;
-  color: var(--cf-color-primary);
-  font-size: 32px;
-}
-
-.growth-step:last-child .growth-step__icon,
-.growth-step:last-child .growth-step__number {
-  border-color: #fde68a;
-  background: #fffbeb;
-  color: var(--cf-color-accent-hover);
-}
-
-.growth-step__number {
-  display: inline-flex;
-  width: 26px;
-  height: 26px;
-  align-items: center;
-  justify-content: center;
-  margin-top: var(--cf-space-3);
-  border-radius: 50%;
-  background: var(--cf-color-primary);
+.home-button--primary {
+  background: var(--ssm-color-brand);
   color: #fff;
-  font-size: 13px;
-  font-weight: 700;
 }
 
-.growth-step h3 {
-  margin: var(--cf-space-4) 0 var(--cf-space-2);
-  color: #0b1740;
-  font-size: 19px;
-}
-
-.growth-step p {
-  min-height: 42px;
-  margin: 0;
-  color: var(--cf-color-text-muted);
-  font-size: 13px;
-}
-
-.growth-step strong {
-  margin-top: var(--cf-space-4);
-  padding: 8px 11px;
-  border-radius: 8px;
-  background: var(--cf-color-primary-soft);
-  color: var(--cf-color-primary);
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.growth-section__loop {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin: 30px 0 0;
-  color: var(--cf-color-text-secondary);
-}
-
-.growth-section__loop :deep(svg) {
-  color: var(--cf-color-primary);
-}
-
-.interview-section {
-  background: #fff;
-}
-
-.interview-tabs {
-  display: grid;
-  max-width: 620px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  margin: 0 auto 24px;
-  padding: 4px;
-  border: 1px solid #d6def2;
-  border-radius: 10px;
-  background: #f8fafc;
-}
-
-.interview-tabs__button {
-  min-height: 44px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--cf-color-text-secondary);
-  cursor: pointer;
-  font-weight: 650;
-}
-
-.interview-tabs__button--active {
-  background: var(--cf-color-primary);
+.home-button--primary:hover {
+  background: var(--ssm-color-brand-hover);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.18);
+}
+
+.home-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--ssm-color-brand);
+  color: var(--ssm-color-ink);
+  font-weight: 550;
 }
 
 .interview-preview {
+  display: grid;
+  min-height: 500px;
+  grid-template-columns: 150px minmax(0, 1fr);
   overflow: hidden;
-  max-width: 1080px;
-  margin: 0 auto;
-  border: 1px solid #dce3f0;
-  border-radius: var(--cf-radius-panel);
-  background: #fff;
-  box-shadow: var(--cf-shadow-panel);
+  border: 1px solid var(--ssm-color-line);
+  border-radius: var(--ssm-radius-panel);
+  background: var(--ssm-color-surface);
+  box-shadow: 0 24px 70px rgba(23, 26, 28, 0.06);
 }
 
-.interview-preview__header {
+.interview-preview__rail {
   display: flex;
-  min-height: 58px;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--cf-space-4);
-  padding: 0 24px;
-  border-bottom: 1px solid #e9edf5;
-  color: #16213f;
-  font-weight: 700;
+  flex-direction: column;
+  gap: 8px;
+  padding: 28px 14px;
+  border-right: 1px solid var(--ssm-color-line);
 }
 
-.interview-preview__header > span:first-child {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.interview-preview__sample {
-  color: var(--cf-color-text-muted);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.interview-preview__content {
-  display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.8fr);
-}
-
-.interview-conversation {
-  display: grid;
-  gap: 12px;
-  padding: 26px;
-}
-
-.interview-conversation__role {
-  margin: 0;
-  color: var(--cf-color-primary);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.interview-conversation__question,
-.interview-conversation__answer {
-  max-width: 88%;
-  padding: 18px 20px;
-  border: 1px solid #d8e0fb;
-  border-radius: 8px;
-  background: #fbfcff;
-  color: #16213f;
-  font-size: 16px;
-  line-height: 1.7;
-}
-
-.interview-conversation__answer {
-  justify-self: end;
-  border-color: #e0e7ff;
-  background: var(--cf-color-primary-soft);
-}
-
-.interview-conversation__question--follow {
-  margin-bottom: 10px;
-}
-
-.interview-conversation__composer {
-  display: flex;
-  min-height: 50px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 14px 0 18px;
-  border: 1px solid #d8dfec;
-  border-radius: 9px;
-  color: #94a3b8;
-}
-
-.interview-conversation__composer :deep(svg) {
-  color: var(--cf-color-primary);
+.interview-preview__rail > strong {
+  margin: 0 10px 14px;
+  font-family: var(--ssm-font-serif);
   font-size: 20px;
 }
 
-.interview-feedback {
-  padding: 26px 22px;
-  border-left: 1px solid #e9edf5;
-  background: #fcfdff;
-}
-
-.interview-feedback__title {
-  margin: 0 0 12px;
-  color: #1e293b;
-  font-size: 13px;
-  font-weight: 750;
-}
-
-.interview-feedback__title:not(:first-child) {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid #e8edf6;
-}
-
-.interview-feedback__steps {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  color: #94a3b8;
-  font-size: 11px;
-}
-
-.interview-feedback__steps span {
+.interview-preview__rail-item {
   display: flex;
-  min-height: 36px;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  color: var(--ssm-color-text-secondary);
+  font-size: 14px;
+}
+
+.interview-preview__rail-item--active {
+  border-radius: 6px;
+  background: var(--ssm-color-brand-soft);
+  color: var(--ssm-color-brand);
+}
+
+.interview-preview__rail-divider {
+  height: 1px;
+  margin: 10px;
+  background: var(--ssm-color-line);
+}
+
+.interview-preview__body {
+  min-width: 0;
+  padding: 28px;
+}
+
+.interview-preview__topbar,
+.interview-preview__topbar > div,
+.interview-preview__actions {
+  display: flex;
+  align-items: center;
+}
+
+.interview-preview__topbar {
+  justify-content: space-between;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--ssm-color-line);
+}
+
+.interview-preview__topbar > div {
+  gap: 18px;
+  color: var(--ssm-color-text-secondary);
+  font-size: 13px;
+}
+
+.interview-preview__topbar span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.interview-preview__progress {
+  width: 96px;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e1dd;
+}
+
+.interview-preview__progress i {
+  width: 37.5%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ssm-color-brand);
+}
+
+.interview-preview__question {
+  padding: 34px 0 24px;
+}
+
+.interview-preview__question > span {
+  color: var(--ssm-color-text-secondary);
+  font-size: 13px;
+}
+
+.interview-preview__question h2 {
+  margin: 12px 0 0;
+  font-size: clamp(20px, 1.7vw, 27px);
+  line-height: 1.5;
+}
+
+.interview-preview__answer {
+  position: relative;
+  min-height: 160px;
+  padding: 18px;
+  border: 1px solid #c9c7c0;
+  border-radius: 8px;
+  color: #8a8d90;
+  font-size: 14px;
+}
+
+.interview-preview__answer small {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  color: var(--ssm-color-text-secondary);
+}
+
+.interview-preview__actions {
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.interview-preview__actions button {
+  display: inline-flex;
+  min-height: 42px;
   align-items: center;
   justify-content: center;
+  gap: 7px;
+  padding: 0 18px;
+  border: 1px solid var(--ssm-color-line);
   border-radius: 7px;
-  background: #f1f5f9;
+  background: var(--ssm-color-surface);
+  color: var(--ssm-color-ink);
+  opacity: 1;
 }
 
-.interview-feedback__steps .is-complete {
-  background: #ecfdf5;
-  color: var(--cf-color-success);
+.interview-preview__actions .interview-preview__submit {
+  min-width: 154px;
+  border-color: var(--ssm-color-brand);
+  background: var(--ssm-color-brand);
+  color: #fff;
 }
 
-.interview-feedback__steps .is-active {
-  background: var(--cf-color-primary-soft);
-  color: var(--cf-color-primary);
-  font-weight: 700;
+.interview-preview__note {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--ssm-color-warning);
+  background: #f7efe3;
+  color: #8d5e20;
+  font-size: 13px;
 }
 
-.interview-feedback__roles,
-.interview-feedback__focus {
+.home-modes {
   display: grid;
-  gap: 11px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 54px;
+  border-top: 1px solid var(--ssm-color-line);
+  border-bottom: 1px solid var(--ssm-color-line);
+}
+
+.home-mode-entry {
+  display: grid;
+  min-height: 112px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 30px;
+  padding: 24px 28px;
+}
+
+.home-mode-entry:first-child {
+  border-right: 1px solid var(--ssm-color-line);
+}
+
+.home-mode-entry:hover {
+  background: rgba(232, 241, 246, 0.55);
+}
+
+.home-mode-entry h2 {
   margin: 0;
-  padding: 0;
-  color: var(--cf-color-text-secondary);
-  font-size: 12px;
-  list-style: none;
-}
-
-.interview-feedback__roles li,
-.interview-feedback__focus li {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.interview-feedback__roles li :deep(svg) {
-  color: var(--cf-color-primary);
-  font-size: 16px;
-}
-
-.interview-feedback__focus li :deep(svg) {
-  color: var(--cf-color-success);
-}
-
-.trust-section {
-  padding: 72px 0;
-  border-block: 1px solid #f4ead5;
-  background: var(--cf-color-background-warm);
-}
-
-.trust-section__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(400px, 0.9fr);
-  align-items: center;
-  gap: 80px;
-}
-
-.trust-section .section-eyebrow,
-.faq-section .section-eyebrow,
-.final-cta .section-eyebrow {
-  margin-bottom: var(--cf-space-4);
-}
-
-.trust-section ul {
-  display: grid;
-  gap: var(--cf-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.trust-section li {
-  display: grid;
-  grid-template-columns: 42px 1fr;
-  align-items: center;
-  gap: var(--cf-space-4);
-  padding: 16px 18px;
-  border: 1px solid #ece5d7;
-  border-radius: 10px;
-  background: #fff;
-  color: var(--cf-color-text-secondary);
-}
-
-.trust-section li > :deep(svg) {
-  color: var(--cf-color-primary);
+  font-family: var(--ssm-font-serif);
   font-size: 26px;
+  font-weight: 600;
 }
 
-.trust-section li span {
+.home-mode-entry > div {
   display: grid;
-  gap: 2px;
+  gap: 6px;
+  padding-left: 28px;
+  border-left: 1px solid var(--ssm-color-line);
 }
 
-.trust-section li strong {
-  color: #1e293b;
+.home-mode-entry strong {
+  font-size: 16px;
+  font-weight: 550;
 }
 
-.faq-section__grid {
+.home-mode-entry span {
+  color: var(--ssm-color-text-secondary);
+  font-size: 13px;
+}
+
+.home-section {
+  padding: 118px 0;
+}
+
+.home-section + .home-section {
+  border-top: 1px solid var(--ssm-color-line);
+}
+
+.home-section__heading {
+  max-width: 680px;
+}
+
+.home-section__heading h2 {
+  font-size: clamp(40px, 4.5vw, 64px);
+  line-height: 1.2;
+}
+
+.home-section__heading > span {
+  display: block;
+  margin-top: 24px;
+  color: var(--ssm-color-text-secondary);
+  font-size: 17px;
+  line-height: 1.8;
+}
+
+.home-process__list {
   display: grid;
-  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.3fr);
-  gap: 80px;
+  margin: 66px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--ssm-color-line);
+  list-style: none;
 }
 
-.faq-list {
-  border-top: 1px solid #dfe5ef;
+.home-process__list li {
+  display: grid;
+  grid-template-columns: 90px minmax(220px, 0.65fr) minmax(0, 1fr);
+  gap: 30px;
+  align-items: baseline;
+  padding: 28px 0;
+  border-bottom: 1px solid var(--ssm-color-line);
 }
 
-.faq-list details {
-  border-bottom: 1px solid #dfe5ef;
+.home-process__list li > span {
+  color: var(--ssm-color-brand);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
 }
 
-.faq-list summary {
-  padding: 22px 4px;
-  color: #18223f;
-  cursor: pointer;
-  font-weight: 700;
+.home-process__list h3,
+.home-process__list p {
+  margin: 0;
 }
 
-.faq-list p {
-  margin: -6px 0 22px;
-  padding-right: 28px;
-  color: var(--cf-color-text-muted);
-  line-height: 1.75;
+.home-process__list h3 {
+  font-size: 22px;
 }
 
-.final-cta {
-  padding: 64px 0;
-  border-top: 1px solid #f2e7d4;
-  background: #fffaf0;
+.home-process__list p {
+  color: var(--ssm-color-text-secondary);
+  line-height: 1.8;
 }
 
-.final-cta__inner {
+.home-report {
+  background: var(--ssm-color-surface);
+}
+
+.home-report__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(520px, 1.18fr);
+  align-items: center;
+  gap: clamp(60px, 8vw, 120px);
+}
+
+.report-preview {
+  border: 1px solid var(--ssm-color-line);
+  background: var(--ssm-color-paper);
+}
+
+.report-preview > header,
+.report-preview > section {
+  padding: 24px 28px;
+}
+
+.report-preview > header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 48px;
+  border-bottom: 1px solid var(--ssm-color-line);
 }
 
-.final-cta h2 {
-  max-width: 720px;
-  font-size: clamp(28px, 2.6vw, 38px);
+.report-preview > header p,
+.report-preview section p,
+.report-preview section h3 {
+  margin: 0;
 }
 
-.final-cta__actions {
-  flex: 0 0 auto;
-  margin-top: 0;
+.report-preview > header p {
+  font-family: var(--ssm-font-serif);
+  font-size: 22px;
+  font-weight: 600;
 }
 
-@media (max-width: 1023px) {
-  .capability-grid {
+.report-preview > header span,
+.report-preview small {
+  color: var(--ssm-color-text-secondary);
+  font-size: 12px;
+}
+
+.report-preview section h3 {
+  margin-top: 12px;
+  font-size: 22px;
+}
+
+.report-preview section p {
+  margin-top: 10px;
+  color: var(--ssm-color-text-secondary);
+  line-height: 1.75;
+}
+
+.report-preview__columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-top: 1px solid var(--ssm-color-line);
+}
+
+.report-preview__columns > div {
+  padding-right: 24px;
+}
+
+.report-preview__columns > div + div {
+  padding-left: 24px;
+  border-left: 1px solid var(--ssm-color-line);
+}
+
+.home-comparison__table {
+  margin-top: 66px;
+  border-top: 1px solid var(--ssm-color-line);
+}
+
+.home-comparison__row {
+  display: grid;
+  grid-template-columns: 180px 1fr 1fr;
+  border-bottom: 1px solid var(--ssm-color-line);
+}
+
+.home-comparison__row > * {
+  margin: 0;
+  padding: 22px 24px;
+}
+
+.home-comparison__row > * + * {
+  border-left: 1px solid var(--ssm-color-line);
+}
+
+.home-comparison__row > span,
+.home-comparison__row p {
+  color: var(--ssm-color-text-secondary);
+}
+
+.home-comparison__row--head {
+  background: var(--ssm-color-surface);
+}
+
+.home-faq__grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.7fr) minmax(0, 1.3fr);
+  gap: clamp(70px, 10vw, 150px);
+}
+
+.home-faq__list {
+  border-top: 1px solid var(--ssm-color-line);
+}
+
+.home-faq details {
+  border-bottom: 1px solid var(--ssm-color-line);
+}
+
+.home-faq summary {
+  padding: 24px 4px;
+  cursor: pointer;
+  font-size: 17px;
+  font-weight: 550;
+}
+
+.home-faq details p {
+  margin: -4px 4px 24px;
+  color: var(--ssm-color-text-secondary);
+  line-height: 1.8;
+}
+
+@media (max-width: 1120px) {
+  .home-hero__grid {
     grid-template-columns: 1fr;
   }
 
-  .capability-card {
-    min-height: 0;
+  .home-hero__copy {
+    max-width: 700px;
   }
 
-  .growth-path {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 32px 16px;
-  }
-
-  .growth-step:last-child {
-    grid-column: 1 / -1;
-  }
-
-  .growth-step::after {
-    display: none;
-  }
-
-  .interview-preview__content {
+  .home-report__grid {
     grid-template-columns: 1fr;
-  }
-
-  .interview-feedback {
-    border-top: 1px solid #e9edf5;
-    border-left: 0;
-  }
-
-  .trust-section__grid,
-  .faq-section__grid {
-    grid-template-columns: 1fr;
-    gap: 40px;
-  }
-
-  .final-cta__inner {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .final-cta__actions {
-    justify-content: flex-start;
   }
 }
 
-@media (max-width: 767px) {
-  .hero-section__inner {
+@media (max-width: 760px) {
+  .home-hero {
+    padding-top: 64px;
+  }
+
+  .home-hero__grid {
     min-height: auto;
-    padding-block: 64px 56px;
   }
 
-  .hero-section h1 {
-    font-size: 38px;
+  .home-hero h1 {
+    font-size: clamp(50px, 15vw, 68px);
   }
 
-  .hero-section__lead {
-    font-size: 17px;
+  .interview-preview {
+    grid-template-columns: 1fr;
+    min-height: auto;
   }
 
-  .section-block {
-    padding: 68px 0;
-  }
-
-  .section-heading {
-    align-items: flex-start;
-    margin-bottom: 36px;
-    text-align: left;
-  }
-
-  .section-heading h2,
-  .trust-section h2,
-  .faq-section h2,
-  .final-cta h2 {
-    font-size: 30px;
-  }
-
-  .capability-card {
-    padding: 22px;
-  }
-
-  .convergence-line {
-    align-items: stretch;
-    flex-direction: column;
-    gap: var(--cf-space-3);
-  }
-
-  .convergence-line span {
-    padding: 14px 16px;
-    border: 1px solid #e1e7f2;
-    border-radius: 9px;
-  }
-
-  .convergence-line__arrow {
+  .interview-preview__rail {
     display: none;
   }
 
-  .growth-path {
-    grid-template-columns: 1fr;
-    padding: 28px 18px;
-  }
-
-  .growth-step:last-child {
-    grid-column: auto;
-  }
-
-  .growth-step p {
-    min-height: 0;
-  }
-
-  .growth-section__loop {
-    align-items: flex-start;
-    text-align: left;
-  }
-
-  .interview-tabs {
-    grid-template-columns: 1fr;
-  }
-
-  .interview-preview__header {
-    align-items: flex-start;
-    flex-direction: column;
-    padding-block: 16px;
-  }
-
-  .interview-conversation,
-  .interview-feedback {
+  .interview-preview__body {
     padding: 20px;
   }
 
-  .interview-conversation__question,
-  .interview-conversation__answer {
-    max-width: 100%;
+  .interview-preview__topbar {
+    align-items: flex-start;
+    gap: 14px;
   }
 
-  .trust-section {
-    padding: 58px 0;
+  .interview-preview__topbar > div {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
   }
 
-  .final-cta__actions,
-  .hero-section__actions {
-    width: 100%;
-    flex-direction: column;
+  .interview-preview__progress {
+    display: none;
   }
 
-  .cf-action {
-    width: 100%;
-  }
-}
-
-@media (max-width: 479px) {
-  .hero-section h1 {
-    font-size: 34px;
+  .interview-preview__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
-  .section-eyebrow {
-    padding-inline: 12px;
-    font-size: 13px;
+  .interview-preview__actions .interview-preview__submit {
+    grid-column: 1 / -1;
   }
 
-  .interview-feedback__steps {
-    grid-template-columns: repeat(2, 1fr);
+  .home-modes {
+    grid-template-columns: 1fr;
   }
 
-  .trust-section li {
-    grid-template-columns: 34px 1fr;
-    padding: 14px;
+  .home-mode-entry:first-child {
+    border-right: 0;
+    border-bottom: 1px solid var(--ssm-color-line);
+  }
+
+  .home-mode-entry {
+    grid-template-columns: 1fr auto;
+    gap: 14px;
+    padding-inline: 4px;
+  }
+
+  .home-mode-entry > div {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding: 0;
+    border: 0;
+  }
+
+  .home-section {
+    padding: 84px 0;
+  }
+
+  .home-process__list li {
+    grid-template-columns: 50px 1fr;
+    gap: 18px;
+  }
+
+  .home-process__list p {
+    grid-column: 2;
+  }
+
+  .report-preview__columns {
+    grid-template-columns: 1fr;
+  }
+
+  .report-preview__columns > div + div {
+    margin-top: 20px;
+    padding: 20px 0 0;
+    border-top: 1px solid var(--ssm-color-line);
+    border-left: 0;
+  }
+
+  .home-comparison__table {
+    overflow-x: auto;
+  }
+
+  .home-comparison__row {
+    min-width: 620px;
+  }
+
+  .home-faq__grid {
+    grid-template-columns: 1fr;
+    gap: 48px;
   }
 }
 </style>

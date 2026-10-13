@@ -1,5 +1,6 @@
 package com.leo.careerforgeai.interviewflow.application.session;
 
+import com.leo.careerforgeai.auth.application.port.AuthLogoutHandler;
 import com.leo.careerforgeai.interviewflow.application.port.InterviewActivityLease;
 import com.leo.careerforgeai.interviewflow.application.port.InterviewQuestionRepository;
 import com.leo.careerforgeai.interviewflow.application.port.InterviewSessionRepository;
@@ -39,7 +40,7 @@ import java.util.UUID;
         name = "enabled",
         havingValue = "true"
 )
-public class InterviewTimerApplicationService {
+public class InterviewTimerApplicationService implements AuthLogoutHandler {
 
     private static final InterviewStateMachine STATE_MACHINE =
             new InterviewStateMachine(new QuickInterviewPolicy());
@@ -237,6 +238,31 @@ public class InterviewTimerApplicationService {
                 paused,
                 aggregate.session().version()
         );
+    }
+
+    @Override
+    @Transactional
+    public void beforeTokenRevocation(ActorId ownerId) {
+        Objects.requireNonNull(ownerId, "ownerId不能为null");
+        Optional<InterviewAggregate> current = sessionRepository
+                .findInProgress(ownerId)
+                .flatMap(session -> sessionRepository.findById(
+                        ownerId,
+                        session.interviewId()
+                ));
+        if (current.isEmpty()) {
+            return;
+        }
+        InterviewAggregate aggregate = current.get();
+        if (aggregate.session().stage() != SessionStage.INTERVIEWING) {
+            return;
+        }
+        if (aggregate.timer().state() != TimerState.RUNNING) {
+            revokeQuietly(ownerId, aggregate.session().interviewId());
+            return;
+        }
+        settleAndPause(ownerId, aggregate, clock.instant());
+        revokeQuietly(ownerId, aggregate.session().interviewId());
     }
 
     private InterviewAggregate settleAndPause(

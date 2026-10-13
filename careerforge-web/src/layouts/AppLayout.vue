@@ -1,14 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
-  BookOutlined,
-  BulbOutlined,
-  DatabaseOutlined,
-  FileDoneOutlined,
-  HomeOutlined,
+  DownOutlined,
+  HistoryOutlined,
+  LogoutOutlined,
   MenuOutlined,
-  MessageOutlined,
-  ReadOutlined,
   RobotOutlined,
   UserOutlined,
 } from '@ant-design/icons-vue'
@@ -16,31 +12,32 @@ import { Avatar, Button, Drawer } from 'ant-design-vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 
 import BrandLogo from '@/components/brand/BrandLogo.vue'
+import { useAuthStore } from '@/features/auth/store/auth-store'
+import { useInterviewFlowStore } from '@/features/interview/store/interview-flow-store'
 import { ROUTE_PATHS } from '@/router/paths'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
+const interviewStore = useInterviewFlowStore()
 const mobileNavigationOpen = ref(false)
+const loggingOut = ref(false)
+const immersive = computed(() => route.meta.immersive === true)
+const HEARTBEAT_INTERVAL_MS = 10_000
+let heartbeatTimer: number | undefined
 
 const navigation = [
-  { label: '成长总览', to: ROUTE_PATHS.app, routeName: 'dashboard', icon: HomeOutlined },
-  { label: '目标岗位', to: ROUTE_PATHS.targetRole, routeName: 'target-role', icon: ReadOutlined },
-  { label: '能力差距', to: ROUTE_PATHS.skillGaps, routeName: 'skill-gaps', icon: BulbOutlined },
-  {
-    label: '训练计划',
-    to: ROUTE_PATHS.trainingPlans,
-    routeName: 'training-plans',
-    icon: FileDoneOutlined,
-  },
-  { label: 'Career Coach', to: ROUTE_PATHS.coach, routeName: 'coach', icon: MessageOutlined },
-  { label: '知识问答', to: ROUTE_PATHS.knowledge, routeName: 'knowledge', icon: BookOutlined },
-  { label: '长期记忆', to: ROUTE_PATHS.memories, routeName: 'memories', icon: DatabaseOutlined },
-  { label: '个人证据', to: ROUTE_PATHS.evidence, routeName: 'evidence', icon: UserOutlined },
   { label: '开始面试', to: ROUTE_PATHS.interviews, routeName: 'interviews', icon: RobotOutlined },
-  { label: '面试记录', to: ROUTE_PATHS.interviewRecords, routeName: 'interview-records', icon: RobotOutlined },
+  {
+    label: '面试记录',
+    to: ROUTE_PATHS.interviewRecords,
+    routeName: 'interview-records',
+    icon: HistoryOutlined,
+  },
 ] as const
 
-const pageTitle = computed(() => String(route.meta.title ?? '成长工作台'))
+const pageTitle = computed(() => String(route.meta.title ?? '面试中心'))
+const accountName = computed(() => authStore.currentUser?.displayName || '当前账户')
 
 function isActive(path: string) {
   if (path === ROUTE_PATHS.app) {
@@ -54,14 +51,67 @@ function closeMobileNavigation() {
   mobileNavigationOpen.value = false
 }
 
+async function logout() {
+  loggingOut.value = true
+  try {
+    try {
+      await interviewStore.pauseActiveBeforeLogout()
+    } catch {
+      // Redis活动租约仍会在退出后将运行中的面试安全收敛为暂停。
+    }
+    await authStore.logout()
+  } catch {
+    // 即使服务端退出暂时失败，本地会话也已由 auth store 清除。
+  } finally {
+    loggingOut.value = false
+    await router.replace(ROUTE_PATHS.login)
+  }
+}
+
 function isRouteAvailable(routeName: string) {
   return router.hasRoute(routeName)
 }
+
+function synchronizeHeartbeat() {
+  window.clearInterval(heartbeatTimer)
+  heartbeatTimer = undefined
+  if (
+    interviewStore.session?.stage !== 'INTERVIEWING' ||
+    interviewStore.timer?.timerState !== 'RUNNING' ||
+    interviewStore.waiting
+  ) {
+    return
+  }
+  heartbeatTimer = window.setInterval(() => {
+    void interviewStore.heartbeat().catch(() => undefined)
+  }, HEARTBEAT_INTERVAL_MS)
+}
+
+function pauseForPageExit() {
+  interviewStore.pauseForPageExit()
+}
+
+const stopHeartbeatWatch = watch(
+  () => [
+    interviewStore.session?.stage,
+    interviewStore.timer?.timerState,
+    interviewStore.waiting,
+  ],
+  synchronizeHeartbeat,
+  { immediate: true },
+)
+
+onMounted(() => window.addEventListener('pagehide', pauseForPageExit))
+onBeforeUnmount(() => {
+  window.removeEventListener('pagehide', pauseForPageExit)
+  window.clearInterval(heartbeatTimer)
+  stopHeartbeatWatch()
+})
 </script>
 
 <template>
-  <div class="app-layout">
-    <aside class="app-sidebar" aria-label="工作台导航">
+  <div class="app-layout" :class="{ 'app-layout--immersive': immersive }">
+    <aside v-if="!immersive" class="app-sidebar" aria-label="面试中心导航">
       <div class="app-sidebar__brand">
         <BrandLogo />
       </div>
@@ -89,22 +139,45 @@ function isRouteAvailable(routeName: string) {
     </aside>
 
     <div class="app-layout__body">
-      <header class="app-header">
+      <header v-if="!immersive" class="app-header">
         <Button
           class="app-header__menu-button"
           type="text"
-          aria-label="打开工作台导航"
+          aria-label="打开面试中心导航"
           @click="mobileNavigationOpen = true"
         >
           <MenuOutlined />
         </Button>
         <h1 class="app-header__title">{{ pageTitle }}</h1>
-        <Avatar class="app-header__avatar" aria-label="当前账户">
-          <template #icon><UserOutlined /></template>
-        </Avatar>
+        <details class="app-account-menu">
+          <summary aria-label="打开账户菜单">
+            <Avatar class="app-header__avatar" :aria-label="accountName">
+              <template #icon><UserOutlined /></template>
+            </Avatar>
+            <span class="app-header__account-name">{{ accountName }}</span>
+            <DownOutlined class="app-account-menu__chevron" aria-hidden="true" />
+          </summary>
+          <div class="app-account-menu__panel">
+            <div class="app-account-menu__identity">
+              <strong>{{ accountName }}</strong>
+              <span>{{ authStore.currentUser?.email || '已登录账户' }}</span>
+            </div>
+            <Button
+              type="text"
+              danger
+              block
+              aria-label="退出登录"
+              :loading="loggingOut"
+              @click="logout"
+            >
+              <LogoutOutlined />
+              退出登录
+            </Button>
+          </div>
+        </details>
       </header>
 
-      <main class="app-content">
+      <main class="app-content" :class="{ 'app-content--immersive': immersive }">
         <slot>
           <RouterView />
         </slot>
@@ -112,17 +185,18 @@ function isRouteAvailable(routeName: string) {
     </div>
 
     <Drawer
+      v-if="!immersive"
       v-model:open="mobileNavigationOpen"
       placement="left"
       :width="280"
       :closable="false"
       :body-style="{ padding: 0 }"
-      title="工作台导航"
+      title="面试中心导航"
     >
       <div class="app-drawer__brand">
         <BrandLogo />
       </div>
-      <nav class="app-navigation" aria-label="移动端工作台导航">
+      <nav class="app-navigation" aria-label="移动端面试中心导航">
         <template v-for="item in navigation" :key="item.to">
           <RouterLink
             v-if="isRouteAvailable(item.routeName)"
@@ -154,6 +228,10 @@ function isRouteAvailable(routeName: string) {
   min-height: 100vh;
   grid-template-columns: var(--cf-app-sidebar-width) minmax(0, 1fr);
   background: var(--cf-color-background);
+}
+
+.app-layout--immersive {
+  display: block;
 }
 
 .app-sidebar {
@@ -195,7 +273,7 @@ function isRouteAvailable(routeName: string) {
 }
 
 .app-navigation__item:hover {
-  background: #f8fafc;
+  background: var(--ssm-color-brand-soft);
   color: var(--cf-color-primary);
 }
 
@@ -206,8 +284,9 @@ function isRouteAvailable(routeName: string) {
 }
 
 .app-navigation__item--disabled {
-  color: #a8b1c1;
+  color: var(--ssm-color-text-muted);
   cursor: not-allowed;
+  opacity: 0.58;
 }
 
 .app-layout__body {
@@ -224,8 +303,7 @@ function isRouteAvailable(routeName: string) {
   gap: var(--cf-space-3);
   padding: 0 var(--cf-space-8);
   border-bottom: 1px solid var(--cf-color-border);
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(12px);
+  background: var(--ssm-color-surface);
 }
 
 .app-header__title {
@@ -241,6 +319,88 @@ function isRouteAvailable(routeName: string) {
   color: var(--cf-color-primary);
 }
 
+.app-header__account-name {
+  max-width: 180px;
+  overflow: hidden;
+  color: var(--cf-color-text-secondary);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-account-menu {
+  position: relative;
+}
+
+.app-account-menu > summary {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: var(--cf-space-2);
+  padding: 4px 8px;
+  border-radius: var(--ssm-radius-control);
+  cursor: pointer;
+  list-style: none;
+  transition: background var(--ssm-motion-fast) ease;
+}
+
+.app-account-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.app-account-menu > summary:hover,
+.app-account-menu[open] > summary {
+  background: var(--ssm-color-brand-soft);
+}
+
+.app-account-menu > summary:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ssm-color-brand) 30%, transparent);
+  outline-offset: 2px;
+}
+
+.app-account-menu__chevron {
+  color: var(--ssm-color-text-secondary);
+  font-size: 11px;
+  transition: transform var(--ssm-motion-fast) ease;
+}
+
+.app-account-menu[open] .app-account-menu__chevron {
+  transform: rotate(180deg);
+}
+
+.app-account-menu__panel {
+  position: absolute;
+  z-index: 110;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 260px;
+  padding: 10px;
+  border: 1px solid var(--ssm-color-line);
+  border-radius: var(--ssm-radius-card);
+  background: var(--ssm-color-surface);
+  box-shadow: var(--ssm-shadow-panel);
+}
+
+.app-account-menu__identity {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px 14px;
+  border-bottom: 1px solid var(--ssm-color-line);
+  margin-bottom: 6px;
+}
+
+.app-account-menu__identity strong,
+.app-account-menu__identity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-account-menu__identity span {
+  color: var(--ssm-color-text-secondary);
+  font-size: 13px;
+}
+
 .app-header__menu-button {
   display: none;
 }
@@ -250,6 +410,13 @@ function isRouteAvailable(routeName: string) {
   min-height: calc(100vh - var(--cf-app-header-height));
   margin-inline: auto;
   padding: var(--cf-space-8) 0 var(--cf-space-12);
+}
+
+.app-content--immersive {
+  width: 100%;
+  min-height: 100vh;
+  padding: var(--cf-space-6)
+    max(var(--cf-space-6), calc((100vw - var(--cf-content-width)) / 2));
 }
 
 @media (max-width: 1023px) {
@@ -274,6 +441,15 @@ function isRouteAvailable(routeName: string) {
   .app-content {
     width: min(calc(100% - 32px), var(--cf-content-width));
     padding-top: var(--cf-space-6);
+  }
+
+  .app-content--immersive {
+    width: 100%;
+    padding: var(--cf-space-4);
+  }
+
+  .app-header__account-name {
+    display: none;
   }
 }
 </style>

@@ -2,6 +2,7 @@ package com.leo.careerforgeai.auth.application;
 
 import com.leo.careerforgeai.auth.application.AuthTokenService.IssuedAccessToken;
 import com.leo.careerforgeai.auth.application.AuthTokenService.IssuedRefreshToken;
+import com.leo.careerforgeai.auth.application.port.AuthLogoutHandler;
 import com.leo.careerforgeai.auth.application.port.AuthRepository;
 import com.leo.careerforgeai.auth.domain.RefreshToken;
 import com.leo.careerforgeai.auth.domain.UserAccount;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -48,6 +51,7 @@ class AuthApplicationServiceTest {
     @Mock private AuthTokenService tokenService;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private CurrentActorProvider currentActorProvider;
+    @Mock private AuthLogoutHandler logoutHandler;
 
     private AuthApplicationService service;
 
@@ -55,7 +59,8 @@ class AuthApplicationServiceTest {
     void setUp() {
         when(passwordEncoder.encode(anyString())).thenReturn(PASSWORD_HASH);
         service = new AuthApplicationService(repository, tokenService, passwordEncoder,
-                currentActorProvider, Clock.fixed(NOW, ZoneOffset.UTC));
+                currentActorProvider, Clock.fixed(NOW, ZoneOffset.UTC),
+                List.of(logoutHandler));
     }
 
     /**
@@ -195,8 +200,35 @@ class AuthApplicationServiceTest {
 
         service.logout("owned-refresh");
 
-        verify(repository).revokeActiveToken(USER_ID, HASH_A, NOW);
+        InOrder logoutOrder = inOrder(logoutHandler, repository);
+        logoutOrder.verify(logoutHandler).beforeTokenRevocation(USER_ID);
+        logoutOrder.verify(repository).revokeActiveToken(USER_ID, HASH_A, NOW);
         verifyNoInteractions(currentActorProvider);
+    }
+
+    @Test
+    void shouldStillRevokeRefreshTokenWhenInterviewPauseFails() {
+        RefreshToken token = activeToken(TOKEN_ID, null, HASH_A);
+        when(tokenService.hashRefreshToken("owned-refresh")).thenReturn(HASH_A);
+        when(repository.findRefreshTokenByHash(HASH_A)).thenReturn(Optional.of(token));
+        doThrow(new IllegalStateException("interview storage unavailable"))
+                .when(logoutHandler).beforeTokenRevocation(USER_ID);
+
+        service.logout("owned-refresh");
+
+        verify(repository).revokeActiveToken(USER_ID, HASH_A, NOW);
+    }
+
+    @Test
+    void shouldNotPauseInterviewForAPreviouslyRotatedRefreshToken() {
+        RefreshToken rotated = activeToken(TOKEN_ID, null, HASH_A).rotate(NOW);
+        when(tokenService.hashRefreshToken("rotated-refresh")).thenReturn(HASH_A);
+        when(repository.findRefreshTokenByHash(HASH_A)).thenReturn(Optional.of(rotated));
+
+        service.logout("rotated-refresh");
+
+        verifyNoInteractions(logoutHandler);
+        verify(repository).revokeActiveToken(USER_ID, HASH_A, NOW);
     }
 
     /**
@@ -231,6 +263,7 @@ class AuthApplicationServiceTest {
         service.logout("unknown-refresh");
 
         verify(repository, never()).revokeActiveToken(any(), anyString(), any());
+        verifyNoInteractions(logoutHandler);
         verifyNoInteractions(currentActorProvider);
     }
 

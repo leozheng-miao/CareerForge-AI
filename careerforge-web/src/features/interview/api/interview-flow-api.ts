@@ -1,5 +1,6 @@
 import { httpClient } from '@/shared/api/http'
 import { ApiError } from '@/shared/api/errors'
+import { getAccessToken } from '@/shared/api/session-bridge'
 
 export type InterviewStage =
   | 'PREPARING' | 'READY' | 'INTERVIEWING' | 'GENERATING_REPORT' | 'COMPLETED' | 'FAILED'
@@ -54,6 +55,22 @@ export async function enterInterview(value: InterviewSession) { return post<Inte
 export async function getCurrentQuestion(id: string) { return get<CurrentQuestion>(`${path(id)}/question`) }
 export async function heartbeat(id: string) { return post<TimerStatus>(`${path(id)}/heartbeat`) }
 export async function pauseInterview(id: string, expectedVersion: number) { return post<TimerStatus>(`${path(id)}/pause`, { expectedVersion }) }
+export function pauseInterviewOnPageExit(id: string, expectedVersion: number) {
+  const accessToken = getAccessToken()
+  if (!accessToken) return
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL?.trim() || '').replace(/\/$/, '')
+  void fetch(`${apiBaseUrl}${path(id)}/pause`, {
+    method: 'POST',
+    keepalive: true,
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ expectedVersion }),
+  }).catch(() => undefined)
+}
 export async function resumeInterview(id: string, expectedVersion: number) { return post<TimerStatus>(`${path(id)}/resume`, { expectedVersion }) }
 export async function saveDraft(id: string, question: CurrentQuestion, content: string) { return put<{ version: number }>(`${path(id)}/questions/${question.questionId}/draft`, { content, expectedVersion: question.answerVersion < 0 ? 0 : question.answerVersion }) }
 export async function submitAnswer(id: string, question: CurrentQuestion, content: string) { return post<SubmissionResult>(`${path(id)}/questions/${question.questionId}/submit`, { requestId: freshRequestId(), content, expectedVersion: question.answerVersion < 0 ? 0 : question.answerVersion }) }

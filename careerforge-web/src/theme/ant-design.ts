@@ -1,29 +1,29 @@
 import type { ConfigProviderProps } from 'ant-design-vue'
 
-export const careerForgeTheme: ConfigProviderProps['theme'] = {
+export const shuishuiMianTheme: ConfigProviderProps['theme'] = {
   token: {
-    colorPrimary: '#4f46e5',
-    colorPrimaryHover: '#4338ca',
-    colorInfo: '#4f46e5',
-    colorSuccess: '#16a34a',
-    colorWarning: '#d97706',
-    colorError: '#dc2626',
-    colorText: '#0f172a',
-    colorTextSecondary: '#475569',
-    colorBgBase: '#f8fafc',
-    colorBgContainer: '#ffffff',
-    colorBorder: '#e2e8f0',
+    colorPrimary: '#2f78aa',
+    colorPrimaryHover: '#27668f',
+    colorInfo: '#2f78aa',
+    colorSuccess: '#287a55',
+    colorWarning: '#b87925',
+    colorError: '#b33a3a',
+    colorText: '#171a1c',
+    colorTextSecondary: '#5d6267',
+    colorBgBase: '#f7f5f0',
+    colorBgContainer: '#fcfbf8',
+    colorBorder: '#d8d5ce',
     borderRadius: 8,
     borderRadiusLG: 12,
     controlHeight: 40,
     fontFamily:
-      'Inter, "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      '"PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     fontSize: 14,
     fontWeightStrong: 600,
-    boxShadowSecondary: '0 12px 32px rgba(15, 23, 42, 0.08)',
-    motionDurationFast: '0.15s',
-    motionDurationMid: '0.2s',
-    motionDurationSlow: '0.24s',
+    boxShadowSecondary: '0 12px 32px rgba(23, 26, 28, 0.07)',
+    motionDurationFast: '0.12s',
+    motionDurationMid: '0.16s',
+    motionDurationSlow: '0.2s',
   },
   components: {
     Button: {

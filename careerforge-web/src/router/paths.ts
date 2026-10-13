@@ -2,6 +2,8 @@ export const ROUTE_PATHS = {
   home: '/',
   login: '/login',
   register: '/register',
+  terms: '/terms',
+  privacy: '/privacy',
   app: '/app',
   targetRole: '/app/target-role',
   skillGaps: '/app/skill-gaps',

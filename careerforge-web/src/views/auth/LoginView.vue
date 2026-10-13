@@ -48,7 +48,7 @@ function resolveRedirect(value: unknown) {
   if (typeof value === 'string' && value.startsWith('/app') && !value.startsWith('//')) {
     return value
   }
-  return ROUTE_PATHS.app
+  return ROUTE_PATHS.interviews
 }
 </script>
 
@@ -56,8 +56,8 @@ function resolveRedirect(value: unknown) {
   <AuthPanel
     id="login"
     eyebrow="欢迎回来"
-    title="登录 CareerForge-AI"
-    description="继续你的岗位诊断、训练计划和模拟面试。"
+    title="登录水水面"
+    description="继续未完成的面试，或查看已经生成的正式报告。"
   >
     <Alert v-if="errorMessage" class="auth-alert" type="error" show-icon :message="errorMessage" />
     <Alert
@@ -91,14 +91,18 @@ function resolveRedirect(value: unknown) {
       />
 
       <Button type="primary" html-type="submit" size="large" block :loading="submitting">
-        登录并继续
+        登录
       </Button>
     </form>
 
     <p class="auth-switch">
       还没有账号？<RouterLink :to="ROUTE_PATHS.register">免费注册</RouterLink>
     </p>
-    <p class="auth-security">Access Token 仅保存在当前页面内存中，不写入浏览器存储。</p>
+    <p class="auth-security">登录状态只用于识别你的账户和恢复面试进度。</p>
+    <p class="auth-legal">
+      继续即表示你同意<RouterLink :to="ROUTE_PATHS.terms">用户协议</RouterLink>和
+      <RouterLink :to="ROUTE_PATHS.privacy">隐私政策</RouterLink>。
+    </p>
   </AuthPanel>
 </template>
 

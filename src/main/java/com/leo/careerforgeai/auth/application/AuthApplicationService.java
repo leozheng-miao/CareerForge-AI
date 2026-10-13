@@ -2,11 +2,13 @@ package com.leo.careerforgeai.auth.application;
 
 import com.leo.careerforgeai.auth.application.AuthTokenService.IssuedAccessToken;
 import com.leo.careerforgeai.auth.application.AuthTokenService.IssuedRefreshToken;
+import com.leo.careerforgeai.auth.application.port.AuthLogoutHandler;
 import com.leo.careerforgeai.auth.application.port.AuthRepository;
 import com.leo.careerforgeai.auth.domain.RefreshToken;
 import com.leo.careerforgeai.auth.domain.UserAccount;
 import com.leo.careerforgeai.shared.actor.ActorId;
 import com.leo.careerforgeai.shared.actor.CurrentActorProvider;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -25,6 +28,7 @@ import java.util.UUID;
  * @author: Miao Zheng
  * @date: 2026-09-02
  **/
+@Slf4j
 @Service
 @ConditionalOnProperty(prefix = "careerforge.auth", name = "enabled", havingValue = "true")
 public class AuthApplicationService {
@@ -34,6 +38,7 @@ public class AuthApplicationService {
     private final PasswordEncoder passwordEncoder;
     private final CurrentActorProvider currentActorProvider;
     private final Clock clock;
+    private final List<AuthLogoutHandler> logoutHandlers;
     private final String dummyPasswordHash;
 
     public AuthApplicationService(
@@ -41,13 +46,18 @@ public class AuthApplicationService {
             AuthTokenService tokenService,
             PasswordEncoder passwordEncoder,
             CurrentActorProvider currentActorProvider,
-            Clock clock
+            Clock clock,
+            List<AuthLogoutHandler> logoutHandlers
     ) {
         this.repository = Objects.requireNonNull(repository, "repository不能为空");
         this.tokenService = Objects.requireNonNull(tokenService, "tokenService不能为空");
         this.passwordEncoder = Objects.requireNonNull(passwordEncoder, "passwordEncoder不能为空");
         this.currentActorProvider = Objects.requireNonNull(currentActorProvider, "currentActorProvider不能为空");
         this.clock = Objects.requireNonNull(clock, "clock不能为空");
+        this.logoutHandlers = List.copyOf(Objects.requireNonNull(
+                logoutHandlers,
+                "logoutHandlers不能为null"
+        ));
         this.dummyPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
@@ -162,8 +172,32 @@ public class AuthApplicationService {
         } catch (IllegalArgumentException exception) {
             return;
         }
-        repository.findRefreshTokenByHash(tokenHash).ifPresent(token ->
-                repository.revokeActiveToken(token.userId(), tokenHash, clock.instant()));
+        repository.findRefreshTokenByHash(tokenHash).ifPresent(token -> {
+            Instant now = clock.instant();
+            if (token.status() == RefreshToken.Status.ACTIVE
+                    && !token.expiredAt(now)) {
+                runLogoutHandlers(token.userId());
+            }
+            repository.revokeActiveToken(
+                    token.userId(),
+                    tokenHash,
+                    now
+            );
+        });
+    }
+
+    private void runLogoutHandlers(ActorId userId) {
+        for (AuthLogoutHandler handler : logoutHandlers) {
+            try {
+                handler.beforeTokenRevocation(userId);
+            } catch (RuntimeException exception) {
+                log.warn(
+                        "退出登录业务清理失败，继续撤销登录凭证，userId={}",
+                        userId.value(),
+                        exception
+                );
+            }
+        }
     }
 
     public CurrentUser me() {

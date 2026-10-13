@@ -2,12 +2,12 @@
 import { App as AntApplication, ConfigProvider } from 'ant-design-vue'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 
-import { careerForgeTheme } from '@/theme/ant-design'
+import { shuishuiMianTheme } from '@/theme/ant-design'
 </script>
 
 <template>
-  <ConfigProvider :locale="zhCN" :theme="careerForgeTheme">
-    <AntApplication class="careerforge-app">
+  <ConfigProvider :locale="zhCN" :theme="shuishuiMianTheme">
+    <AntApplication class="shuishuimian-app">
       <RouterView />
     </AntApplication>
   </ConfigProvider>

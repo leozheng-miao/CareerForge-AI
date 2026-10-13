@@ -187,6 +187,22 @@ class PauseResumeTimeoutTest {
     }
 
     @Test
+    void shouldSettleAndPauseTheRunningInterviewBeforeLogout() {
+        InterviewAggregate running = runningInterview();
+        sessionRepository.seed(running);
+        activityLease.refresh(OWNER, INTERVIEW_ID, properties.leaseDuration());
+        clock.advance(Duration.ofSeconds(25));
+
+        service.beforeTokenRevocation(OWNER);
+
+        InterviewAggregate stored = sessionRepository.get(INTERVIEW_ID);
+        assertThat(stored.timer().state()).isEqualTo(TimerState.PAUSED);
+        assertThat(stored.timer().accumulated()).isEqualTo(Duration.ofSeconds(25));
+        assertThat(activityLease.isActive(OWNER, INTERVIEW_ID)).isFalse();
+        assertThat(sessionRepository.updateCount()).isEqualTo(1);
+    }
+
+    @Test
     void shouldSettleAnExpiredLeaseExactlyOnce() {
         InterviewAggregate running = runningInterview();
         sessionRepository.seed(running);

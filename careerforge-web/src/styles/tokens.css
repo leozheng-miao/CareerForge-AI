@@ -1,49 +1,83 @@
 :root {
   color-scheme: light;
 
-  --cf-color-primary: #4f46e5;
-  --cf-color-primary-hover: #4338ca;
-  --cf-color-primary-soft: #eef2ff;
-  --cf-color-accent: #f59e0b;
-  --cf-color-accent-hover: #d97706;
-  --cf-color-success: #16a34a;
-  --cf-color-warning: #d97706;
-  --cf-color-error: #dc2626;
+  --ssm-color-brand: #2f78aa;
+  --ssm-color-brand-hover: #27668f;
+  --ssm-color-brand-soft: #e8f1f6;
+  --ssm-color-paper: #f7f5f0;
+  --ssm-color-surface: #fcfbf8;
+  --ssm-color-ink: #171a1c;
+  --ssm-color-text-secondary: #5d6267;
+  --ssm-color-text-muted: #5d6267;
+  --ssm-color-line: #d8d5ce;
+  --ssm-color-warning: #b87925;
+  --ssm-color-success: #287a55;
+  --ssm-color-error: #b33a3a;
 
-  --cf-color-text: #0f172a;
-  --cf-color-text-secondary: #475569;
-  --cf-color-text-muted: #64748b;
-  --cf-color-border: #e2e8f0;
-  --cf-color-surface: #ffffff;
-  --cf-color-background: #f8fafc;
-  --cf-color-background-warm: #fffcf5;
+  --ssm-font-sans:
+    'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ssm-font-serif: 'Songti SC', STSong, SimSun, serif;
 
-  --cf-font-sans:
-    Inter, 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    sans-serif;
+  --ssm-space-1: 4px;
+  --ssm-space-2: 8px;
+  --ssm-space-3: 12px;
+  --ssm-space-4: 16px;
+  --ssm-space-6: 24px;
+  --ssm-space-8: 32px;
+  --ssm-space-12: 48px;
+  --ssm-space-16: 64px;
 
-  --cf-space-1: 4px;
-  --cf-space-2: 8px;
-  --cf-space-3: 12px;
-  --cf-space-4: 16px;
-  --cf-space-6: 24px;
-  --cf-space-8: 32px;
-  --cf-space-12: 48px;
-  --cf-space-16: 64px;
+  --ssm-radius-control: 8px;
+  --ssm-radius-card: 10px;
+  --ssm-radius-panel: 12px;
 
-  --cf-radius-control: 8px;
-  --cf-radius-card: 12px;
-  --cf-radius-panel: 16px;
+  --ssm-shadow-card: 0 8px 24px rgba(23, 26, 28, 0.05);
+  --ssm-shadow-panel: 0 16px 40px rgba(23, 26, 28, 0.07);
 
-  --cf-shadow-card: 0 8px 24px rgba(15, 23, 42, 0.06);
-  --cf-shadow-panel: 0 16px 40px rgba(15, 23, 42, 0.08);
+  --ssm-content-width: 1280px;
+  --ssm-public-header-height: 72px;
+  --ssm-app-header-height: 64px;
+  --ssm-app-sidebar-width: 240px;
 
-  --cf-content-width: 1200px;
-  --cf-public-header-height: 72px;
-  --cf-app-header-height: 64px;
-  --cf-app-sidebar-width: 240px;
+  --ssm-motion-fast: 120ms;
+  --ssm-motion-normal: 160ms;
+  --ssm-motion-slow: 200ms;
 
-  --cf-motion-fast: 150ms;
-  --cf-motion-normal: 200ms;
-  --cf-motion-slow: 240ms;
+  /* 分阶段产品化期间保留旧变量别名，避免未改造页面失去样式。 */
+  --cf-color-primary: var(--ssm-color-brand);
+  --cf-color-primary-hover: var(--ssm-color-brand-hover);
+  --cf-color-primary-soft: var(--ssm-color-brand-soft);
+  --cf-color-accent: var(--ssm-color-warning);
+  --cf-color-accent-hover: #9c661f;
+  --cf-color-success: var(--ssm-color-success);
+  --cf-color-warning: var(--ssm-color-warning);
+  --cf-color-error: var(--ssm-color-error);
+  --cf-color-text: var(--ssm-color-ink);
+  --cf-color-text-secondary: var(--ssm-color-text-secondary);
+  --cf-color-text-muted: var(--ssm-color-text-muted);
+  --cf-color-border: var(--ssm-color-line);
+  --cf-color-surface: var(--ssm-color-surface);
+  --cf-color-background: var(--ssm-color-paper);
+  --cf-color-background-warm: var(--ssm-color-paper);
+  --cf-font-sans: var(--ssm-font-sans);
+  --cf-space-1: var(--ssm-space-1);
+  --cf-space-2: var(--ssm-space-2);
+  --cf-space-3: var(--ssm-space-3);
+  --cf-space-4: var(--ssm-space-4);
+  --cf-space-6: var(--ssm-space-6);
+  --cf-space-8: var(--ssm-space-8);
+  --cf-space-12: var(--ssm-space-12);
+  --cf-space-16: var(--ssm-space-16);
+  --cf-radius-control: var(--ssm-radius-control);
+  --cf-radius-card: var(--ssm-radius-card);
+  --cf-radius-panel: var(--ssm-radius-panel);
+  --cf-shadow-card: var(--ssm-shadow-card);
+  --cf-shadow-panel: var(--ssm-shadow-panel);
+  --cf-content-width: var(--ssm-content-width);
+  --cf-public-header-height: var(--ssm-public-header-height);
+  --cf-app-header-height: var(--ssm-app-header-height);
+  --cf-app-sidebar-width: var(--ssm-app-sidebar-width);
+  --cf-motion-fast: var(--ssm-motion-fast);
+  --cf-motion-normal: var(--ssm-motion-normal);
+  --cf-motion-slow: var(--ssm-motion-slow);
 }

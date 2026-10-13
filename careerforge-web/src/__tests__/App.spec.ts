@@ -15,7 +15,7 @@ describe('App', () => {
       },
     })
 
-    expect(wrapper.find('.careerforge-app').exists()).toBe(true)
+    expect(wrapper.find('.shuishuimian-app').exists()).toBe(true)
     expect(wrapper.find('[data-testid="router-view"]').exists()).toBe(true)
   })
 })
